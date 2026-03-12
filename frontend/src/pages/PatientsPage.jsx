@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import axios from '../api'
 import { Search, Plus, X } from 'lucide-react'
 
 export default function PatientsPage() {

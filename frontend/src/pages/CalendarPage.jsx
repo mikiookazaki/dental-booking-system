@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import axios from '../api'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 
 const HOURS = Array.from({ length: 19 }, (_, i) => {

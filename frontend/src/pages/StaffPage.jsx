@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import axios from '../api'
 
 const ROLE_LABEL = {
   doctor:     '歯科医師',
