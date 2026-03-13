@@ -88,20 +88,24 @@ async function handleEvent(event) {
 
     case 'message': {
       if (event.message.type !== 'text') break;
-      const text    = event.message.text.trim();
-      const patient = await getPatientByLineId(lineUserId);
+      const text = event.message.text.trim();
+
+      // text= プレフィックスを除去（LINEのURLスキーム経由で付く場合がある）
+      const cleanText = text.replace(/^text=/, '');
 
       // QR連携トークンの処理
-      if (text.startsWith('token=')) {
-        await handleLineLink(replyToken, lineUserId, text.replace('token=', '').trim());
+      if (cleanText.startsWith('token=')) {
+        await handleLineLink(replyToken, lineUserId, cleanText.replace('token=', '').trim());
         break;
       }
 
-      if (text === '予約' || text === '予約する') {
+      const patient = await getPatientByLineId(lineUserId);
+
+      if (cleanText === '予約' || cleanText === '予約する') {
         await startBookingFlow(replyToken, patient);
-      } else if (text === 'キャンセル' || text === '予約キャンセル') {
+      } else if (cleanText === 'キャンセル' || cleanText === '予約キャンセル') {
         await startCancelFlow(replyToken, patient, lineUserId);
-      } else if (text === '予約確認') {
+      } else if (cleanText === '予約確認') {
         await showUpcomingAppointments(replyToken, patient);
       } else {
         await replyMessage(replyToken, [{
