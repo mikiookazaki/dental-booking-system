@@ -1,210 +1,449 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from '../api'
-import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Plus, Calendar, User } from 'lucide-react'
 
-const HOURS = Array.from({ length: 19 }, (_, i) => {
-  const h = Math.floor(i / 2) + 9
-  const m = i % 2 === 0 ? '00' : '30'
-  return `${String(h).padStart(2,'0')}:${m}`
-}).filter(t => t <= '18:00')
+const HOURS = []
+for (let h = 9; h <= 18; h++) {
+  for (let m = 0; m < 60; m += 30) {
+    if (h === 18 && m > 0) break
+    HOURS.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`)
+  }
+}
+
+const DOW = ['日','月','火','水','木','金','土']
 
 const STATUS_COLOR = {
-  confirmed: 'bg-blue-100 border-blue-300 text-blue-800',
-  completed:  'bg-green-100 border-green-300 text-green-800',
-  cancelled:  'bg-red-100 border-red-300 text-red-800',
-  no_show:    'bg-gray-100 border-gray-300 text-gray-600',
+  confirmed: { bg: '#dbeafe', border: '#93c5fd', text: '#1e40af' },
+  completed:  { bg: '#d1fae5', border: '#6ee7b7', text: '#065f46' },
+  cancelled:  { bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' },
+  no_show:    { bg: '#f3f4f6', border: '#d1d5db', text: '#6b7280' },
 }
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [viewMonth, setViewMonth]       = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState(new Date())
   const [appointments, setAppointments] = useState([])
-  const [chairs, setChairs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [monthAppts, setMonthAppts]     = useState([])
+  const [chairs, setChairs]             = useState([])
+  const [staff, setStaff]               = useState([])
+  const [groupBy, setGroupBy]           = useState('chair') // 'chair' | 'staff'
+  const [loading, setLoading]           = useState(false)
+  const [selected, setSelected]         = useState(null)
 
-  const dateStr = currentDate.toISOString().split('T')[0]
+  const selectedStr  = selectedDate.toISOString().split('T')[0]
+  const monthStr     = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth()+1).padStart(2,'0')}`
 
+  // 月間予約取得
   useEffect(() => {
-    fetchData()
-  }, [dateStr])
+    fetchMonthAppts()
+  }, [monthStr])
 
-  async function fetchData() {
+  // 日別予約取得
+  useEffect(() => {
+    fetchDayAppts()
+  }, [selectedStr])
+
+  // チェア・スタッフ取得
+  useEffect(() => {
+    Promise.all([
+      axios.get('/api/chairs'),
+      axios.get('/api/staff'),
+    ]).then(([c, s]) => {
+      setChairs(c.data.chairs || [])
+      setStaff((s.data.staff || []).filter(s => s.role === 'doctor' || s.role === 'hygienist'))
+    })
+  }, [])
+
+  async function fetchMonthAppts() {
+    try {
+      const res = await axios.get(`/api/appointments?month=${monthStr}`)
+      setMonthAppts(res.data.appointments || [])
+    } catch (err) { console.error(err) }
+  }
+
+  async function fetchDayAppts() {
     setLoading(true)
     try {
-      const [apptRes, chairRes] = await Promise.all([
-        axios.get(`/api/appointments?date=${dateStr}&status=confirmed`),
-        axios.get('/api/chairs'),
-      ])
-      setAppointments(apptRes.data.appointments || [])
-      setChairs(chairRes.data.chairs || [])
-    } catch (err) {
-      console.error(err)
-    }
+      const res = await axios.get(`/api/appointments?date=${selectedStr}`)
+      setAppointments(res.data.appointments || [])
+    } catch (err) { console.error(err) }
     setLoading(false)
   }
 
-  function prevDay() {
-    const d = new Date(currentDate)
-    d.setDate(d.getDate() - 1)
-    setCurrentDate(d)
+  // ── 月間カレンダーの計算 ───────────────────────────────────
+  function getMonthDays() {
+    const year  = viewMonth.getFullYear()
+    const month = viewMonth.getMonth()
+    const first = new Date(year, month, 1)
+    const last  = new Date(year, month + 1, 0)
+    const days  = []
+    // 前月の空白
+    for (let i = 0; i < first.getDay(); i++) days.push(null)
+    for (let d = 1; d <= last.getDate(); d++) days.push(new Date(year, month, d))
+    return days
   }
 
-  function nextDay() {
-    const d = new Date(currentDate)
-    d.setDate(d.getDate() + 1)
-    setCurrentDate(d)
+  function countAppts(date) {
+    if (!date) return 0
+    const str = date.toISOString().split('T')[0]
+    return monthAppts.filter(a => a.appointment_date === str && a.status === 'confirmed').length
   }
 
-  function toToday() {
-    setCurrentDate(new Date())
+  function isToday(date) {
+    if (!date) return false
+    const t = new Date()
+    return date.toDateString() === t.toDateString()
   }
 
-  function formatDateJP(date) {
-    const dow = ['日','月','火','水','木','金','土'][date.getDay()]
-    return `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日（${dow}）`
+  function isSelected(date) {
+    if (!date) return false
+    return date.toDateString() === selectedDate.toDateString()
   }
 
-  function getApptForSlot(chairId, time) {
-    return appointments.find(a =>
-      a.chair_id === chairId &&
-      a.start_time.substring(0,5) === time
-    )
+  // ── 日別グリッドの計算 ────────────────────────────────────
+  const columns = groupBy === 'chair'
+    ? chairs.filter(c => c.is_active)
+    : staff
+
+  function getAppt(colId, time) {
+    return appointments.filter(a => {
+      const col = groupBy === 'chair' ? a.chair_id : a.staff_id
+      return col === colId && a.start_time.substring(0,5) === time && a.status !== 'cancelled'
+    })
   }
 
-  function calcRowSpan(duration) {
-    return Math.ceil(duration / 30)
+  function slotHeight(duration) {
+    return Math.max(1, Math.round(duration / 30)) * 40
+  }
+
+  // 各列の予約をtime→apptのマップに変換（重複スキップ用）
+  function buildColMap(colId) {
+    const map = {}
+    const occupied = new Set()
+    appointments
+      .filter(a => {
+        const col = groupBy === 'chair' ? a.chair_id : a.staff_id
+        return col === colId && a.status !== 'cancelled'
+      })
+      .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      .forEach(appt => {
+        const start = appt.start_time.substring(0,5)
+        const slots = Math.ceil(appt.treatment_duration / 30)
+        const startIdx = HOURS.indexOf(start)
+        if (startIdx === -1) return
+        for (let i = 0; i < slots; i++) {
+          if (HOURS[startIdx + i]) occupied.add(HOURS[startIdx + i])
+        }
+        map[start] = appt
+      })
+    return { map, occupied }
   }
 
   return (
-    <div className="p-6">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-800">予約カレンダー</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          新規予約
-        </button>
-      </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: '"Noto Sans JP", sans-serif' }}>
 
-      {/* 日付ナビゲーション */}
-      <div className="flex items-center gap-3 mb-4">
-        <button onClick={prevDay} className="p-2 rounded-lg hover:bg-gray-100">
-          <ChevronLeft size={20} />
-        </button>
-        <h2 className="text-lg font-semibold text-gray-700 min-w-64 text-center">
-          {formatDateJP(currentDate)}
-        </h2>
-        <button onClick={nextDay} className="p-2 rounded-lg hover:bg-gray-100">
-          <ChevronRight size={20} />
-        </button>
-        <button
-          onClick={toToday}
-          className="ml-2 px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          今日
-        </button>
-      </div>
-
-      {/* カレンダーグリッド */}
-      {loading ? (
-        <div className="text-center py-20 text-gray-400">読み込み中...</div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="w-16 p-2 border-b border-r border-gray-200 text-gray-500 font-medium">時間</th>
-                {chairs.map(chair => (
-                  <th key={chair.id} className="p-2 border-b border-r border-gray-200 text-gray-700 font-medium min-w-32">
-                    {chair.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {HOURS.map(time => (
-                <tr key={time} className="hover:bg-gray-50">
-                  <td className="p-2 border-b border-r border-gray-200 text-gray-400 text-xs text-right">
-                    {time}
-                  </td>
-                  {chairs.map(chair => {
-                    const appt = getApptForSlot(chair.id, time)
-                    if (appt) {
-                      return (
-                        <td
-                          key={chair.id}
-                          className="border-b border-r border-gray-200 p-1 align-top"
-                        >
-                          <div
-                            className={`rounded border p-1 cursor-pointer text-xs ${STATUS_COLOR[appt.status]}`}
-                            onClick={() => setSelected(appt)}
-                          >
-                            <div className="font-medium">{appt.patient_name}</div>
-                            <div className="text-xs opacity-75">{appt.treatment_name}</div>
-                            <div className="text-xs opacity-75">{appt.start_time.substring(0,5)}〜{appt.end_time.substring(0,5)}</div>
-                          </div>
-                        </td>
-                      )
-                    }
-                    return (
-                      <td key={chair.id} className="border-b border-r border-gray-200 p-1" />
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ── 左パネル：月間カレンダー ── */}
+      <div style={{
+        width: 280, flexShrink: 0, borderRight: '1px solid #e5e7eb',
+        background: '#fafafa', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+      }}>
+        {/* 月ナビ */}
+        <div style={{ padding: '16px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <button
+              onClick={() => setViewMonth(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#6b7280' }}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#1f2937' }}>
+              {viewMonth.getFullYear()}年{viewMonth.getMonth()+1}月
+            </span>
+            <button
+              onClick={() => setViewMonth(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#6b7280' }}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          {/* 曜日ヘッダー */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, marginBottom: 4 }}>
+            {DOW.map((d, i) => (
+              <div key={d} style={{
+                textAlign: 'center', fontSize: 11, fontWeight: 600, padding: '2px 0',
+                color: i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : '#9ca3af'
+              }}>{d}</div>
+            ))}
+          </div>
+          {/* 日付グリッド */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+            {getMonthDays().map((date, idx) => {
+              const count = countAppts(date)
+              const _today    = date && isToday(date)
+              const _selected = date && isSelected(date)
+              return (
+                <div
+                  key={idx}
+                  onClick={() => date && setSelectedDate(date)}
+                  style={{
+                    textAlign: 'center', padding: '3px 0', borderRadius: 8,
+                    cursor: date ? 'pointer' : 'default',
+                    background: _selected ? '#2563eb' : _today ? '#eff6ff' : 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {date && (
+                    <>
+                      <div style={{
+                        fontSize: 13, lineHeight: 1.4,
+                        color: _selected ? '#fff' : _today ? '#2563eb'
+                          : date.getDay() === 0 ? '#ef4444'
+                          : date.getDay() === 6 ? '#3b82f6' : '#374151',
+                        fontWeight: _today || _selected ? 700 : 400,
+                      }}>{date.getDate()}</div>
+                      {count > 0 && (
+                        <div style={{
+                          fontSize: 9, lineHeight: 1,
+                          color: _selected ? 'rgba(255,255,255,0.8)' : '#2563eb',
+                          fontWeight: 600,
+                        }}>{count}件</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      )}
+
+        {/* 選択日の予約サマリー */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '12px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>
+            {selectedDate.getMonth()+1}月{selectedDate.getDate()}日の予約
+          </div>
+          {appointments.filter(a => a.status === 'confirmed').length === 0 ? (
+            <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', paddingTop: 16 }}>予約なし</div>
+          ) : appointments.filter(a => a.status === 'confirmed').map(a => (
+            <div
+              key={a.id}
+              onClick={() => setSelected(a)}
+              style={{
+                background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+                padding: '8px 10px', marginBottom: 6, cursor: 'pointer',
+                borderLeft: `3px solid ${STATUS_COLOR[a.status]?.border || '#93c5fd'}`,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ fontWeight: 600, color: '#1f2937' }}>{a.patient_name}</div>
+              <div style={{ color: '#6b7280', marginTop: 2 }}>
+                {a.start_time.substring(0,5)}〜 {a.treatment_name}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 右パネル：日別タイムライン ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* ヘッダー */}
+        <div style={{
+          padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: '#fff', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n })}
+              style={{ border: '1px solid #e5e7eb', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer' }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#1f2937', minWidth: 200, textAlign: 'center' }}>
+              {selectedDate.getFullYear()}年{selectedDate.getMonth()+1}月{selectedDate.getDate()}日（{DOW[selectedDate.getDay()]}）
+            </span>
+            <button
+              onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n })}
+              style={{ border: '1px solid #e5e7eb', background: '#fff', borderRadius: 8, padding: '4px 8px', cursor: 'pointer' }}
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={() => { const t = new Date(); setSelectedDate(t); setViewMonth(t) }}
+              style={{ border: '1px solid #e5e7eb', background: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer', color: '#374151' }}
+            >今日</button>
+          </div>
+
+          {/* 切り替えタブ */}
+          <div style={{ display: 'flex', gap: 0, background: '#f3f4f6', borderRadius: 8, padding: 3 }}>
+            {[
+              { key: 'chair', label: 'チェア別', icon: <Calendar size={14} /> },
+              { key: 'staff', label: 'ドクター別', icon: <User size={14} /> },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setGroupBy(tab.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 500,
+                  background: groupBy === tab.key ? '#fff' : 'transparent',
+                  color: groupBy === tab.key ? '#2563eb' : '#6b7280',
+                  boxShadow: groupBy === tab.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >{tab.icon}{tab.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* タイムライングリッド */}
+        {loading ? (
+          <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'#9ca3af' }}>
+            読み込み中...
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 56 }} />
+                {columns.map(c => <col key={c.id} />)}
+              </colgroup>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
+                <tr>
+                  <th style={{ padding: '8px 4px', borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>時間</th>
+                  {columns.map(col => (
+                    <th key={col.id} style={{
+                      padding: '8px 12px', borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb',
+                      fontSize: 13, fontWeight: 600, color: '#1f2937', textAlign: 'center',
+                      background: '#fff',
+                    }}>
+                      {col.name}
+                      {groupBy === 'staff' && col.title && (
+                        <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400 }}>{col.title}</div>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {HOURS.map((time, timeIdx) => {
+                  const isHour = time.endsWith(':00')
+                  return (
+                    <tr key={time} style={{ height: 40 }}>
+                      <td style={{
+                        padding: '0 6px', borderBottom: '1px solid #f3f4f6',
+                        borderRight: '1px solid #e5e7eb', verticalAlign: 'top',
+                        fontSize: 11, color: '#9ca3af', textAlign: 'right', paddingTop: 2,
+                        background: isHour ? '#fafafa' : '#fff',
+                        fontWeight: isHour ? 600 : 400,
+                      }}>
+                        {isHour ? time : ''}
+                      </td>
+                      {columns.map(col => {
+                        const { map, occupied } = buildColMap(col.id)
+                        const appt = map[time]
+                        // このスロットが別の予約に占有されている場合はスキップ
+                        if (!appt && occupied.has(time) && timeIdx > 0) return null
+                        if (appt) {
+                          const h = slotHeight(appt.treatment_duration)
+                          const color = STATUS_COLOR[appt.status] || STATUS_COLOR.confirmed
+                          const slots = Math.ceil(appt.treatment_duration / 30)
+                          return (
+                            <td
+                              key={col.id}
+                              rowSpan={slots}
+                              style={{
+                                padding: 4, borderBottom: '1px solid #f3f4f6',
+                                borderRight: '1px solid #e5e7eb', verticalAlign: 'top',
+                                background: isHour ? '#fafafa' : '#fff',
+                              }}
+                            >
+                              <div
+                                onClick={() => setSelected(appt)}
+                                style={{
+                                  background: color.bg, border: `1px solid ${color.border}`,
+                                  borderLeft: `3px solid ${color.border}`,
+                                  borderRadius: 6, padding: '4px 8px',
+                                  cursor: 'pointer', height: h - 10,
+                                  overflow: 'hidden', fontSize: 12,
+                                  transition: 'opacity 0.15s',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                              >
+                                <div style={{ fontWeight: 600, color: color.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {appt.patient_name}
+                                </div>
+                                <div style={{ color: color.text, opacity: 0.8, fontSize: 11, marginTop: 2 }}>
+                                  {appt.treatment_name}
+                                </div>
+                                <div style={{ color: color.text, opacity: 0.7, fontSize: 11 }}>
+                                  {appt.start_time.substring(0,5)}〜{appt.end_time.substring(0,5)}
+                                </div>
+                              </div>
+                            </td>
+                          )
+                        }
+                        return (
+                          <td key={col.id} style={{
+                            borderBottom: '1px solid #f3f4f6',
+                            borderRight: '1px solid #e5e7eb',
+                            background: isHour ? '#fafafa' : '#fff',
+                          }} />
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* 予約詳細モーダル */}
       {selected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-96">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-800">予約詳細</h3>
-              <button onClick={() => setSelected(null)}>
-                <X size={20} className="text-gray-400" />
+        <div
+          onClick={() => setSelected(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', padding: 24, width: 380 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>予約詳細</span>
+              <button onClick={() => setSelected(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+                <X size={20} />
               </button>
             </div>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">患者名</span>
-                <span className="font-medium">{selected.patient_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">治療</span>
-                <span>{selected.treatment_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">担当</span>
-                <span>{selected.staff_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">チェア</span>
-                <span>{selected.chair_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">時間</span>
-                <span>{selected.start_time.substring(0,5)}〜{selected.end_time.substring(0,5)}</span>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14 }}>
+              {[
+                ['患者名', selected.patient_name],
+                ['患者番号', selected.patient_code],
+                ['治療', selected.treatment_name],
+                ['担当', selected.staff_name],
+                ['チェア', selected.chair_name],
+                ['時間', `${selected.start_time.substring(0,5)}〜${selected.end_time.substring(0,5)}`],
+                ['予約元', selected.source === 'line' ? 'LINE' : selected.source === 'staff' ? '院内' : selected.source],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b7280' }}>{label}</span>
+                  <span style={{ fontWeight: 500, color: '#1f2937' }}>{value || '-'}</span>
+                </div>
+              ))}
               {selected.notes && (
-                <div>
-                  <span className="text-gray-500">メモ</span>
-                  <p className="mt-1 text-gray-700">{selected.notes}</p>
+                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#374151' }}>
+                  {selected.notes}
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setSelected(null)}
-              className="mt-4 w-full py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200"
-            >
-              閉じる
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => setSelected(null)}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' }}
+              >閉じる</button>
+            </div>
           </div>
         </div>
       )}
