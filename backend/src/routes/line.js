@@ -3,10 +3,9 @@ const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../config/database');
 
-// ── 内部API呼び出し用のベースURL ─────────────────────────
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
-// LINE Webhookの署名検証
+// ── 署名検証 ────────────────────────────────────────────────
 function verifyLineSignature(body, signature) {
   const hash = crypto
     .createHmac('sha256', process.env.LINE_CHANNEL_SECRET)
@@ -15,37 +14,58 @@ function verifyLineSignature(body, signature) {
   return hash === signature;
 }
 
-// LINE Messaging API で返信を送る
+// ── LINE API：返信 ───────────────────────────────────────────
 async function replyMessage(replyToken, messages) {
-  const response = await fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'POST',
+  const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+    method:  'POST',
     headers: {
       'Content-Type':  'application/json',
       'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
     },
     body: JSON.stringify({ replyToken, messages }),
   });
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('LINE reply error:', err);
-  }
+  if (!res.ok) console.error('LINE reply error:', await res.text());
 }
 
-// LINE Messaging API でプッシュメッセージを送る
+// ── LINE API：プッシュ ───────────────────────────────────────
 async function pushMessage(lineUserId, messages) {
-  const response = await fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
+  const res = await fetch('https://api.line.me/v2/bot/message/push', {
+    method:  'POST',
     headers: {
       'Content-Type':  'application/json',
       'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
     },
     body: JSON.stringify({ to: lineUserId, messages }),
   });
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('LINE push error:', err);
-  }
+  if (!res.ok) console.error('LINE push error:', await res.text());
 }
+
+// ============================================================
+// GET /api/line/link?code=P-00001
+// QRコードを読み取ったときのLINE連携エンドポイント
+// LINE の QR リーダーはURLをブラウザで開くため、
+// ここでは LINE UserID を取得できないので LINE Bot への
+// 誘導メッセージを返し、Webhook 側で処理する
+// ============================================================
+router.get('/link', async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).send('patient_code が必要です');
+
+  const patient = await db.query(
+    'SELECT id, name, patient_code FROM patients WHERE patient_code = $1 AND is_active = TRUE',
+    [code]
+  );
+  if (!patient.rows.length) {
+    return res.status(404).send('患者が見つかりません');
+  }
+
+  const botId = process.env.LINE_BOT_ID;
+  const text  = `link:${code}`;
+  const lineUrl = `https://line.me/R/oaMessage/${encodeURIComponent(botId)}/?text=${encodeURIComponent(text)}`;
+
+  // LINE アプリへリダイレクト
+  res.redirect(lineUrl);
+});
 
 // ============================================================
 // POST /api/line/webhook
@@ -66,7 +86,6 @@ router.post('/webhook', async (req, res) => {
       console.error('Webhook event error:', err);
     }
   }
-
   res.sendStatus(200);
 });
 
@@ -81,37 +100,31 @@ async function handleEvent(event) {
     case 'follow': {
       await replyMessage(replyToken, [{
         type: 'text',
-        text: `🦷 スマイル歯科クリニックへようこそ！\n\nご予約・変更・キャンセルはメニューからどうぞ。\n\n初めての方は診察券のQRコードを読み取って患者登録してください。`,
+        text: `🦷 スマイル歯科クリニックへようこそ！\n\nご予約・変更・キャンセルはメニューからどうぞ。\n\n初めての方は受付で発行したQRコードを読み取って患者登録してください。`,
       }]);
       break;
     }
 
     case 'message': {
       if (event.message.type !== 'text') break;
-      const text = event.message.text.trim();
+      const raw       = event.message.text.trim();
+      // URLスキーム経由で付く "text=" プレフィックスを除去
+      const cleanText = raw.replace(/^text=/, '');
 
-      // text= プレフィックスを除去（LINEのURLスキーム経由で付く場合がある）
-      const cleanText = text.replace(/^text=/, '');
-
-      // QR連携トークンの処理
-      if (cleanText.startsWith('token=')) {
-        await handleLineLink(replyToken, lineUserId, cleanText.replace('token=', '').trim());
+      // QRコード経由の患者連携
+      if (cleanText.startsWith('link:')) {
+        const code = cleanText.replace('link:', '').trim();
+        await handleLineLink(replyToken, lineUserId, code);
         break;
       }
 
       const patient = await getPatientByLineId(lineUserId);
 
-      if (cleanText === '予約' || cleanText === '予約する') {
-        await startBookingFlow(replyToken, patient);
-      } else if (cleanText === 'キャンセル' || cleanText === '予約キャンセル') {
-        await startCancelFlow(replyToken, patient, lineUserId);
-      } else if (cleanText === '予約確認') {
-        await showUpcomingAppointments(replyToken, patient);
-      } else {
-        await replyMessage(replyToken, [{
-          type: 'text',
-          text: '下のメニューから操作してください 👇',
-        }]);
+      if      (cleanText === '予約' || cleanText === '予約する')          await startBookingFlow(replyToken, patient);
+      else if (cleanText === 'キャンセル' || cleanText === '予約キャンセル') await startCancelFlow(replyToken, patient);
+      else if (cleanText === '予約確認')                                   await showUpcomingAppointments(replyToken, patient);
+      else {
+        await replyMessage(replyToken, [{ type: 'text', text: '下のメニューから操作してください 👇' }]);
       }
       break;
     }
@@ -122,21 +135,11 @@ async function handleEvent(event) {
       const patient = await getPatientByLineId(lineUserId);
 
       switch (action) {
-        case 'select_treatment':
-          await handleTreatmentSelect(replyToken, data.get('treatment_id'), patient);
-          break;
-        case 'select_date':
-          await handleDateSelect(replyToken, data.get('treatment_id'), data.get('date'), patient);
-          break;
-        case 'select_time':
-          await handleTimeSelect(replyToken, data, patient);
-          break;
-        case 'confirm_booking':
-          await handleConfirmBooking(replyToken, data, patient);
-          break;
-        case 'cancel_appointment':
-          await handleCancelAppointment(replyToken, data.get('appointment_id'), patient);
-          break;
+        case 'select_treatment':   await handleTreatmentSelect(replyToken, data.get('treatment_id'), patient); break;
+        case 'select_date':        await handleDateSelect(replyToken, data.get('treatment_id'), data.get('date'), patient); break;
+        case 'select_time':        await handleTimeSelect(replyToken, data, patient); break;
+        case 'confirm_booking':    await handleConfirmBooking(replyToken, data, patient); break;
+        case 'cancel_appointment': await handleCancelAppointment(replyToken, data.get('appointment_id'), patient); break;
       }
       break;
     }
@@ -144,48 +147,55 @@ async function handleEvent(event) {
 }
 
 // ============================================================
-// QRコード連携
+// QRコードによる患者連携
+// patient_code で患者を照合し LINE UserID を保存
 // ============================================================
-async function handleLineLink(replyToken, lineUserId, token) {
-  const result = await db.query(`
-    SELECT * FROM patients
-    WHERE patient_token = $1
-      AND token_expires > NOW()
-  `, [token]);
+async function handleLineLink(replyToken, lineUserId, patientCode) {
+  const result = await db.query(
+    'SELECT * FROM patients WHERE patient_code = $1 AND is_active = TRUE',
+    [patientCode]
+  );
 
   if (!result.rows.length) {
     await replyMessage(replyToken, [{
       type: 'text',
-      text: '❌ QRコードが無効または期限切れです。\n受付で再発行をお申し付けください。',
+      text: '❌ 患者番号が見つかりません。\n受付にお問い合わせください。',
     }]);
     return;
   }
 
   const patient = result.rows[0];
 
-  // すでに別のLINEと連携済みの場合
+  // 既に別のLINEと連携済みの場合
   if (patient.line_user_id && patient.line_user_id !== lineUserId) {
     await replyMessage(replyToken, [{
       type: 'text',
-      text: '⚠️ このQRコードはすでに使用済みです。\n受付にお問い合わせください。',
+      text: '⚠️ このQRコードはすでに別のアカウントで連携されています。\n受付にお問い合わせください。',
     }]);
     return;
   }
 
-  // LINE UserIDを保存してトークンを無効化
+  // 同じLINEで再連携しようとした場合
+  if (patient.line_user_id === lineUserId) {
+    await replyMessage(replyToken, [{
+      type: 'text',
+      text: `✅ ${patient.name} 様はすでに連携済みです。\nメニューからご予約いただけます🦷`,
+    }]);
+    return;
+  }
+
+  // LINE UserID を保存
   await db.query(`
     UPDATE patients SET
       line_user_id   = $1,
       line_linked_at = NOW(),
-      patient_token  = NULL,
-      token_expires  = NULL,
       updated_at     = NOW()
     WHERE id = $2
   `, [lineUserId, patient.id]);
 
   await replyMessage(replyToken, [{
     type: 'text',
-    text: `✅ ${patient.name} 様、LINE連携が完了しました！\n\n「予約する」から診察の予約ができます🦷\nご来院をお待ちしております。`,
+    text: `✅ ${patient.name} 様（${patient.patient_code}）、LINE連携が完了しました！\n\n「予約する」から診察の予約ができます🦷\nご来院をお待ちしております。`,
   }]);
 }
 
@@ -196,15 +206,14 @@ async function startBookingFlow(replyToken, patient) {
   if (!patient) {
     await replyMessage(replyToken, [{
       type: 'text',
-      text: '診察券のQRコードを読み取って患者登録を先に行ってください。',
+      text: '受付で発行したQRコードを読み取って患者登録を先に行ってください。',
     }]);
     return;
   }
 
   const treatments = await db.query(
-    `SELECT * FROM treatments WHERE is_active = TRUE ORDER BY display_order`
+    'SELECT * FROM treatments WHERE is_active = TRUE AND line_visible = TRUE ORDER BY display_order'
   );
-
   if (!treatments.rows.length) {
     await replyMessage(replyToken, [{ type: 'text', text: '現在予約できる治療メニューがありません。' }]);
     return;
@@ -213,11 +222,7 @@ async function startBookingFlow(replyToken, patient) {
   const columns = treatments.rows.slice(0, 10).map(t => ({
     title:   t.name.substring(0, 40),
     text:    `所要時間: ${t.duration}分`,
-    actions: [{
-      type:  'postback',
-      label: '選択する',
-      data:  `action=select_treatment&treatment_id=${t.id}`,
-    }],
+    actions: [{ type: 'postback', label: '選択する', data: `action=select_treatment&treatment_id=${t.id}` }],
   }));
 
   await replyMessage(replyToken, [{
@@ -238,9 +243,8 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
   }
 
   const actions = dates.map(date => ({
-    type:  'postback',
-    label: formatDateJP(date),
-    data:  `action=select_date&treatment_id=${treatmentId}&date=${date}`,
+    type: 'postback', label: formatDateJP(date),
+    data: `action=select_date&treatment_id=${treatmentId}&date=${date}`,
   }));
 
   await replyMessage(replyToken, [{
@@ -251,9 +255,7 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
 }
 
 async function handleDateSelect(replyToken, treatmentId, date, patient) {
-  const res   = await fetch(
-    `${BACKEND_URL}/api/appointments/available/slots?date=${date}&treatment_id=${treatmentId}`
-  );
+  const res   = await fetch(`${BACKEND_URL}/api/appointments/available/slots?date=${date}&treatment_id=${treatmentId}`);
   const data  = await res.json();
   const slots = data.slots || [];
 
@@ -266,9 +268,8 @@ async function handleDateSelect(replyToken, treatmentId, date, patient) {
   }
 
   const actions = slots.slice(0, 4).map(slot => ({
-    type:  'postback',
-    label: `${slot.time}〜${slot.endTime}`,
-    data:  `action=select_time&treatment_id=${treatmentId}&date=${date}&time=${slot.time}`,
+    type: 'postback', label: `${slot.time}〜${slot.endTime}`,
+    data: `action=select_time&treatment_id=${treatmentId}&date=${date}&time=${slot.time}`,
   }));
 
   await replyMessage(replyToken, [{
@@ -282,9 +283,7 @@ async function handleTimeSelect(replyToken, data, patient) {
   const treatmentId = data.get('treatment_id');
   const date        = data.get('date');
   const time        = data.get('time');
-
-  const treatment = await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId]);
-  const t = treatment.rows[0];
+  const t           = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
 
   await replyMessage(replyToken, [{
     type:     'template',
@@ -293,16 +292,8 @@ async function handleTimeSelect(replyToken, data, patient) {
       type: 'confirm',
       text: `以下で予約しますか？\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}（${t.duration}分）`,
       actions: [
-        {
-          type:  'postback',
-          label: '✅ 予約する',
-          data:  `action=confirm_booking&treatment_id=${treatmentId}&date=${date}&time=${time}`,
-        },
-        {
-          type:  'postback',
-          label: '❌ やり直す',
-          data:  'action=restart',
-        },
+        { type: 'postback', label: '✅ 予約する', data: `action=confirm_booking&treatment_id=${treatmentId}&date=${date}&time=${time}` },
+        { type: 'postback', label: '❌ やり直す', data: 'action=restart' },
       ],
     },
   }]);
@@ -315,14 +306,10 @@ async function handleConfirmBooking(replyToken, data, patient) {
   const date        = data.get('date');
   const time        = data.get('time');
 
-  const chairResult = await db.query(
-    'SELECT id FROM chairs WHERE is_active=TRUE ORDER BY display_order LIMIT 1'
-  );
-  const staffResult = await db.query(
-    "SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1"
-  );
+  const chair = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE AND line_bookable=TRUE ORDER BY display_order LIMIT 1')).rows[0];
+  const staff = (await db.query("SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1")).rows[0];
 
-  if (!chairResult.rows.length || !staffResult.rows.length) {
+  if (!chair || !staff) {
     await replyMessage(replyToken, [{ type: 'text', text: '空き枠の確保に失敗しました。お電話でご予約ください。' }]);
     return;
   }
@@ -331,19 +318,13 @@ async function handleConfirmBooking(replyToken, data, patient) {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
-      patient_id:       patient.id,
-      staff_id:         staffResult.rows[0].id,
-      chair_id:         chairResult.rows[0].id,
-      treatment_id:     treatmentId,
-      appointment_date: date,
-      start_time:       time,
-      source:           'line',
+      patient_id: patient.id, staff_id: staff.id, chair_id: chair.id,
+      treatment_id: treatmentId, appointment_date: date, start_time: time, source: 'line',
     }),
   });
 
   if (res.ok) {
-    const treatment = await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId]);
-    const t = treatment.rows[0];
+    const t = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
     await replyMessage(replyToken, [{
       type: 'text',
       text: `✅ 予約が完了しました！\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております🦷`,
@@ -353,9 +334,9 @@ async function handleConfirmBooking(replyToken, data, patient) {
   }
 }
 
-async function startCancelFlow(replyToken, patient, lineUserId) {
+async function startCancelFlow(replyToken, patient) {
   if (!patient) {
-    await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。診察券のQRコードを読み取ってください。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。受付で発行したQRコードを読み取ってください。' }]);
     return;
   }
 
@@ -373,7 +354,7 @@ async function startCancelFlow(replyToken, patient, lineUserId) {
   }
 
   const actions = result.rows.map(appt => ({
-    type:  'postback',
+    type: 'postback',
     label: `${formatDateJP(appt.appointment_date.toISOString().split('T')[0])} ${appt.start_time.substring(0,5)}`,
     data:  `action=cancel_appointment&appointment_id=${appt.id}`,
   }));
@@ -421,7 +402,7 @@ async function showUpcomingAppointments(replyToken, patient) {
   await replyMessage(replyToken, [{ type: 'text', text: `ご予約一覧\n\n${text}` }]);
 }
 
-// ── ユーティリティ ────────────────────────────────────────
+// ── ユーティリティ ────────────────────────────────────────────
 async function getPatientByLineId(lineUserId) {
   if (!lineUserId) return null;
   const result = await db.query('SELECT * FROM patients WHERE line_user_id=$1', [lineUserId]);
@@ -434,5 +415,5 @@ function formatDateJP(dateStr) {
   return `${d.getMonth()+1}月${d.getDate()}日(${dow})`;
 }
 
-module.exports            = router;
+module.exports             = router;
 module.exports.pushMessage = pushMessage;
