@@ -3,6 +3,10 @@ const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../config/database');
 
+// ── 内部API呼び出し用のベースURL ─────────────────────────
+// Renderでは localhost が使えないため環境変数で切り替え
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
 // LINE Webhookの署名検証
 function verifyLineSignature(body, signature) {
   const hash = crypto
@@ -46,10 +50,8 @@ async function pushMessage(lineUserId, messages) {
 
 // ============================================================
 // POST /api/line/webhook
-// LINEからのWebhookを受け取る
 // ============================================================
 router.post('/webhook', async (req, res) => {
-  // 署名検証
   const signature = req.headers['x-line-signature'];
   if (!verifyLineSignature(req.body, signature)) {
     return res.status(401).send('Invalid signature');
@@ -58,7 +60,6 @@ router.post('/webhook', async (req, res) => {
   const body   = JSON.parse(req.body);
   const events = body.events || [];
 
-  // 各イベントを処理
   for (const event of events) {
     try {
       await handleEvent(event);
@@ -78,9 +79,7 @@ async function handleEvent(event) {
   const lineUserId = source?.userId;
 
   switch (type) {
-    // ── 友だち追加 ────────────────────────────────────────
     case 'follow': {
-      // トークン付きURLからの追加かチェック（Postbackで処理することが多い）
       await replyMessage(replyToken, [{
         type: 'text',
         text: `🦷 スマイル歯科クリニックへようこそ！\n\nご予約・変更・キャンセルはメニューからどうぞ。\n\n初めての方は診察券のQRコードを読み取って患者登録してください。`,
@@ -88,12 +87,9 @@ async function handleEvent(event) {
       break;
     }
 
-    // ── テキストメッセージ ────────────────────────────────
     case 'message': {
       if (event.message.type !== 'text') break;
       const text = event.message.text.trim();
-
-      // 患者を検索
       const patient = await getPatientByLineId(lineUserId);
 
       if (text === '予約' || text === '予約する') {
@@ -111,10 +107,9 @@ async function handleEvent(event) {
       break;
     }
 
-    // ── ポストバック（ボタン選択） ──────────────────────
     case 'postback': {
-      const data   = new URLSearchParams(event.postback.data);
-      const action = data.get('action');
+      const data    = new URLSearchParams(event.postback.data);
+      const action  = data.get('action');
       const patient = await getPatientByLineId(lineUserId);
 
       switch (action) {
@@ -151,15 +146,21 @@ async function startBookingFlow(replyToken, patient) {
     return;
   }
 
-  // 治療メニューをボタンで表示
+  // line_visible カラムがない場合は is_active のみで絞る
   const treatments = await db.query(
-    'SELECT * FROM treatments WHERE is_active=TRUE AND line_visible=TRUE ORDER BY display_order'
+    `SELECT * FROM treatments
+     WHERE is_active = TRUE
+     ORDER BY display_order`
   );
 
-  const columns = treatments.rows.map(t => ({
-    thumbnailImageUrl: undefined,
-    title:   t.name,
-    text:    `所要時間: ${t.duration}分 / ${t.category}`,
+  if (!treatments.rows.length) {
+    await replyMessage(replyToken, [{ type: 'text', text: '現在予約できる治療メニューがありません。' }]);
+    return;
+  }
+
+  const columns = treatments.rows.slice(0, 10).map(t => ({
+    title:   t.name.substring(0, 40),
+    text:    `所要時間: ${t.duration}分`,
     actions: [{
       type:  'postback',
       label: '選択する',
@@ -168,27 +169,25 @@ async function startBookingFlow(replyToken, patient) {
   }));
 
   await replyMessage(replyToken, [{
-    type:         'template',
-    altText:      '治療メニューを選択してください',
+    type:     'template',
+    altText:  '治療メニューを選択してください',
     template: {
       type:    'carousel',
-      columns: columns.slice(0, 10), // LINEの上限10件
+      columns,
     },
   }]);
 }
 
 async function handleTreatmentSelect(replyToken, treatmentId, patient) {
-  // 今後7日間の選択肢を表示
-  const dates   = [];
-  const today   = new Date();
+  const dates = [];
+  const today = new Date();
   for (let i = 1; i <= 14; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const dow = d.getDay();
-    if (dow !== 0) { // 日曜除外（簡易版）
+    if (d.getDay() !== 0) {
       dates.push(d.toISOString().split('T')[0]);
     }
-    if (dates.length >= 7) break;
+    if (dates.length >= 4) break;
   }
 
   const actions = dates.map(date => ({
@@ -198,22 +197,22 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
   }));
 
   await replyMessage(replyToken, [{
-    type:         'template',
-    altText:      '日程を選択してください',
+    type:     'template',
+    altText:  '日程を選択してください',
     template: {
       type:    'buttons',
       text:    '診察日を選択してください',
-      actions: actions.slice(0, 4),
+      actions,
     },
   }]);
 }
 
 async function handleDateSelect(replyToken, treatmentId, date, patient) {
-  // 空き枠取得
-  const res = await fetch(
-    `http://localhost:${process.env.PORT || 3001}/api/appointments/available/slots?date=${date}&treatment_id=${treatmentId}`
+  // ✅ localhost → BACKEND_URL に修正
+  const res  = await fetch(
+    `${BACKEND_URL}/api/appointments/available/slots?date=${date}&treatment_id=${treatmentId}`
   );
-  const data = await res.json();
+  const data  = await res.json();
   const slots = data.slots || [];
 
   if (!slots.length) {
@@ -231,8 +230,8 @@ async function handleDateSelect(replyToken, treatmentId, date, patient) {
   }));
 
   await replyMessage(replyToken, [{
-    type:         'template',
-    altText:      '時間を選択してください',
+    type:     'template',
+    altText:  '時間を選択してください',
     template: {
       type:    'buttons',
       text:    `${formatDateJP(date)}の空き時間`,
@@ -250,11 +249,11 @@ async function handleTimeSelect(replyToken, data, patient) {
   const t = treatment.rows[0];
 
   await replyMessage(replyToken, [{
-    type:         'template',
-    altText:      '予約内容の確認',
+    type:     'template',
+    altText:  '予約内容の確認',
     template: {
-      type:  'confirm',
-      text:  `以下で予約しますか？\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}（${t.duration}分）`,
+      type: 'confirm',
+      text: `以下で予約しますか？\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}（${t.duration}分）`,
       actions: [
         {
           type:  'postback',
@@ -278,20 +277,21 @@ async function handleConfirmBooking(replyToken, data, patient) {
   const date        = data.get('date');
   const time        = data.get('time');
 
-  // 空いているチェアとスタッフを自動割り当て（簡易版）
+  // ✅ line_bookable カラムなしでも動くよう修正（is_active のみで絞る）
   const chairResult = await db.query(
-    'SELECT id FROM chairs WHERE line_bookable=TRUE AND is_active=TRUE ORDER BY display_order LIMIT 1'
+    'SELECT id FROM chairs WHERE is_active=TRUE ORDER BY display_order LIMIT 1'
   );
   const staffResult = await db.query(
-    'SELECT id FROM staff WHERE role=$1 AND is_active=TRUE LIMIT 1', ['doctor']
+    "SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1"
   );
 
   if (!chairResult.rows.length || !staffResult.rows.length) {
-    await replyMessage(replyToken, [{ type:'text', text:'空き枠の確保に失敗しました。お電話でご予約ください。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '空き枠の確保に失敗しました。お電話でご予約ください。' }]);
     return;
   }
 
-  const res = await fetch(`http://localhost:${process.env.PORT || 3001}/api/appointments`, {
+  // ✅ localhost → BACKEND_URL に修正
+  const res = await fetch(`${BACKEND_URL}/api/appointments`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
@@ -313,13 +313,13 @@ async function handleConfirmBooking(replyToken, data, patient) {
       text: `✅ 予約が完了しました！\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております🦷`,
     }]);
   } else {
-    await replyMessage(replyToken, [{ type:'text', text:'予約の確定に失敗しました。お電話でご予約ください。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '予約の確定に失敗しました。お電話でご予約ください。' }]);
   }
 }
 
 async function startCancelFlow(replyToken, patient, lineUserId) {
   if (!patient) {
-    await replyMessage(replyToken, [{ type:'text', text:'患者登録が必要です。診察券のQRコードを読み取ってください。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。診察券のQRコードを読み取ってください。' }]);
     return;
   }
   const result = await db.query(`
@@ -331,35 +331,36 @@ async function startCancelFlow(replyToken, patient, lineUserId) {
   `, [patient.id]);
 
   if (!result.rows.length) {
-    await replyMessage(replyToken, [{ type:'text', text:'キャンセルできる予約がありません。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: 'キャンセルできる予約がありません。' }]);
     return;
   }
 
   const actions = result.rows.map(appt => ({
     type:  'postback',
-    label: `${formatDateJP(appt.appointment_date.toISOString().split('T')[0])} ${appt.start_time.substring(0,5)} ${appt.treatment_name}`,
+    label: `${formatDateJP(appt.appointment_date.toISOString().split('T')[0])} ${appt.start_time.substring(0,5)}`,
     data:  `action=cancel_appointment&appointment_id=${appt.id}`,
   }));
 
   await replyMessage(replyToken, [{
     type:     'template',
     altText:  'キャンセルする予約を選択',
-    template: { type:'buttons', text:'キャンセルする予約を選択してください', actions },
+    template: { type: 'buttons', text: 'キャンセルする予約を選択してください', actions },
   }]);
 }
 
 async function handleCancelAppointment(replyToken, appointmentId, patient) {
-  await fetch(`http://localhost:${process.env.PORT || 3001}/api/appointments/${appointmentId}`, {
+  // ✅ localhost → BACKEND_URL に修正
+  await fetch(`${BACKEND_URL}/api/appointments/${appointmentId}`, {
     method:  'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ cancelled_by: 'patient', cancel_reason: 'LINEからキャンセル' }),
   });
-  await replyMessage(replyToken, [{ type:'text', text:'✅ 予約をキャンセルしました。またのご来院をお待ちしております。' }]);
+  await replyMessage(replyToken, [{ type: 'text', text: '✅ 予約をキャンセルしました。またのご来院をお待ちしております。' }]);
 }
 
 async function showUpcomingAppointments(replyToken, patient) {
   if (!patient) {
-    await replyMessage(replyToken, [{ type:'text', text:'患者登録が必要です。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。' }]);
     return;
   }
   const result = await db.query(`
@@ -372,7 +373,7 @@ async function showUpcomingAppointments(replyToken, patient) {
   `, [patient.id]);
 
   if (!result.rows.length) {
-    await replyMessage(replyToken, [{ type:'text', text:'現在ご予約はありません。' }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '現在ご予約はありません。' }]);
     return;
   }
 
@@ -380,7 +381,7 @@ async function showUpcomingAppointments(replyToken, patient) {
     `📅 ${formatDateJP(a.appointment_date.toISOString().split('T')[0])}\n⏰ ${a.start_time.substring(0,5)}\n🦷 ${a.treatment_name}\n👨‍⚕️ ${a.staff_name}`
   ).join('\n\n');
 
-  await replyMessage(replyToken, [{ type:'text', text: `ご予約一覧\n\n${text}` }]);
+  await replyMessage(replyToken, [{ type: 'text', text: `ご予約一覧\n\n${text}` }]);
 }
 
 // ── ユーティリティ ────────────────────────────────────────
@@ -391,11 +392,10 @@ async function getPatientByLineId(lineUserId) {
 }
 
 function formatDateJP(dateStr) {
-  const d   = new Date(dateStr);
+  const d   = new Date(dateStr + 'T00:00:00');
   const dow = ['日','月','火','水','木','金','土'][d.getDay()];
   return `${d.getMonth()+1}月${d.getDate()}日(${dow})`;
 }
 
-// プッシュメッセージ（リマインドなど外部から使えるようにexport）
-module.exports        = router;
+module.exports            = router;
 module.exports.pushMessage = pushMessage;
