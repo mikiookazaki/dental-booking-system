@@ -30,8 +30,12 @@ export default function CalendarPage() {
   const [loading, setLoading]           = useState(false)
   const [selected, setSelected]         = useState(null)
 
-  const selectedStr  = selectedDate.toISOString().split('T')[0]
-  const monthStr     = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth()+1).padStart(2,'0')}`
+  // タイムゾーンずれ防止：ローカル日付文字列を使用
+  function toLocalDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  }
+  const selectedStr = toLocalDateStr(selectedDate)
+  const monthStr    = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth()+1).padStart(2,'0')}`
 
   // 月間予約取得
   useEffect(() => {
@@ -85,19 +89,18 @@ export default function CalendarPage() {
 
   function countAppts(date) {
     if (!date) return 0
-    const str = date.toISOString().split('T')[0]
+    const str = toLocalDateStr(date)
     return monthAppts.filter(a => a.appointment_date.substring(0,10) === str && a.status === 'confirmed').length
   }
 
   function isToday(date) {
     if (!date) return false
-    const t = new Date()
-    return date.toDateString() === t.toDateString()
+    return toLocalDateStr(date) === toLocalDateStr(new Date())
   }
 
   function isSelected(date) {
     if (!date) return false
-    return date.toDateString() === selectedDate.toDateString()
+    return toLocalDateStr(date) === toLocalDateStr(selectedDate)
   }
 
   // ── 日別グリッドの計算 ────────────────────────────────────
