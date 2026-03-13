@@ -4,7 +4,6 @@ const crypto  = require('crypto');
 const db      = require('../config/database');
 
 // ── 内部API呼び出し用のベースURL ─────────────────────────
-// Renderでは localhost が使えないため環境変数で切り替え
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
 // LINE Webhookの署名検証
@@ -89,8 +88,14 @@ async function handleEvent(event) {
 
     case 'message': {
       if (event.message.type !== 'text') break;
-      const text = event.message.text.trim();
+      const text    = event.message.text.trim();
       const patient = await getPatientByLineId(lineUserId);
+
+      // QR連携トークンの処理
+      if (text.startsWith('token=')) {
+        await handleLineLink(replyToken, lineUserId, text.replace('token=', '').trim());
+        break;
+      }
 
       if (text === '予約' || text === '予約する') {
         await startBookingFlow(replyToken, patient);
@@ -135,6 +140,52 @@ async function handleEvent(event) {
 }
 
 // ============================================================
+// QRコード連携
+// ============================================================
+async function handleLineLink(replyToken, lineUserId, token) {
+  const result = await db.query(`
+    SELECT * FROM patients
+    WHERE patient_token = $1
+      AND token_expires > NOW()
+  `, [token]);
+
+  if (!result.rows.length) {
+    await replyMessage(replyToken, [{
+      type: 'text',
+      text: '❌ QRコードが無効または期限切れです。\n受付で再発行をお申し付けください。',
+    }]);
+    return;
+  }
+
+  const patient = result.rows[0];
+
+  // すでに別のLINEと連携済みの場合
+  if (patient.line_user_id && patient.line_user_id !== lineUserId) {
+    await replyMessage(replyToken, [{
+      type: 'text',
+      text: '⚠️ このQRコードはすでに使用済みです。\n受付にお問い合わせください。',
+    }]);
+    return;
+  }
+
+  // LINE UserIDを保存してトークンを無効化
+  await db.query(`
+    UPDATE patients SET
+      line_user_id   = $1,
+      line_linked_at = NOW(),
+      patient_token  = NULL,
+      token_expires  = NULL,
+      updated_at     = NOW()
+    WHERE id = $2
+  `, [lineUserId, patient.id]);
+
+  await replyMessage(replyToken, [{
+    type: 'text',
+    text: `✅ ${patient.name} 様、LINE連携が完了しました！\n\n「予約する」から診察の予約ができます🦷\nご来院をお待ちしております。`,
+  }]);
+}
+
+// ============================================================
 // 予約フロー
 // ============================================================
 async function startBookingFlow(replyToken, patient) {
@@ -146,11 +197,8 @@ async function startBookingFlow(replyToken, patient) {
     return;
   }
 
-  // line_visible カラムがない場合は is_active のみで絞る
   const treatments = await db.query(
-    `SELECT * FROM treatments
-     WHERE is_active = TRUE
-     ORDER BY display_order`
+    `SELECT * FROM treatments WHERE is_active = TRUE ORDER BY display_order`
   );
 
   if (!treatments.rows.length) {
@@ -171,10 +219,7 @@ async function startBookingFlow(replyToken, patient) {
   await replyMessage(replyToken, [{
     type:     'template',
     altText:  '治療メニューを選択してください',
-    template: {
-      type:    'carousel',
-      columns,
-    },
+    template: { type: 'carousel', columns },
   }]);
 }
 
@@ -184,9 +229,7 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
   for (let i = 1; i <= 14; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    if (d.getDay() !== 0) {
-      dates.push(d.toISOString().split('T')[0]);
-    }
+    if (d.getDay() !== 0) dates.push(d.toISOString().split('T')[0]);
     if (dates.length >= 4) break;
   }
 
@@ -199,17 +242,12 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
   await replyMessage(replyToken, [{
     type:     'template',
     altText:  '日程を選択してください',
-    template: {
-      type:    'buttons',
-      text:    '診察日を選択してください',
-      actions,
-    },
+    template: { type: 'buttons', text: '診察日を選択してください', actions },
   }]);
 }
 
 async function handleDateSelect(replyToken, treatmentId, date, patient) {
-  // ✅ localhost → BACKEND_URL に修正
-  const res  = await fetch(
+  const res   = await fetch(
     `${BACKEND_URL}/api/appointments/available/slots?date=${date}&treatment_id=${treatmentId}`
   );
   const data  = await res.json();
@@ -232,11 +270,7 @@ async function handleDateSelect(replyToken, treatmentId, date, patient) {
   await replyMessage(replyToken, [{
     type:     'template',
     altText:  '時間を選択してください',
-    template: {
-      type:    'buttons',
-      text:    `${formatDateJP(date)}の空き時間`,
-      actions,
-    },
+    template: { type: 'buttons', text: `${formatDateJP(date)}の空き時間`, actions },
   }]);
 }
 
@@ -277,7 +311,6 @@ async function handleConfirmBooking(replyToken, data, patient) {
   const date        = data.get('date');
   const time        = data.get('time');
 
-  // ✅ line_bookable カラムなしでも動くよう修正（is_active のみで絞る）
   const chairResult = await db.query(
     'SELECT id FROM chairs WHERE is_active=TRUE ORDER BY display_order LIMIT 1'
   );
@@ -290,7 +323,6 @@ async function handleConfirmBooking(replyToken, data, patient) {
     return;
   }
 
-  // ✅ localhost → BACKEND_URL に修正
   const res = await fetch(`${BACKEND_URL}/api/appointments`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -322,6 +354,7 @@ async function startCancelFlow(replyToken, patient, lineUserId) {
     await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。診察券のQRコードを読み取ってください。' }]);
     return;
   }
+
   const result = await db.query(`
     SELECT a.id, a.appointment_date, a.start_time, t.name AS treatment_name
     FROM appointments a
@@ -349,7 +382,6 @@ async function startCancelFlow(replyToken, patient, lineUserId) {
 }
 
 async function handleCancelAppointment(replyToken, appointmentId, patient) {
-  // ✅ localhost → BACKEND_URL に修正
   await fetch(`${BACKEND_URL}/api/appointments/${appointmentId}`, {
     method:  'DELETE',
     headers: { 'Content-Type': 'application/json' },
@@ -363,6 +395,7 @@ async function showUpcomingAppointments(replyToken, patient) {
     await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。' }]);
     return;
   }
+
   const result = await db.query(`
     SELECT a.appointment_date, a.start_time, t.name AS treatment_name, s.name AS staff_name
     FROM appointments a
