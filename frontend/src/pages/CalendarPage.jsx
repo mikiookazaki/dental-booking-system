@@ -86,7 +86,7 @@ export default function CalendarPage() {
   function countAppts(date) {
     if (!date) return 0
     const str = date.toISOString().split('T')[0]
-    return monthAppts.filter(a => a.appointment_date === str && a.status === 'confirmed').length
+    return monthAppts.filter(a => a.appointment_date.substring(0,10) === str && a.status === 'confirmed').length
   }
 
   function isToday(date) {
@@ -125,10 +125,10 @@ export default function CalendarPage() {
         const col = groupBy === 'chair' ? a.chair_id : a.staff_id
         return col === colId && a.status !== 'cancelled'
       })
-      .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      .sort((a, b) => (a.start_time||'').localeCompare(b.start_time||''))
       .forEach(appt => {
-        const start = appt.start_time.substring(0,5)
-        const slots = Math.ceil(appt.treatment_duration / 30)
+        const start = (appt.start_time || '').substring(0,5)
+        const slots = Math.ceil((appt.treatment_duration || 30) / 30)
         const startIdx = HOURS.indexOf(start)
         if (startIdx === -1) return
         for (let i = 0; i < slots; i++) {
