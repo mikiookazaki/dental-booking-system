@@ -1,8 +1,8 @@
 // routes/appointments.js
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
-const authenticateToken = require('../middleware/auth');
+const { pool } = require('../config/database');          // ← パス修正
+const authenticateToken = require('../middleware/auth'); // ← パス修正
 
 // =============================================
 // 【1】DB設定値から動的に空き枠を計算するヘルパー
@@ -20,12 +20,12 @@ async function getClinicSettings() {
   result.rows.forEach(r => { settings[r.key] = r.value; });
 
   return {
-    openDays: JSON.parse(settings.open_days || '[1,2,3,4,5]'),      // 0=日〜6=土
+    openDays: JSON.parse(settings.open_days || '[1,2,3,4,5]'),
     openTime: settings.open_time || '09:00',
     closeTime: settings.close_time || '18:00',
     lunchStart: settings.lunch_start || '13:00',
     lunchEnd: settings.lunch_end || '14:00',
-    slotDuration: parseInt(settings.slot_duration || '30'),           // 分
+    slotDuration: parseInt(settings.slot_duration || '30'),
     maxChairs: parseInt(settings.max_chairs || '3'),
     patientBookingEnabled: settings.patient_booking_enabled !== 'false'
   };
@@ -60,7 +60,6 @@ function generateSlots(dateStr, settings) {
   const le = toMinutes(lunchEnd);
 
   while (cur + slotDuration <= end) {
-    // 昼休み除外
     if (!(cur >= ls && cur < le)) {
       slots.push(toTimeStr(cur));
     }
@@ -93,44 +92,36 @@ async function getBlockedSlots(dateStr) {
 
 // =============================================
 // GET /api/appointments/available-slots/:date
-// 指定日の空き枠一覧（LINE Bot・フロント共通）
 // =============================================
 router.get('/available-slots/:date', async (req, res) => {
   try {
     const { date } = req.params;
     const settings = await getClinicSettings();
 
-    // 診療日チェック
     if (!isOpenDay(date, settings.openDays)) {
       return res.json({ available: false, reason: 'closed', slots: [] });
     }
 
-    // 全日ブロックチェック
     const blocks = await getBlockedSlots(date);
     const fullDayBlock = blocks.find(b => b.block_type === 'full_day');
     if (fullDayBlock) {
       return res.json({ available: false, reason: 'blocked', slots: [] });
     }
 
-    // スロット生成
     const allSlots = generateSlots(date, settings);
     const booked = await getBookedSlots(date);
-
-    // 時間帯ブロックをマップ
     const timeBlocks = blocks.filter(b => b.block_type !== 'full_day');
 
     const slotDetails = allSlots.map(slot => {
       const slotMin = toMinutes(slot);
       const slotEndMin = slotMin + settings.slotDuration;
 
-      // ブロック判定
       const isBlocked = timeBlocks.some(b => {
         const bs = toMinutes(b.start_time);
         const be = toMinutes(b.end_time);
         return slotMin < be && slotEndMin > bs;
       });
 
-      // 同時間帯の予約数
       const bookedCount = booked.filter(b => b.time_slot === slot).length;
       const availableChairs = settings.maxChairs - bookedCount;
 
@@ -158,11 +149,10 @@ router.get('/available-slots/:date', async (req, res) => {
 
 // =============================================
 // GET /api/appointments/available-dates/:yearMonth
-// 月間の予約可能日一覧（LINE Bot用）
 // =============================================
 router.get('/available-dates/:yearMonth', async (req, res) => {
   try {
-    const { yearMonth } = req.params; // YYYY-MM
+    const { yearMonth } = req.params;
     const [year, month] = yearMonth.split('-').map(Number);
     const settings = await getClinicSettings();
 
@@ -172,7 +162,7 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const today = new Date().toISOString().split('T')[0];
-      if (dateStr < today) continue; // 過去日除外
+      if (dateStr < today) continue;
 
       if (!isOpenDay(dateStr, settings.openDays)) continue;
 
@@ -199,7 +189,6 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
 
 // =============================================
 // GET /api/appointments/calendar/:date
-// カレンダー表示用：日別全予約（管理者）
 // =============================================
 router.get('/calendar/:date', authenticateToken, async (req, res) => {
   try {
@@ -254,7 +243,6 @@ router.get('/calendar/:date', authenticateToken, async (req, res) => {
 
 // =============================================
 // GET /api/appointments
-// 全予約一覧（管理者）
 // =============================================
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -267,9 +255,9 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
     const params = [];
 
-    if (date) { params.push(date); query += ` AND a.appointment_date = $${params.length}`; }
+    if (date)       { params.push(date);       query += ` AND a.appointment_date = $${params.length}`; }
     if (patient_id) { params.push(patient_id); query += ` AND a.patient_id = $${params.length}`; }
-    if (status) { params.push(status); query += ` AND a.status = $${params.length}`; }
+    if (status)     { params.push(status);     query += ` AND a.status = $${params.length}`; }
 
     query += ' ORDER BY a.appointment_date, a.time_slot';
 
@@ -282,23 +270,14 @@ router.get('/', authenticateToken, async (req, res) => {
 
 // =============================================
 // POST /api/appointments
-// 新規予約作成【9】申し送り入力欄対応
 // =============================================
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
-      patient_id,
-      appointment_date,
-      time_slot,
-      duration_minutes,
-      treatment_type,
-      treatment_color,
-      chair_number,
-      doctor_name,
-      notes            // 【9】申し送り
+      patient_id, appointment_date, time_slot, duration_minutes,
+      treatment_type, treatment_color, chair_number, doctor_name, notes
     } = req.body;
 
-    // 重複チェック
     const conflict = await pool.query(`
       SELECT id FROM appointments
       WHERE appointment_date = $1
@@ -330,24 +309,16 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // =============================================
 // PUT /api/appointments/:id
-// 予約更新（D&D移動対応）【2】
 // =============================================
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      appointment_date,
-      time_slot,
-      duration_minutes,
-      treatment_type,
-      treatment_color,
-      chair_number,
-      doctor_name,
-      notes,
-      status
+      appointment_date, time_slot, duration_minutes,
+      treatment_type, treatment_color, chair_number,
+      doctor_name, notes, status
     } = req.body;
 
-    // 移動先の重複チェック（自分以外）
     if (appointment_date && time_slot && chair_number) {
       const conflict = await pool.query(`
         SELECT id FROM appointments
@@ -389,7 +360,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // =============================================
-// DELETE /api/appointments/:id（キャンセル）
+// DELETE /api/appointments/:id
 // =============================================
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
