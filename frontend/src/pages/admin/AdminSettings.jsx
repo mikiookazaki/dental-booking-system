@@ -212,27 +212,51 @@ export default function AdminSettings() {
         </div>
 
         {/* 昼休み */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 8 }}>
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              昼休み開始
-            </label>
-            <input
-              type="time" value={settings.lunch_start || '13:00'}
-              onChange={e => update('lunch_start', e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-            />
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>昼休みあり</label>
+            <div
+              onClick={() => update('has_lunch_break', settings.has_lunch_break === 'false' ? 'true' : 'false')}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                background: settings.has_lunch_break === 'false' ? '#d1d5db' : '#2563eb',
+                position: 'relative', transition: 'background 0.2s',
+              }}
+            >
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                position: 'absolute', top: 3,
+                left: settings.has_lunch_break === 'false' ? 3 : 23,
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              昼休み終了
-            </label>
-            <input
-              type="time" value={settings.lunch_end || '14:00'}
-              onChange={e => update('lunch_end', e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-            />
-          </div>
+          {settings.has_lunch_break !== 'false' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み開始</label>
+                <input
+                  type="time" value={settings.lunch_start || '13:00'}
+                  onChange={e => update('lunch_start', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み終了</label>
+                <input
+                  type="time" value={settings.lunch_end || '14:00'}
+                  onChange={e => update('lunch_end', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          )}
+          {settings.has_lunch_break === 'false' && (
+            <p style={{ fontSize: 12, color: '#6b7280', margin: 0, background: '#f0fdf4', padding: '8px 12px', borderRadius: 6 }}>
+              昼休みなし（終日診療）
+            </p>
+          )}
         </div>
 
         {/* プレビュー */}
@@ -245,7 +269,9 @@ export default function AdminSettings() {
           </span>
           <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 16 }}>
             {settings.open_time || '09:00'}〜{settings.close_time || '18:30'}
-            　昼休み {settings.lunch_start || '13:00'}〜{settings.lunch_end || '14:00'}
+            　{settings.has_lunch_break === 'false'
+              ? '昼休みなし'
+              : `昼休み ${settings.lunch_start || '13:00'}〜${settings.lunch_end || '14:00'}`}
           </span>
         </div>
       </div>
