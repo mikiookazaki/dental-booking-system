@@ -28,6 +28,7 @@ app.use('/api/settings',     require('./routes/settings'));
 app.use('/api/blocked-slots',require('./routes/blockedSlots'));
 app.use('/api/line',         require('./routes/line'));
 app.use('/api/auth',         require('./routes/auth'));
+app.use('/api/admin',        require('./routes/admin'));
 
 // ── ヘルスチェック ────────────────────────────────────────
 app.get('/health', (req, res) => {
