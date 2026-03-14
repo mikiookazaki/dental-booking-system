@@ -51,6 +51,7 @@ export default function CalendarPage() {
   const [dragOver, setDragOver]           = useState(null);
   const [newApptModal, setNewApptModal]   = useState(null);
   const [detailModal, setDetailModal]     = useState(null);
+  const [allStaff, setAllStaff]           = useState([]);
   const [now, setNow]                     = useState(new Date());
 
   useEffect(() => {
@@ -69,6 +70,13 @@ export default function CalendarPage() {
   }, [selectedDate]);
 
   useEffect(() => { fetchCalendar(); }, [fetchCalendar]);
+
+  useEffect(() => {
+    axios.get("/api/staff").then(r => {
+      const list = r.data?.staff || r.data || [];
+      setAllStaff(Array.isArray(list) ? list : []);
+    }).catch(() => {});
+  }, []);
 
   // 月別データ取得
   const fetchMonth = useCallback(async () => {
@@ -142,16 +150,10 @@ export default function CalendarPage() {
   const lunchTop    = slotTop(settings.lunchStart);
   const lunchHeight = durationPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
 
-  // ドクター別グループ
-  const doctors = [...new Map(
-    appointments.filter(a => a.staff_id)
-      .map(a => [a.staff_id, { id: a.staff_id, name: a.doctor_name }])
-  ).values()];
-
-  // 表示列
+  // 表示列（ドクターモードは全スタッフ表示）
   const columns = viewMode === 'chair'
     ? chairs.map(c => ({ id: c.id, label: c.name, type: 'chair' }))
-    : doctors.map(d => ({ id: d.id, label: d.name, type: 'doctor' }));
+    : allStaff.map(s => ({ id: s.id, label: s.name, type: 'doctor' }));
 
   function getApptsForColumn(col) {
     if (col.type === 'chair') return appointments.filter(a => a.chair_id === col.id);
@@ -241,7 +243,7 @@ export default function CalendarPage() {
       {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
 
       {/* ドクターモードで予約なし */}
-      {viewMode === 'doctor' && columns.length === 0 && (
+      {viewMode === "doctor" && allStaff.length === 0 && (
         <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
           本日の予約はありません
         </div>
