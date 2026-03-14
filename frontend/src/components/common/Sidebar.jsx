@@ -13,7 +13,7 @@ export default function Sidebar() {
 
   function handleLogout() {
     localStorage.clear()
-    navigate('/admin/login')
+    window.location.href = '/admin/login'
   }
 
   return (
