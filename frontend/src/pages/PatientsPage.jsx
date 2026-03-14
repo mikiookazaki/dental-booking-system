@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import axios from '../api'
 import { Search, Plus, X, QrCode } from 'lucide-react'
 
+// カタカナバリデーション
+function validateKana(val) {
+  if (!val || !val.trim()) return 'フリガナ（カタカナ）は必須です'
+  if (!/^[ァ-ヶー　\s]+$/.test(val.trim())) return 'カタカナで入力してください（例: ヤマダ タロウ）'
+  return ''
+}
+
 export default function PatientsPage() {
   const [patients, setPatients]       = useState([])
   const [query, setQuery]             = useState('')
@@ -10,7 +17,10 @@ export default function PatientsPage() {
   const [showQRModal, setShowQRModal] = useState(false)
   const [qrData, setQrData]           = useState(null)
   const [qrLoading, setQrLoading]     = useState(false)
-  const [form, setForm] = useState({ name: '', name_kana: '', phone: '', birth_date: '', gender: '' })
+  const [form, setForm] = useState({
+    name: '', name_kana: '', phone: '', birth_date: '', gender: ''
+  })
+  const [errors, setErrors] = useState({})
 
   useEffect(() => { fetchPatients() }, [])
 
@@ -28,16 +38,44 @@ export default function PatientsPage() {
     fetchPatients()
   }
 
+  // フィールド更新＋リアルタイムバリデーション
+  function setField(key, val) {
+    setForm(f => ({ ...f, [key]: val }))
+    if (key === 'name') {
+      setErrors(e => ({ ...e, name: val.trim() ? '' : '氏名は必須です' }))
+    }
+    if (key === 'name_kana') {
+      setErrors(e => ({ ...e, name_kana: validateKana(val) }))
+    }
+  }
+
+  function validate() {
+    const errs = {}
+    if (!form.name?.trim()) errs.name = '氏名は必須です'
+    const kanaErr = validateKana(form.name_kana)
+    if (kanaErr) errs.name_kana = kanaErr
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   async function handleCreate(e) {
     e.preventDefault()
+    if (!validate()) return
     try {
       await axios.post('/api/patients', form)
       setShowModal(false)
       setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '' })
+      setErrors({})
       fetchPatients()
     } catch (err) {
-      alert('登録に失敗しました')
+      alert(err.response?.data?.error || '登録に失敗しました')
     }
+  }
+
+  function handleCloseModal() {
+    setShowModal(false)
+    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '' })
+    setErrors({})
   }
 
   async function handleShowQR(patient) {
@@ -148,7 +186,6 @@ export default function PatientsPage() {
                 <p className="text-sm font-medium text-gray-700">
                   {qrData.name} 様（{qrData.patient_code}）
                 </p>
-                {/* QR画像（外部API生成） */}
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData.qr_url)}`}
                   alt="QRコード"
@@ -167,7 +204,6 @@ export default function PatientsPage() {
                     未連携 / スマホのLINEカメラで読み取ってください
                   </span>
                 )}
-                {/* QR URL コピー */}
                 <button
                   onClick={() => navigator.clipboard.writeText(qrData.qr_url)}
                   className="w-full py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
@@ -183,10 +219,10 @@ export default function PatientsPage() {
       {/* 新規登録モーダル */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-96">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-gray-800">新規患者登録（初診）</h3>
-              <button onClick={() => setShowModal(false)}>
+              <button onClick={handleCloseModal}>
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
@@ -194,43 +230,75 @@ export default function PatientsPage() {
               ※ 患者番号は自動採番されます。詳細情報は登録後に追加できます。
             </p>
             <form onSubmit={handleCreate} className="space-y-3">
+
+              {/* 氏名 */}
               <div>
-                <label className="text-xs text-gray-500">氏名 *</label>
+                <label className="text-xs text-gray-500">
+                  氏名 <span className="text-red-500">*</span>
+                </label>
                 <input
-                  required value={form.name}
-                  onChange={e => setForm({...form, name: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  value={form.name}
+                  onChange={e => setField('name', e.target.value)}
+                  placeholder="例: 山田 太郎"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2
+                    ${errors.name
+                      ? 'border-red-400 focus:ring-red-300'
+                      : 'border-gray-300 focus:ring-blue-300'}`}
                 />
+                {errors.name && (
+                  <p className="text-xs text-red-500 mt-0.5">{errors.name}</p>
+                )}
               </div>
+
+              {/* フリガナ（カタカナ必須）*/}
               <div>
-                <label className="text-xs text-gray-500">氏名（カナ）</label>
+                <label className="text-xs text-gray-500">
+                  フリガナ <span className="text-red-500">*</span>
+                  <span className="text-gray-400 ml-1">（カタカナ）</span>
+                </label>
                 <input
                   value={form.name_kana}
-                  onChange={e => setForm({...form, name_kana: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  onChange={e => setField('name_kana', e.target.value)}
+                  placeholder="例: ヤマダ タロウ"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2
+                    ${errors.name_kana
+                      ? 'border-red-400 focus:ring-red-300'
+                      : 'border-gray-300 focus:ring-blue-300'}`}
                 />
+                {errors.name_kana ? (
+                  <p className="text-xs text-red-500 mt-0.5">{errors.name_kana}</p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-0.5">カタカナのみ入力可</p>
+                )}
               </div>
+
+              {/* 電話番号 */}
               <div>
                 <label className="text-xs text-gray-500">電話番号</label>
                 <input
                   value={form.phone}
-                  onChange={e => setForm({...form, phone: e.target.value})}
+                  onChange={e => setField('phone', e.target.value)}
+                  placeholder="090-0000-0000"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
               </div>
+
+              {/* 生年月日 */}
               <div>
                 <label className="text-xs text-gray-500">生年月日</label>
                 <input
                   type="date" value={form.birth_date}
-                  onChange={e => setForm({...form, birth_date: e.target.value})}
+                  onChange={e => setField('birth_date', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
               </div>
+
+              {/* 性別 */}
               <div>
                 <label className="text-xs text-gray-500">性別</label>
                 <select
                   value={form.gender}
-                  onChange={e => setForm({...form, gender: e.target.value})}
+                  onChange={e => setField('gender', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 >
                   <option value="">選択してください</option>
@@ -239,9 +307,10 @@ export default function PatientsPage() {
                   <option value="other">その他</option>
                 </select>
               </div>
+
               <div className="flex gap-2 pt-2">
                 <button
-                  type="button" onClick={() => setShowModal(false)}
+                  type="button" onClick={handleCloseModal}
                   className="flex-1 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
                 >キャンセル</button>
                 <button

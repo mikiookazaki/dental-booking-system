@@ -1,161 +1,135 @@
-const express  = require('express');
-const router   = express.Router();
-const db       = require('../config/database');
+// routes/patients.js
+const express = require('express');
+const router = express.Router();
+const pool = require('../db');
+const authenticateToken = require('../middleware/auth');
 
-// ============================================================
-// 患者一覧（検索対応）
-// ============================================================
-router.get('/', async (req, res) => {
+// カタカナバリデーション【8】
+function isValidKana(str) {
+  return /^[ァ-ヶー　\s]+$/.test(str);
+}
+
+// =============================================
+// GET /api/patients
+// 患者一覧
+// =============================================
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { q } = req.query;
-    let query    = 'SELECT * FROM patients WHERE is_active = TRUE';
+    const { search } = req.query;
+    let query = `
+      SELECT id, patient_code, name, name_kana, phone, email,
+             date_of_birth, gender, address, notes, created_at
+      FROM patients
+    `;
     const params = [];
-    if (q) {
-      query += ' AND (name ILIKE $1 OR name_kana ILIKE $1 OR patient_code ILIKE $1 OR rececon_id ILIKE $1 OR phone LIKE $1)';
-      params.push(`%${q}%`);
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` WHERE name ILIKE $1 OR name_kana ILIKE $1
+                   OR phone LIKE $1 OR patient_code ILIKE $1`;
     }
+
     query += ' ORDER BY created_at DESC';
-    const result = await db.query(query, params);
-    res.json({ patients: result.rows });
+    const result = await pool.query(query, params);
+    res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'サーバーエラー' });
   }
 });
 
-// ============================================================
-// 患者詳細
-// ============================================================
-router.get('/:id', async (req, res) => {
+// =============================================
+// GET /api/patients/:id
+// =============================================
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM patients WHERE id = $1', [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ error: '患者が見つかりません' });
-    res.json({ patient: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-// 患者登録
-// 初診：名前・性別・電話番号など最小情報で登録
-// patient_code は DB トリガーで自動採番（P-00001 形式）
-// ============================================================
-router.post('/', async (req, res) => {
-  const { name, name_kana, phone, birth_date, gender, email, address, insurance_number, allergies, notes } = req.body;
-  if (!name) return res.status(400).json({ error: '氏名は必須です' });
-  try {
-    const result = await db.query(`
-      INSERT INTO patients
-        (name, name_kana, phone, birth_date, gender, email, address,
-         insurance_number, allergies, notes, first_visit)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CURRENT_DATE)
-      RETURNING *
-    `, [name, name_kana, phone, birth_date, gender, email, address,
-        insurance_number, allergies, notes]);
-    res.status(201).json({ patient: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-// 患者情報更新
-// ============================================================
-router.put('/:id', async (req, res) => {
-  const { name, name_kana, birth_date, gender, phone, email, address, allergies, notes } = req.body;
-  try {
-    const result = await db.query(`
-      UPDATE patients SET
-        name=$1, name_kana=$2, birth_date=$3, gender=$4,
-        phone=$5, email=$6, address=$7, allergies=$8, notes=$9,
-        updated_at=NOW()
-      WHERE id=$10 RETURNING *
-    `, [name, name_kana, birth_date, gender, phone, email, address, allergies, notes, req.params.id]);
-    res.json({ patient: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-// GET /api/patients/:id/qr
-// QRコード用URLを返す（patient_code 固定・有効期限なし）
-// QRに埋め込む内容: /api/line/link?code=P-00001
-// ============================================================
-router.get('/:id/qr', async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT id, name, patient_code, line_user_id FROM patients WHERE id = $1',
+    const result = await pool.query(
+      'SELECT * FROM patients WHERE id = $1',
       [req.params.id]
     );
-    if (!result.rows.length) return res.status(404).json({ error: '患者が見つかりません' });
-
-    const patient = result.rows[0];
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-    const linkUrl    = `${backendUrl}/api/line/link?code=${patient.patient_code}`;
-
-    res.json({
-      patient_code:  patient.patient_code,
-      name:          patient.name,
-      line_linked:   !!patient.line_user_id,
-      qr_url:        linkUrl,
-    });
+    if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
+    res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'サーバーエラー' });
   }
 });
 
-// ============================================================
-// POST /api/patients/link-line（旧トークン方式との互換用・将来削除可）
-// ============================================================
-router.post('/link-line', async (req, res) => {
-  const { patient_code, line_user_id } = req.body;
-  if (!patient_code || !line_user_id) {
-    return res.status(400).json({ error: 'patient_code と line_user_id は必須です' });
-  }
+// =============================================
+// POST /api/patients
+// 新患登録【8】カタカナ必須
+// =============================================
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const result = await db.query(
-      'SELECT * FROM patients WHERE patient_code = $1 AND is_active = TRUE',
-      [patient_code]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: '患者が見つかりません' });
+    const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
+
+    // バリデーション
+    if (!name || !name?.trim()) {
+      return res.status(400).json({ error: '氏名は必須です' });
     }
-    const patient = result.rows[0];
+    if (!name_kana || !name_kana?.trim()) {
+      return res.status(400).json({ error: 'フリガナ（カタカナ）は必須です' });
+    }
+    if (!isValidKana(name_kana.trim())) {
+      return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
+    }
 
-    await db.query(`
-      UPDATE patients SET
-        line_user_id   = $1,
-        line_linked_at = NOW(),
-        updated_at     = NOW()
-      WHERE id = $2
-    `, [line_user_id, patient.id]);
+    // 患者コード生成（P + 年 + 連番6桁）
+    const year = new Date().getFullYear().toString().slice(-2);
+    const countResult = await pool.query('SELECT COUNT(*) FROM patients');
+    const seq = String(parseInt(countResult.rows[0].count) + 1).padStart(6, '0');
+    const patient_code = `P${year}${seq}`;
 
-    res.json({ message: 'LINE連携が完了しました', patient_code: patient.patient_code, name: patient.name });
+    const result = await pool.query(`
+      INSERT INTO patients (patient_code, name, name_kana, phone, email, date_of_birth, gender, address, notes)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *
+    `, [patient_code, name.trim(), name_kana.trim(), phone, email, date_of_birth, gender, address, notes]);
+
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('POST patient error:', err);
+    res.status(500).json({ error: 'サーバーエラー' });
   }
 });
 
-// ============================================================
-// PUT /api/patients/:id/rececon
-// レセコン連携：rececon_id を設定して名寄せ完了
-// ============================================================
-router.put('/:id/rececon', async (req, res) => {
-  const { rececon_id } = req.body;
-  if (!rececon_id) return res.status(400).json({ error: 'rececon_id は必須です' });
+// =============================================
+// PUT /api/patients/:id
+// 患者更新【8】カタカナ必須
+// =============================================
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const result = await db.query(`
+    const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
+
+    if (name !== undefined && !name?.trim()) {
+      return res.status(400).json({ error: '氏名は必須です' });
+    }
+    if (name_kana !== undefined) {
+      if (!name_kana?.trim()) {
+        return res.status(400).json({ error: 'フリガナ（カタカナ）は必須です' });
+      }
+      if (!isValidKana(name_kana.trim())) {
+        return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
+      }
+    }
+
+    const result = await pool.query(`
       UPDATE patients SET
-        rececon_id  = $1,
-        data_source = 'rececon',
-        mapped_at   = NOW(),
-        updated_at  = NOW()
-      WHERE id = $2 RETURNING *
-    `, [rececon_id, req.params.id]);
-    res.json({ patient: result.rows[0] });
+        name          = COALESCE($1, name),
+        name_kana     = COALESCE($2, name_kana),
+        phone         = COALESCE($3, phone),
+        email         = COALESCE($4, email),
+        date_of_birth = COALESCE($5, date_of_birth),
+        gender        = COALESCE($6, gender),
+        address       = COALESCE($7, address),
+        notes         = COALESCE($8, notes),
+        updated_at    = NOW()
+      WHERE id = $9
+      RETURNING *
+    `, [name?.trim(), name_kana?.trim(), phone, email, date_of_birth, gender, address, notes, req.params.id]);
+
+    if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
+    res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'サーバーエラー' });
   }
 });
 
