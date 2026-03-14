@@ -20,7 +20,7 @@ const API_HEADERS  = {
 
 // ── DBから医院設定を取得 ──────────────────────────────────
 async function getClinicSettings() {
-  const db     = require('../src/config/database');
+  const db     = require('./db');
   const result = await db.query('SELECT key, value FROM clinic_settings');
   const settings = {};
   result.rows.forEach(row => { settings[row.key] = row.value; });
