@@ -5,59 +5,56 @@ const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
 // =============================================
-// 【1】DB設定値から動的に空き枠を計算するヘルパー
+// DB設定値から動的に空き枠を計算するヘルパー
+// ※ 既存スキーマ: clinic_settings テーブル使用
 // =============================================
 async function getClinicSettings() {
   const result = await pool.query(`
-    SELECT key, value FROM system_settings
+    SELECT key, value FROM clinic_settings
     WHERE key IN (
       'open_days', 'open_time', 'close_time',
-      'lunch_start', 'lunch_end', 'slot_duration',
-      'max_chairs', 'patient_booking_enabled'
+      'lunch_start', 'lunch_end', 'slot_minutes',
+      'can_patient_book'
     )
   `);
   const settings = {};
   result.rows.forEach(r => { settings[r.key] = r.value; });
 
   return {
-    openDays: JSON.parse(settings.open_days || '[1,2,3,4,5]'),
-    openTime: settings.open_time || '09:00',
-    closeTime: settings.close_time || '18:00',
-    lunchStart: settings.lunch_start || '13:00',
-    lunchEnd: settings.lunch_end || '14:00',
-    slotDuration: parseInt(settings.slot_duration || '30'),
-    maxChairs: parseInt(settings.max_chairs || '3'),
-    patientBookingEnabled: settings.patient_booking_enabled !== 'false'
+    openDays:     JSON.parse(settings.open_days || '[1,2,3,4,5,6]'),
+    openTime:     settings.open_time   || '09:00',
+    closeTime:    settings.close_time  || '18:30',
+    lunchStart:   settings.lunch_start || '13:00',
+    lunchEnd:     settings.lunch_end   || '14:00',
+    slotDuration: parseInt(settings.slot_minutes || '30'),
+    patientBookingEnabled: settings.can_patient_book !== 'false'
   };
 }
 
-// 指定日が診療日かチェック
 function isOpenDay(dateStr, openDays) {
   const dow = new Date(dateStr).getDay();
   return openDays.includes(dow);
 }
 
-// HH:MM → 分
 function toMinutes(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number);
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.toString().substring(0, 5).split(':').map(Number);
   return h * 60 + m;
 }
 
-// 分 → HH:MM
 function toTimeStr(minutes) {
   const h = Math.floor(minutes / 60).toString().padStart(2, '0');
   const m = (minutes % 60).toString().padStart(2, '0');
   return `${h}:${m}`;
 }
 
-// 指定日の全スロット（昼休み除外）を生成
-function generateSlots(dateStr, settings) {
+function generateSlots(settings) {
   const { openTime, closeTime, lunchStart, lunchEnd, slotDuration } = settings;
   const slots = [];
   let cur = toMinutes(openTime);
   const end = toMinutes(closeTime);
-  const ls = toMinutes(lunchStart);
-  const le = toMinutes(lunchEnd);
+  const ls  = toMinutes(lunchStart);
+  const le  = toMinutes(lunchEnd);
 
   while (cur + slotDuration <= end) {
     if (!(cur >= ls && cur < le)) {
@@ -68,24 +65,49 @@ function generateSlots(dateStr, settings) {
   return slots;
 }
 
-// 指定日の予約済み枠をDB取得
+async function getChairs() {
+  const result = await pool.query(
+    `SELECT id, name FROM chairs WHERE is_active = TRUE ORDER BY display_order`
+  );
+  return result.rows;
+}
+
 async function getBookedSlots(dateStr) {
   const result = await pool.query(`
-    SELECT time_slot, chair_number, duration_minutes
-    FROM appointments
-    WHERE appointment_date = $1
-      AND status NOT IN ('cancelled')
+    SELECT
+      a.id,
+      a.patient_id,
+      a.staff_id,
+      a.chair_id,
+      a.treatment_id,
+      a.appointment_date,
+      a.start_time,
+      a.end_time,
+      a.status,
+      a.notes,
+      p.name        AS patient_name,
+      p.name_kana,
+      c.name        AS chair_name,
+      s.name        AS doctor_name,
+      t.name        AS treatment_type,
+      COALESCE(t.color, '#dbeafe') AS treatment_color
+    FROM appointments a
+    LEFT JOIN patients   p ON a.patient_id   = p.id
+    LEFT JOIN chairs     c ON a.chair_id     = c.id
+    LEFT JOIN staff      s ON a.staff_id     = s.id
+    LEFT JOIN treatments t ON a.treatment_id = t.id
+    WHERE a.appointment_date = $1
+      AND a.status != 'cancelled'
+    ORDER BY a.start_time, a.chair_id
   `, [dateStr]);
   return result.rows;
 }
 
-// 指定日のブロック枠をDB取得
 async function getBlockedSlots(dateStr) {
   const result = await pool.query(`
-    SELECT start_time, end_time, block_type, reason
-    FROM booking_blocks
+    SELECT id, block_date, start_time, end_time, affects_all, reason
+    FROM blocked_slots
     WHERE block_date = $1
-      AND (block_type = 'full_day' OR start_time IS NOT NULL)
   `, [dateStr]);
   return result.rows;
 }
@@ -96,51 +118,50 @@ async function getBlockedSlots(dateStr) {
 router.get('/available-slots/:date', async (req, res) => {
   try {
     const { date } = req.params;
-    const settings = await getClinicSettings();
+    const settings  = await getClinicSettings();
+    const chairs    = await getChairs();
+    const maxChairs = chairs.length;
 
     if (!isOpenDay(date, settings.openDays)) {
       return res.json({ available: false, reason: 'closed', slots: [] });
     }
 
-    const blocks = await getBlockedSlots(date);
-    const fullDayBlock = blocks.find(b => b.block_type === 'full_day');
+    const blocks       = await getBlockedSlots(date);
+    const fullDayBlock = blocks.find(b => b.affects_all && !b.start_time);
     if (fullDayBlock) {
-      return res.json({ available: false, reason: 'blocked', slots: [] });
+      return res.json({ available: false, reason: 'blocked', reason_text: fullDayBlock.reason, slots: [] });
     }
 
-    const allSlots = generateSlots(date, settings);
-    const booked = await getBookedSlots(date);
-    const timeBlocks = blocks.filter(b => b.block_type !== 'full_day');
+    const allSlots = generateSlots(settings);
+    const booked   = await getBookedSlots(date);
 
     const slotDetails = allSlots.map(slot => {
-      const slotMin = toMinutes(slot);
+      const slotMin    = toMinutes(slot);
       const slotEndMin = slotMin + settings.slotDuration;
 
-      const isBlocked = timeBlocks.some(b => {
+      const isBlocked = blocks.some(b => {
+        if (!b.start_time) return false;
         const bs = toMinutes(b.start_time);
         const be = toMinutes(b.end_time);
         return slotMin < be && slotEndMin > bs;
       });
 
-      const bookedCount = booked.filter(b => b.time_slot === slot).length;
-      const availableChairs = settings.maxChairs - bookedCount;
+      const bookedCount = booked.filter(b => {
+        const bStart = toMinutes(b.start_time);
+        const bEnd   = toMinutes(b.end_time);
+        return bStart < slotEndMin && bEnd > slotMin;
+      }).length;
 
       return {
-        time: slot,
-        available: !isBlocked && availableChairs > 0,
-        availableChairs: isBlocked ? 0 : availableChairs,
+        time:            slot,
+        available:       !isBlocked && (maxChairs - bookedCount) > 0,
+        availableChairs: isBlocked ? 0 : Math.max(0, maxChairs - bookedCount),
         bookedCount,
         isBlocked
       };
     });
 
-    res.json({
-      date,
-      available: true,
-      slotDuration: settings.slotDuration,
-      maxChairs: settings.maxChairs,
-      slots: slotDetails
-    });
+    res.json({ date, available: true, slotDuration: settings.slotDuration, maxChairs, slots: slotDetails });
   } catch (err) {
     console.error('available-slots error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
@@ -154,27 +175,34 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
   try {
     const { yearMonth } = req.params;
     const [year, month] = yearMonth.split('-').map(Number);
-    const settings = await getClinicSettings();
+    const settings  = await getClinicSettings();
+    const chairs    = await getChairs();
+    const maxChairs = chairs.length;
 
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const daysInMonth    = new Date(year, month, 0).getDate();
     const availableDates = [];
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
+      const today   = new Date().toISOString().split('T')[0];
       if (dateStr < today) continue;
-
       if (!isOpenDay(dateStr, settings.openDays)) continue;
 
       const blocks = await getBlockedSlots(dateStr);
-      if (blocks.find(b => b.block_type === 'full_day')) continue;
+      if (blocks.find(b => b.affects_all && !b.start_time)) continue;
 
-      const booked = await getBookedSlots(dateStr);
-      const allSlots = generateSlots(dateStr, settings);
+      const booked   = await getBookedSlots(dateStr);
+      const allSlots = generateSlots(settings);
 
       const hasAvailable = allSlots.some(slot => {
-        const bookedCount = booked.filter(b => b.time_slot === slot).length;
-        return bookedCount < settings.maxChairs;
+        const slotMin    = toMinutes(slot);
+        const slotEndMin = slotMin + settings.slotDuration;
+        const bookedCount = booked.filter(b => {
+          const bStart = toMinutes(b.start_time);
+          const bEnd   = toMinutes(b.end_time);
+          return bStart < slotEndMin && bEnd > slotMin;
+        }).length;
+        return bookedCount < maxChairs;
       });
 
       if (hasAvailable) availableDates.push(dateStr);
@@ -192,47 +220,26 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
 // =============================================
 router.get('/calendar/:date', requireAuth, async (req, res) => {
   try {
-    const { date } = req.params;
-    const settings = await getClinicSettings();
-
-    const result = await pool.query(`
-      SELECT
-        a.id,
-        a.patient_id,
-        p.name AS patient_name,
-        p.name_kana,
-        a.appointment_date,
-        a.time_slot,
-        a.duration_minutes,
-        a.treatment_type,
-        a.treatment_color,
-        a.chair_number,
-        a.doctor_name,
-        a.status,
-        a.notes,
-        a.created_at
-      FROM appointments a
-      JOIN patients p ON a.patient_id = p.id
-      WHERE a.appointment_date = $1
-        AND a.status != 'cancelled'
-      ORDER BY a.time_slot, a.chair_number
-    `, [date]);
-
-    const blocks = await getBlockedSlots(date);
-    const allSlots = generateSlots(date, settings);
+    const { date }   = req.params;
+    const settings   = await getClinicSettings();
+    const chairs     = await getChairs();
+    const booked     = await getBookedSlots(date);
+    const blocks     = await getBlockedSlots(date);
+    const allSlots   = generateSlots(settings);
 
     res.json({
       date,
       settings: {
-        openTime: settings.openTime,
-        closeTime: settings.closeTime,
-        lunchStart: settings.lunchStart,
-        lunchEnd: settings.lunchEnd,
+        openTime:     settings.openTime,
+        closeTime:    settings.closeTime,
+        lunchStart:   settings.lunchStart,
+        lunchEnd:     settings.lunchEnd,
         slotDuration: settings.slotDuration,
-        maxChairs: settings.maxChairs
+        maxChairs:    chairs.length
       },
-      slots: allSlots,
-      appointments: result.rows,
+      chairs,
+      slots:        allSlots,
+      appointments: booked,
       blocks
     });
   } catch (err) {
@@ -248,22 +255,25 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const { date, patient_id, status } = req.query;
     let query = `
-      SELECT a.*, p.name AS patient_name, p.name_kana, p.phone
+      SELECT a.*, p.name AS patient_name, p.name_kana, p.phone,
+             c.name AS chair_name, s.name AS doctor_name,
+             t.name AS treatment_type, t.color AS treatment_color
       FROM appointments a
-      JOIN patients p ON a.patient_id = p.id
+      LEFT JOIN patients   p ON a.patient_id   = p.id
+      LEFT JOIN chairs     c ON a.chair_id     = c.id
+      LEFT JOIN staff      s ON a.staff_id     = s.id
+      LEFT JOIN treatments t ON a.treatment_id = t.id
       WHERE 1=1
     `;
     const params = [];
-
     if (date)       { params.push(date);       query += ` AND a.appointment_date = $${params.length}`; }
     if (patient_id) { params.push(patient_id); query += ` AND a.patient_id = $${params.length}`; }
     if (status)     { params.push(status);     query += ` AND a.status = $${params.length}`; }
-
-    query += ' ORDER BY a.appointment_date, a.time_slot';
-
+    query += ' ORDER BY a.appointment_date, a.start_time';
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
+    console.error('GET appointments error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
   }
 });
@@ -273,18 +283,15 @@ router.get('/', requireAuth, async (req, res) => {
 // =============================================
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const {
-      patient_id, appointment_date, time_slot, duration_minutes,
-      treatment_type, treatment_color, chair_number, doctor_name, notes
-    } = req.body;
+    const { patient_id, appointment_date, start_time, end_time,
+            treatment_id, chair_id, staff_id, notes, source } = req.body;
 
     const conflict = await pool.query(`
       SELECT id FROM appointments
-      WHERE appointment_date = $1
-        AND time_slot = $2
-        AND chair_number = $3
+      WHERE appointment_date = $1 AND chair_id = $2
         AND status != 'cancelled'
-    `, [appointment_date, time_slot, chair_number]);
+        AND start_time < $3 AND end_time > $4
+    `, [appointment_date, chair_id, end_time, start_time]);
 
     if (conflict.rows.length > 0) {
       return res.status(409).json({ error: '指定の時間・チェアはすでに予約済みです' });
@@ -292,13 +299,12 @@ router.post('/', requireAuth, async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO appointments
-        (patient_id, appointment_date, time_slot, duration_minutes,
-         treatment_type, treatment_color, chair_number, doctor_name, notes, status)
+        (patient_id, appointment_date, start_time, end_time,
+         treatment_id, chair_id, staff_id, notes, source, status)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'confirmed')
       RETURNING *
-    `, [patient_id, appointment_date, time_slot,
-        duration_minutes || 30, treatment_type, treatment_color,
-        chair_number || 1, doctor_name, notes]);
+    `, [patient_id, appointment_date, start_time, end_time,
+        treatment_id, chair_id, staff_id, notes, source || 'staff']);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -313,21 +319,16 @@ router.post('/', requireAuth, async (req, res) => {
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      appointment_date, time_slot, duration_minutes,
-      treatment_type, treatment_color, chair_number,
-      doctor_name, notes, status
-    } = req.body;
+    const { appointment_date, start_time, end_time,
+            treatment_id, chair_id, staff_id, notes, status } = req.body;
 
-    if (appointment_date && time_slot && chair_number) {
+    if (appointment_date && start_time && end_time && chair_id) {
       const conflict = await pool.query(`
         SELECT id FROM appointments
-        WHERE appointment_date = $1
-          AND time_slot = $2
-          AND chair_number = $3
-          AND id != $4
+        WHERE appointment_date = $1 AND chair_id = $2 AND id != $3
           AND status != 'cancelled'
-      `, [appointment_date, time_slot, chair_number, id]);
+          AND start_time < $4 AND end_time > $5
+      `, [appointment_date, chair_id, id, end_time, start_time]);
 
       if (conflict.rows.length > 0) {
         return res.status(409).json({ error: '移動先はすでに予約済みです' });
@@ -337,19 +338,18 @@ router.put('/:id', requireAuth, async (req, res) => {
     const result = await pool.query(`
       UPDATE appointments SET
         appointment_date = COALESCE($1, appointment_date),
-        time_slot        = COALESCE($2, time_slot),
-        duration_minutes = COALESCE($3, duration_minutes),
-        treatment_type   = COALESCE($4, treatment_type),
-        treatment_color  = COALESCE($5, treatment_color),
-        chair_number     = COALESCE($6, chair_number),
-        doctor_name      = COALESCE($7, doctor_name),
-        notes            = COALESCE($8, notes),
-        status           = COALESCE($9, status),
+        start_time       = COALESCE($2, start_time),
+        end_time         = COALESCE($3, end_time),
+        treatment_id     = COALESCE($4, treatment_id),
+        chair_id         = COALESCE($5, chair_id),
+        staff_id         = COALESCE($6, staff_id),
+        notes            = COALESCE($7, notes),
+        status           = COALESCE($8, status),
         updated_at       = NOW()
-      WHERE id = $10
+      WHERE id = $9
       RETURNING *
-    `, [appointment_date, time_slot, duration_minutes, treatment_type,
-        treatment_color, chair_number, doctor_name, notes, status, id]);
+    `, [appointment_date, start_time, end_time,
+        treatment_id, chair_id, staff_id, notes, status, id]);
 
     if (result.rows.length === 0) return res.status(404).json({ error: '予約が見つかりません' });
     res.json(result.rows[0]);
@@ -366,11 +366,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
-      `UPDATE appointments SET status='cancelled', updated_at=NOW() WHERE id=$1`,
+      `UPDATE appointments SET status='cancelled', cancelled_at=NOW(), updated_at=NOW() WHERE id=$1`,
       [id]
     );
     res.json({ message: 'キャンセルしました' });
   } catch (err) {
+    console.error('DELETE appointment error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
   }
 });
