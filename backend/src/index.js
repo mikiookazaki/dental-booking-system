@@ -53,40 +53,63 @@ const pool = require('./config/database');
 const runMigrations = async () => {
   console.log('🔄 マイグレーション開始...');
   try {
-    // patients: name_kana追加
-    await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS name_kana VARCHAR(100)`);
-    await pool.query(`UPDATE patients SET name_kana = name WHERE name_kana IS NULL OR name_kana = ''`);
+    // ── patients ──────────────────────────────────────────
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS name_kana VARCHAR(100)');
+    await pool.query("UPDATE patients SET name_kana = name WHERE name_kana IS NULL OR name_kana = ''");
+    console.log('  ✅ patients');
 
-    // appointments: 各カラム追加
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS treatment_color VARCHAR(20) DEFAULT '#4A90D9'`);
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT`);
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 30`);
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS chair_number INTEGER DEFAULT 1`);
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_name VARCHAR(50)`);
-    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
+    // ── appointments ──────────────────────────────────────
+    await pool.query("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS treatment_color VARCHAR(20) DEFAULT '#4A90D9'");
+    await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT');
+    await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 30');
+    await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS chair_number INTEGER DEFAULT 1');
+    await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_name VARCHAR(50)');
+    await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()');
+    console.log('  ✅ appointments');
 
-    // booking_blocks: 各カラム追加
-    await pool.query(`ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS block_type VARCHAR(20) DEFAULT 'time_slot'`);
-    await pool.query(`ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS start_time TIME`);
-    await pool.query(`ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS end_time TIME`);
-    await pool.query(`ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS reason TEXT`);
+    // ── booking_blocks（テーブルごと作成）─────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS booking_blocks (
+        id           SERIAL PRIMARY KEY,
+        block_date   DATE NOT NULL,
+        block_type   VARCHAR(20) NOT NULL DEFAULT 'time_slot',
+        start_time   TIME,
+        end_time     TIME,
+        reason       TEXT,
+        created_at   TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query("ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS block_type VARCHAR(20) DEFAULT 'time_slot'");
+    await pool.query('ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS start_time TIME');
+    await pool.query('ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS end_time   TIME');
+    await pool.query('ALTER TABLE booking_blocks ADD COLUMN IF NOT EXISTS reason     TEXT');
+    console.log('  ✅ booking_blocks');
 
-    // system_settings: 初期値追加
+    // ── system_settings（テーブルごと作成）────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id         SERIAL PRIMARY KEY,
+        key        VARCHAR(100) UNIQUE NOT NULL,
+        value      TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
     const defaultSettings = [
-      ['slot_duration',  '30'],
-      ['max_chairs',     '3'],
-      ['open_days',      '[1,2,3,4,5]'],
-      ['open_time',      '09:00'],
-      ['close_time',     '18:00'],
-      ['lunch_start',    '13:00'],
-      ['lunch_end',      '14:00'],
+      ['slot_duration', '30'],
+      ['max_chairs',    '3'],
+      ['open_days',     '[1,2,3,4,5]'],
+      ['open_time',     '09:00'],
+      ['close_time',    '18:00'],
+      ['lunch_start',   '13:00'],
+      ['lunch_end',     '14:00'],
     ];
     for (const [key, value] of defaultSettings) {
       await pool.query(
-        `INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+        'INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
         [key, value]
       );
     }
+    console.log('  ✅ system_settings');
 
     console.log('✅ マイグレーション完了');
   } catch (err) {
@@ -97,8 +120,8 @@ const runMigrations = async () => {
 // ── 起動 ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, async () => {
-  console.log(`🦷 歯科予約システム バックエンド起動`);
-  console.log(`   PORT: ${PORT}`);
-  console.log(`   ENV:  ${process.env.NODE_ENV}`);
+  console.log('🦷 歯科予約システム バックエンド起動');
+  console.log('   PORT: ' + PORT);
+  console.log('   ENV:  ' + process.env.NODE_ENV);
   await runMigrations();
 });
