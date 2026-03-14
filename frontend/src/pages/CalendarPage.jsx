@@ -68,7 +68,7 @@ export default function CalendarPage() {
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
       const res = await axios.get(`${API}/api/appointments/calendar/${selectedDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -160,7 +160,7 @@ export default function CalendarPage() {
 
   async function moveAppointment(appt, newSlot, newChair) {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
       await axios.put(`${API}/api/appointments/${appt.id}`, {
         appointment_date: selectedDate,
         time_slot: newSlot,
@@ -482,7 +482,7 @@ function NewAppointmentModal({ slot, chair, date, settings, onClose, onSave }) {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
         const res = await axios.get(`${API}/api/patients?search=${patientSearch}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -504,7 +504,7 @@ function NewAppointmentModal({ slot, chair, date, settings, onClose, onSave }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
       let patientId = selectedPatient?.id;
 
       // 新患登録【8】
@@ -709,7 +709,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
       await axios.put(`${API}/api/appointments/${appt.id}`, { notes }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -721,7 +721,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   async function handleCancel() {
     if (!window.confirm('この予約をキャンセルしますか？')) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
       await axios.delete(`${API}/api/appointments/${appt.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -4,4 +4,13 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
 })
 
+// リクエスト時にトークンを自動付与
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('admin_token') || localStorage.getItem('token')
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+  return config
+})
+
 export default api
