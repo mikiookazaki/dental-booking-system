@@ -48,7 +48,7 @@ app.use((err, req, res, next) => {
 });
 
 // ── マイグレーション ──────────────────────────────────────
-const pool = require('../config/database');
+const pool = require('./config/database');
 
 const runMigrations = async () => {
   console.log('🔄 マイグレーション開始...');
