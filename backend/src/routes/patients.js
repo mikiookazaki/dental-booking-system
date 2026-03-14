@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const authenticateToken = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 // カタカナバリデーション【8】
 function isValidKana(str) {
