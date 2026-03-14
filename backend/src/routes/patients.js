@@ -13,7 +13,7 @@ function isValidKana(str) {
 // GET /api/patients
 // 患者一覧
 // =============================================
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const { search } = req.query;
     let query = `
@@ -40,7 +40,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // =============================================
 // GET /api/patients/:id
 // =============================================
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM patients WHERE id = $1',
@@ -57,7 +57,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // POST /api/patients
 // 新患登録【8】カタカナ必須
 // =============================================
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
 
@@ -95,7 +95,7 @@ router.post('/', authenticateToken, async (req, res) => {
 // PUT /api/patients/:id
 // 患者更新【8】カタカナ必須
 // =============================================
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
 

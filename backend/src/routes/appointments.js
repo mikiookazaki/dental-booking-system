@@ -1,8 +1,8 @@
 // routes/appointments.js
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../config/database');          // ← パス修正
-const authenticateToken = require('../middleware/auth'); // ← パス修正
+const pool = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 // =============================================
 // 【1】DB設定値から動的に空き枠を計算するヘルパー
@@ -190,7 +190,7 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
 // =============================================
 // GET /api/appointments/calendar/:date
 // =============================================
-router.get('/calendar/:date', authenticateToken, async (req, res) => {
+router.get('/calendar/:date', requireAuth, async (req, res) => {
   try {
     const { date } = req.params;
     const settings = await getClinicSettings();
@@ -244,7 +244,7 @@ router.get('/calendar/:date', authenticateToken, async (req, res) => {
 // =============================================
 // GET /api/appointments
 // =============================================
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const { date, patient_id, status } = req.query;
     let query = `
@@ -271,7 +271,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // =============================================
 // POST /api/appointments
 // =============================================
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const {
       patient_id, appointment_date, time_slot, duration_minutes,
@@ -310,7 +310,7 @@ router.post('/', authenticateToken, async (req, res) => {
 // =============================================
 // PUT /api/appointments/:id
 // =============================================
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -362,7 +362,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // =============================================
 // DELETE /api/appointments/:id
 // =============================================
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
