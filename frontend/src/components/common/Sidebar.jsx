@@ -13,7 +13,7 @@ export default function Sidebar() {
 
   function handleLogout() {
     localStorage.clear()
-    navigate('/login')
+    navigate('/admin/login')
   }
 
   return (
