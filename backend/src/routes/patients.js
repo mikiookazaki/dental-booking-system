@@ -18,7 +18,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { search } = req.query;
     let query = `
       SELECT id, patient_code, name, name_kana, phone, email,
-             date_of_birth, gender, address, notes, created_at
+             birth_date, gender, address, notes, created_at
       FROM patients
     `;
     const params = [];
@@ -59,7 +59,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 // =============================================
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
+    const { name, name_kana, phone, email, birth_date, gender, address, notes } = req.body;
 
     // バリデーション
     if (!name || !name?.trim()) {
@@ -79,10 +79,10 @@ router.post('/', requireAuth, async (req, res) => {
     const patient_code = `P${year}${seq}`;
 
     const result = await pool.query(`
-      INSERT INTO patients (patient_code, name, name_kana, phone, email, date_of_birth, gender, address, notes)
+      INSERT INTO patients (patient_code, name, name_kana, phone, email, birth_date, gender, address, notes)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
-    `, [patient_code, name.trim(), name_kana.trim(), phone, email, date_of_birth, gender, address, notes]);
+    `, [patient_code, name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -97,7 +97,7 @@ router.post('/', requireAuth, async (req, res) => {
 // =============================================
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, date_of_birth, gender, address, notes } = req.body;
+    const { name, name_kana, phone, email, birth_date, gender, address, notes } = req.body;
 
     if (name !== undefined && !name?.trim()) {
       return res.status(400).json({ error: '氏名は必須です' });
@@ -117,14 +117,14 @@ router.put('/:id', requireAuth, async (req, res) => {
         name_kana     = COALESCE($2, name_kana),
         phone         = COALESCE($3, phone),
         email         = COALESCE($4, email),
-        date_of_birth = COALESCE($5, date_of_birth),
+        birth_date = COALESCE($5, birth_date),
         gender        = COALESCE($6, gender),
         address       = COALESCE($7, address),
         notes         = COALESCE($8, notes),
         updated_at    = NOW()
       WHERE id = $9
       RETURNING *
-    `, [name?.trim(), name_kana?.trim(), phone, email, date_of_birth, gender, address, notes, req.params.id]);
+    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, req.params.id]);
 
     if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
     res.json(result.rows[0]);
