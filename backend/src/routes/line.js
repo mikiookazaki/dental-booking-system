@@ -99,8 +99,7 @@ async function handleEvent(event) {
         if (elapsed > 30 * 60 * 1000) {
           await replyMessage(replyToken, [{
             type: 'text',
-            text: '⏰ このボタンの有効期限が切れました。
-もう一度メニューから操作してください。',
+            text: 'このボタンの有効期限が切れました。\nもう一度メニューから操作してください。',
           }]);
           break;
         }
