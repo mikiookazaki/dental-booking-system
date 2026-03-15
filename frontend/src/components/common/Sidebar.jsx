@@ -3,6 +3,57 @@ import { Link, useLocation } from 'react-router-dom'
 import { Calendar, Users, UserCog, LogOut } from 'lucide-react'
 import axios from '../../api'
 
+// =============================================
+// 【2】日本の祝日計算
+// =============================================
+function getHolidays(year) {
+  const h = {};
+  const add = (m, d, name) => { h[`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`] = name; };
+
+  // 固定祝日
+  add(1,  1,  '元日');
+  add(2,  11, '建国記念の日');
+  add(2,  23, '天皇誕生日');
+  add(4,  29, '昭和の日');
+  add(5,  3,  '憲法記念日');
+  add(5,  4,  'みどりの日');
+  add(5,  5,  'こどもの日');
+  add(8,  11, '山の日');
+  add(11, 3,  '文化の日');
+  add(11, 23, '勤労感謝の日');
+
+  // ハッピーマンデー（第N月曜日）
+  function nthMon(m, n) {
+    const d = new Date(year, m-1, 1);
+    const first = d.getDay();
+    const mon = first <= 1 ? 1 + (1 - first) : 8 - first + 1;
+    return mon + (n-1) * 7;
+  }
+  add(1,  nthMon(1,2),  '成人の日');
+  add(7,  nthMon(7,3),  '海の日');
+  add(9,  nthMon(9,3),  '敬老の日');
+  add(10, nthMon(10,2), 'スポーツの日');
+
+  // 春分・秋分（簡易計算）
+  const shunbun = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  const shubun  = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  add(3, shunbun, '春分の日');
+  add(9, shubun,  '秋分の日');
+
+  // 振替休日（祝日が日曜 → 翌月曜）
+  const keys = Object.keys(h);
+  keys.forEach(k => {
+    const d = new Date(k);
+    if (d.getDay() === 0) {
+      const next = new Date(d); next.setDate(d.getDate() + 1);
+      const nk = next.toISOString().split('T')[0];
+      if (!h[nk]) h[nk] = '振替休日';
+    }
+  });
+
+  return h;
+}
+
 const navItems = [
   { path: '/calendar', label: '予約カレンダー', icon: Calendar },
   { path: '/patients', label: '患者管理',       icon: Users },
@@ -84,6 +135,7 @@ export default function Sidebar() {
   const daysInMonth = new Date(year, month, 0).getDate()
   const firstDow    = new Date(year, month - 1, 1).getDay()
   const todayStr    = today.toISOString().split('T')[0]
+  const holidays    = getHolidays(year)  // 【2】祝日マップ
 
   const cells = []
   for (let i = 0; i < firstDow; i++) cells.push(null)
@@ -166,13 +218,15 @@ export default function Sidebar() {
                 onClick={() => handleDayClick(ds)}
                 className={`relative flex flex-col items-center justify-center rounded-md py-0.5 transition-all
                   ${isToday ? 'bg-blue-600 text-white' : ''}
-                  ${!isToday && isOpen && !isPast ? 'hover:bg-blue-50 text-gray-700' : ''}
                   ${!isToday && !isOpen ? 'bg-gray-100 text-gray-400' : ''}
-                  ${!isToday && isOpen && isPast ? 'text-gray-400' : ''}`}
+                  ${!isToday && isOpen && holidays[ds] ? 'bg-red-50' : ''}
+                  ${!isToday && isOpen && !holidays[ds] && !isPast ? 'hover:bg-blue-50 text-gray-700' : ''}
+                  ${!isToday && isOpen && !holidays[ds] && isPast ? 'text-gray-400' : ''}`}
               >
                 <span className={`text-xs leading-none font-medium
-                  ${dow === 0 && !isToday && isOpen ? 'text-red-400' : ''}
-                  ${dow === 6 && !isToday && isOpen ? 'text-blue-400' : ''}
+                  ${isToday ? 'text-white' : ''}
+                  ${!isToday && (dow === 0 || holidays[ds]) && isOpen ? 'text-red-500' : ''}
+                  ${!isToday && dow === 6 && !holidays[ds] && isOpen ? 'text-blue-400' : ''}
                   ${!isOpen ? 'text-gray-400' : ''}`}>
                   {d}
                 </span>

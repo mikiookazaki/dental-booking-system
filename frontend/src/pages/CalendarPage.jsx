@@ -246,9 +246,17 @@ export default function CalendarPage() {
           <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }}
               className="text-gray-500 hover:text-blue-600">◀</button>
-            <input type="date" value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
-              className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
+              <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md
+                ${new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' :
+                  new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' :
+                  'text-gray-600 bg-gray-50'}`}>
+                （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
+              </span>
+            </div>
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }}
               className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
