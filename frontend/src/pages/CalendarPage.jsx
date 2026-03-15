@@ -1,5 +1,6 @@
 // src/pages/CalendarPage.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from '../api';
 
 const TREATMENT_COLORS = {
@@ -39,7 +40,10 @@ function formatDate(dateStr) {
 export default function CalendarPage() {
   const [viewType, setViewType]           = useState('day');   // 'month' | 'day'
   const [viewMode, setViewMode]           = useState('chair'); // 'chair' | 'doctor'
-  const [selectedDate, setSelectedDate]   = useState(new Date().toISOString().split('T')[0]);
+  const [searchParams] = useSearchParams();
+  const [selectedDate, setSelectedDate]   = useState(
+    searchParams.get('date') || new Date().toISOString().split('T')[0]
+  );
   const [currentMonth, setCurrentMonth]   = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -130,12 +134,26 @@ export default function CalendarPage() {
     </div>
   );
 
-  const { settings, chairs, slots, appointments, blocks } = calendarData;
-  // 【4】表示時間は displayStart/displayEnd を優先、なければ診療時間を使用
-  const displayStart = settings.displayStart || settings.openTime;
-  const displayEnd   = settings.displayEnd   || settings.closeTime;
-  const openMin  = toMinutes(displayStart);
-  const closeMin = toMinutes(displayEnd);
+  const { settings, chairs, slots: clinicSlots, appointments, blocks } = calendarData;
+
+  // 診療時間外のスロットも生成してslotsを拡張
+  function genExtraSlots(fromMin, toMin, dur) {
+    const s = [];
+    let c = fromMin;
+    while (c + dur <= toMin) { s.push(toTimeStr(c)); c += dur; }
+    return s;
+  }
+  const extraBefore = genExtraSlots(toMinutes(displayStart), clinicOpenMin,  settings.slotDuration);
+  const extraAfter  = genExtraSlots(clinicCloseMin, toMinutes(displayEnd),    settings.slotDuration);
+  const slots = [...extraBefore, ...clinicSlots, ...extraAfter];
+  // 表示時間（診療時間外含む）
+  const displayStart   = settings.displayStart || settings.openTime;
+  const displayEnd     = settings.displayEnd   || settings.closeTime;
+  const openMin        = toMinutes(displayStart);
+  const closeMin       = toMinutes(displayEnd);
+  // 診療時間（グレーアウト判定用）
+  const clinicOpenMin  = toMinutes(settings.openTime);
+  const clinicCloseMin = toMinutes(settings.closeTime);
   const totalMin = closeMin - openMin;
   const SLOT_HEIGHT   = 72;
   const HEADER_HEIGHT = 48;
@@ -348,7 +366,7 @@ export default function CalendarPage() {
                         );
                       })}
 
-                      {/* 空きスロット */}
+                      {/* 空きスロット（時間外グレーアウト対応）*/}
                       {slots.map(slot => {
                         const slotMin    = toMinutes(slot);
                         const slotEndMin = slotMin + settings.slotDuration;
@@ -358,22 +376,38 @@ export default function CalendarPage() {
                           toMinutes(a.start_time) < slotEndMin && toMinutes(a.end_time) > slotMin
                         );
                         if (hasAppt) return null;
-                        const isDragTarget = dragOver?.slot === slot && dragOver?.colId === col.id;
+                        const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
+                        // 診療時間外判定
+                        const isOutOfHours = slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         return (
                           <div key={slot}
-                            className={`absolute left-0 right-0 border-b border-gray-50 cursor-pointer transition-colors group
-                              ${isDragTarget ? 'bg-blue-50 border-blue-200' : 'hover:bg-blue-50/50'}`}
+                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group
+                              ${isOutOfHours
+                                ? 'bg-gray-50/80 border-gray-100 hover:bg-orange-50/50'
+                                : isDragTarget
+                                  ? 'bg-blue-50 border-blue-200'
+                                  : 'border-gray-50 hover:bg-blue-50/50'}`}
                             style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
                             onDragOver={e => handleDragOver(e, slot, col.id)}
                             onDrop={e => handleDrop(e, slot, col.id)}
-                            onClick={() => setNewApptModal({ slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id })}>
+                            onClick={() => setNewApptModal({
+                              slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id,
+                              isOutOfHours
+                            })}>
+                            {/* 時間外ラベル */}
+                            {isOutOfHours && colIdx === 0 && (
+                              <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none"
+                                style={{ fontSize: 9 }}>時間外</div>
+                            )}
                             {isDragTarget && (
                               <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center">
                                 <span className="text-xs text-blue-500 font-medium">ここに移動</span>
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <span className="text-xs text-blue-400">＋ 予約追加</span>
+                              <span className={`text-xs ${isOutOfHours ? 'text-orange-400' : 'text-blue-400'}`}>
+                                {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
+                              </span>
                             </div>
                           </div>
                         );

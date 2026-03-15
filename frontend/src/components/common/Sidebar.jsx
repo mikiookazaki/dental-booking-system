@@ -1,5 +1,7 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Calendar, Users, UserCog, LogOut } from 'lucide-react'
+import axios from '../../api'
 
 const navItems = [
   { path: '/calendar', label: '予約カレンダー', icon: Calendar },
@@ -7,19 +9,82 @@ const navItems = [
   { path: '/staff',    label: 'スタッフ管理',   icon: UserCog },
 ]
 
+const DOW = ['日','月','火','水','木','金','土']
+
 export default function Sidebar() {
   const location = useLocation()
-  const navigate = useNavigate()
+
+  // ミニカレンダー用 state
+  const today = new Date()
+  const [miniMonth, setMiniMonth] = useState({
+    year:  today.getFullYear(),
+    month: today.getMonth() + 1,
+  })
+  const [monthAppts, setMonthAppts] = useState({}) // { 'YYYY-MM-DD': count }
+  const [openDays, setOpenDays]     = useState([1,2,3,4,5,6])
+
+  // 診療曜日・月間予約件数を取得
+  useEffect(() => {
+    fetchMiniData()
+  }, [miniMonth])
+
+  async function fetchMiniData() {
+    try {
+      // 診療設定取得（カレンダーAPIのsettingsから）
+      const today2 = new Date().toISOString().split('T')[0]
+      const cfg = await axios.get(`/api/appointments/calendar/${today2}`).catch(() => null)
+      if (cfg?.data?.settings) {
+        // open_days は clinic_settings から別途取得
+      }
+      // admin settingsから診療曜日を取得
+      const adminCfg = await axios.get('/api/admin/settings').catch(() => null)
+      if (adminCfg?.data?.settings?.open_days?.value) {
+        try { setOpenDays(JSON.parse(adminCfg.data.settings.open_days.value)) } catch {}
+      }
+
+      // 月間予約件数取得（日別）
+      const { year, month } = miniMonth
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const counts = {}
+      const promises = []
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        promises.push(
+          axios.get(`/api/appointments/calendar/${ds}`)
+            .then(r => { counts[ds] = r.data?.appointments?.length || 0 })
+            .catch(() => { counts[ds] = 0 })
+        )
+      }
+      await Promise.all(promises)
+      setMonthAppts(counts)
+    } catch {}
+  }
 
   function handleLogout() {
     localStorage.clear()
     window.location.href = '/admin/login'
   }
 
+  function handleDayClick(dateStr) {
+    // カレンダーページに遷移（URLパラメータで日付を渡す）
+    window.location.href = `/calendar?date=${dateStr}`
+  }
+
+  const { year, month } = miniMonth
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const firstDow    = new Date(year, month - 1, 1).getDay()
+  const todayStr    = today.toISOString().split('T')[0]
+
+  const cells = []
+  for (let i = 0; i < firstDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+  }
+
   return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
+    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
       {/* ロゴ */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🦷</span>
           <div>
@@ -29,8 +94,112 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* 今日の日付 */}
+      <div className="px-3 pt-3 pb-1 flex-shrink-0">
+        <div className="bg-blue-50 rounded-xl px-3 py-2 text-center">
+          <div className="text-xs text-blue-500 font-medium">
+            {today.getFullYear()}年{today.getMonth()+1}月{today.getDate()}日
+          </div>
+          <div className="text-xs text-blue-400">
+            {['日','月','火','水','木','金','土'][today.getDay()]}曜日
+          </div>
+        </div>
+      </div>
+
+      {/* ミニカレンダー */}
+      <div className="px-2 pb-2 flex-shrink-0">
+        {/* 月ナビ */}
+        <div className="flex items-center justify-between px-1 py-1">
+          <button
+            onClick={() => setMiniMonth(m => {
+              const d = new Date(m.year, m.month - 2, 1)
+              return { year: d.getFullYear(), month: d.getMonth() + 1 }
+            })}
+            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 text-xs rounded hover:bg-blue-50"
+          >◀</button>
+          <span className="text-xs font-semibold text-gray-700">
+            {year}年{month}月
+          </span>
+          <button
+            onClick={() => setMiniMonth(m => {
+              const d = new Date(m.year, m.month, 1)
+              return { year: d.getFullYear(), month: d.getMonth() + 1 }
+            })}
+            className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 text-xs rounded hover:bg-blue-50"
+          >▶</button>
+        </div>
+
+        {/* 曜日ヘッダー */}
+        <div className="grid grid-cols-7 mb-0.5">
+          {DOW.map((d, i) => (
+            <div key={d} className={`text-center text-xs py-0.5 font-medium
+              ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* 日付グリッド */}
+        <div className="grid grid-cols-7 gap-0">
+          {cells.map((ds, idx) => {
+            if (!ds) return <div key={`e-${idx}`} />
+            const d       = new Date(ds).getDate()
+            const dow     = new Date(ds).getDay()
+            const isToday = ds === todayStr
+            const count   = monthAppts[ds] || 0
+            const isOpen  = openDays.includes(dow)
+            const isPast  = ds < todayStr
+
+            return (
+              <button
+                key={ds}
+                onClick={() => handleDayClick(ds)}
+                className={`relative flex flex-col items-center justify-center rounded-md py-0.5 transition-all
+                  ${isToday ? 'bg-blue-600 text-white' : ''}
+                  ${!isToday && isOpen && !isPast ? 'hover:bg-blue-50 text-gray-700' : ''}
+                  ${!isToday && !isOpen ? 'text-gray-300' : ''}
+                  ${!isToday && isOpen && isPast ? 'text-gray-400' : ''}`}
+              >
+                <span className={`text-xs leading-none font-medium
+                  ${dow === 0 && !isToday ? 'text-red-400' : ''}
+                  ${dow === 6 && !isToday ? 'text-blue-400' : ''}`}>
+                  {d}
+                </span>
+                {/* 予約件数ドット */}
+                {count > 0 && !isToday && (
+                  <div className="flex gap-0.5 mt-0.5">
+                    {[...Array(Math.min(count, 3))].map((_, i) => (
+                      <div key={i} className="w-1 h-1 rounded-full bg-blue-400" />
+                    ))}
+                    {count > 3 && <div className="w-1 h-1 rounded-full bg-blue-300" />}
+                  </div>
+                )}
+                {count > 0 && isToday && (
+                  <div className="w-1 h-1 rounded-full bg-white mt-0.5" />
+                )}
+                {/* 休診マーク */}
+                {!isOpen && (
+                  <span className="text-gray-300" style={{ fontSize: 7 }}>休</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* 凡例 */}
+        <div className="flex items-center gap-2 mt-1.5 px-1">
+          <span className="flex items-center gap-1 text-gray-400" style={{ fontSize: 9 }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />予約あり
+          </span>
+          <span className="text-gray-300" style={{ fontSize: 9 }}>休=休診</span>
+        </div>
+      </div>
+
+      {/* 区切り */}
+      <div className="border-t border-gray-100 mx-3 mb-2 flex-shrink-0" />
+
       {/* ナビゲーション */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1">
         {navItems.map(({ path, label, icon: Icon }) => {
           const active = location.pathname === path
           return (
@@ -51,7 +220,7 @@ export default function Sidebar() {
       </nav>
 
       {/* フッター */}
-      <div className="p-3 border-t border-gray-200 space-y-2">
+      <div className="p-3 border-t border-gray-200 space-y-2 flex-shrink-0">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors w-full"
