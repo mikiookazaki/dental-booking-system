@@ -111,6 +111,13 @@ const runMigrations = async () => {
     }
     console.log('  ✅ system_settings');
 
+    // calendar display settings
+    await pool.query(
+      "INSERT INTO clinic_settings (key, value, description) VALUES ('calendar_display_start', '07:00', 'カレンダー表示開始時刻') ON CONFLICT (key) DO NOTHING"
+    );
+    await pool.query(
+      "INSERT INTO clinic_settings (key, value, description) VALUES ('calendar_display_end', '21:00', 'カレンダー表示終了時刻') ON CONFLICT (key) DO NOTHING"
+    );
     console.log('✅ マイグレーション完了');
   } catch (err) {
     console.error('❌ マイグレーションエラー:', err.message);

@@ -14,7 +14,8 @@ async function getClinicSettings() {
     WHERE key IN (
       'open_days', 'open_time', 'close_time',
       'lunch_start', 'lunch_end', 'slot_minutes',
-      'can_patient_book'
+      'can_patient_book',
+      'calendar_display_start', 'calendar_display_end'
     )
   `);
   const settings = {};
@@ -27,7 +28,9 @@ async function getClinicSettings() {
     lunchStart:   settings.lunch_start || '13:00',
     lunchEnd:     settings.lunch_end   || '14:00',
     slotDuration: parseInt(settings.slot_minutes || '30'),
-    patientBookingEnabled: settings.can_patient_book !== 'false'
+    patientBookingEnabled: settings.can_patient_book !== 'false',
+    displayStart: settings.calendar_display_start || null,
+    displayEnd:   settings.calendar_display_end   || null,
   };
 }
 
@@ -235,7 +238,9 @@ router.get('/calendar/:date', requireAuth, async (req, res) => {
         lunchStart:   settings.lunchStart,
         lunchEnd:     settings.lunchEnd,
         slotDuration: settings.slotDuration,
-        maxChairs:    chairs.length
+        maxChairs:    chairs.length,
+        displayStart: settings.displayStart || settings.openTime,
+        displayEnd:   settings.displayEnd   || settings.closeTime,
       },
       chairs,
       slots:        allSlots,

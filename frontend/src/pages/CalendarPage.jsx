@@ -131,8 +131,11 @@ export default function CalendarPage() {
   );
 
   const { settings, chairs, slots, appointments, blocks } = calendarData;
-  const openMin  = toMinutes(settings.openTime);
-  const closeMin = toMinutes(settings.closeTime);
+  // 【4】表示時間は displayStart/displayEnd を優先、なければ診療時間を使用
+  const displayStart = settings.displayStart || settings.openTime;
+  const displayEnd   = settings.displayEnd   || settings.closeTime;
+  const openMin  = toMinutes(displayStart);
+  const closeMin = toMinutes(displayEnd);
   const totalMin = closeMin - openMin;
   const SLOT_HEIGHT   = 72;
   const HEADER_HEIGHT = 48;
@@ -288,7 +291,7 @@ export default function CalendarPage() {
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
                         <div className="absolute z-30 pointer-events-none"
-                          style={{ top: nowTop, left: -64, width: `${columns.length * 160 + 64}px` }}>
+                          style={{ top: nowTop, left: -64, width: `${columns.length * 180 + 64}px` }}>
                           <div className="relative">
                             <div className="absolute left-14 right-0 h-0.5 bg-red-500 shadow-sm" />
                             <div className="absolute left-12 -top-1.5 w-3 h-3 rounded-full bg-red-500 shadow" />

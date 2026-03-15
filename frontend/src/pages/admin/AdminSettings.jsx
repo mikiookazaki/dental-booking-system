@@ -56,8 +56,6 @@ export default function AdminSettings() {
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
   const [error, setError]       = useState('')
-
-  // 診療曜日（open_days）: [0,1,2,3,4,5,6] のJSON配列
   const [openDays, setOpenDays] = useState([1,2,3,4,5,6])
 
   useEffect(() => { fetchSettings() }, [])
@@ -70,7 +68,6 @@ export default function AdminSettings() {
       const flat = {}
       Object.entries(data.settings).forEach(([k, v]) => { flat[k] = v.value })
       setSettings(flat)
-      // open_days をパース
       if (flat.open_days) {
         try { setOpenDays(JSON.parse(flat.open_days)) } catch {}
       }
@@ -82,11 +79,9 @@ export default function AdminSettings() {
     setSaving(true)
     setError('')
     try {
-      // open_days を JSON 文字列として保存
       const updates = { ...settings, open_days: JSON.stringify(openDays) }
       const res = await fetch(`${API}/api/admin/settings`, {
-        method: 'PUT',
-        headers: authHeader(),
+        method: 'PUT', headers: authHeader(),
         body: JSON.stringify({ updates }),
       })
       if (!res.ok) throw new Error()
@@ -96,9 +91,7 @@ export default function AdminSettings() {
     setSaving(false)
   }
 
-  function update(key, val) {
-    setSettings(prev => ({ ...prev, [key]: val }))
-  }
+  function update(key, val) { setSettings(prev => ({ ...prev, [key]: val })) }
 
   function toggleDay(d) {
     setOpenDays(prev =>
@@ -110,21 +103,18 @@ export default function AdminSettings() {
 
   return (
     <div style={{ padding: 32, maxWidth: 720 }}>
-      {/* ヘッダー */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', margin: 0 }}>システム設定</h1>
           <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>患者操作の制限・診療時間・クリニック情報を管理します</p>
         </div>
-        <button
-          onClick={handleSave} disabled={saving}
+        <button onClick={handleSave} disabled={saving}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '10px 20px', borderRadius: 8, border: 'none',
             background: saved ? '#059669' : '#2563eb', color: '#fff',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s',
-          }}
-        >
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}>
           <Save size={15} />{saved ? '保存しました ✓' : saving ? '保存中...' : '保存する'}
         </button>
       </div>
@@ -135,7 +125,7 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* ── 診療時間・休診日（専用UI） ── */}
+      {/* ── 診療時間・休診日 ── */}
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>診療時間・休診日</h2>
@@ -144,144 +134,127 @@ export default function AdminSettings() {
 
         {/* 診療曜日 */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 10 }}>
-            診療曜日
-          </label>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 10 }}>診療曜日</label>
           <div style={{ display: 'flex', gap: 8 }}>
             {DOW_LABELS.map((label, i) => {
               const active = openDays.includes(i)
-              const isSun  = i === 0
-              const isSat  = i === 6
               return (
-                <button
-                  key={i}
-                  onClick={() => toggleDay(i)}
+                <button key={i} onClick={() => toggleDay(i)}
                   style={{
                     width: 44, height: 44, borderRadius: 10,
                     border: active ? 'none' : '1px solid #d1d5db',
-                    background: active
-                      ? isSun ? '#fee2e2' : isSat ? '#dbeafe' : '#2563eb'
-                      : '#f9fafb',
-                    color: active
-                      ? isSun ? '#dc2626' : isSat ? '#2563eb' : '#fff'
-                      : '#9ca3af',
-                    fontWeight: active ? 700 : 400,
-                    fontSize: 14, cursor: 'pointer',
-                    transition: 'all 0.15s',
+                    background: active ? (i===0 ? '#fee2e2' : i===6 ? '#dbeafe' : '#2563eb') : '#f9fafb',
+                    color: active ? (i===0 ? '#dc2626' : i===6 ? '#2563eb' : '#fff') : '#9ca3af',
+                    fontWeight: active ? 700 : 400, fontSize: 14, cursor: 'pointer',
                     position: 'relative',
-                  }}
-                >
+                  }}>
                   {label}
                   {!active && (
-                    <div style={{
-                      position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
-                      fontSize: 8, color: '#dc2626', fontWeight: 700, lineHeight: 1,
-                    }}>休</div>
+                    <div style={{ position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)', fontSize: 8, color: '#dc2626', fontWeight: 700 }}>休</div>
                   )}
                 </button>
               )
             })}
           </div>
-          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
-            青色＝診療あり　グレー「休」＝休診日
-          </p>
         </div>
 
         {/* 診療時間 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              診療開始時刻
-            </label>
-            <input
-              type="time" value={settings.open_time || '09:00'}
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>診療開始時刻</label>
+            <input type="time" value={settings.open_time || '09:00'}
               onChange={e => update('open_time', e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-            />
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              診療終了時刻
-            </label>
-            <input
-              type="time" value={settings.close_time || '18:30'}
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>診療終了時刻</label>
+            <input type="time" value={settings.close_time || '18:30'}
               onChange={e => update('close_time', e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-            />
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
           </div>
         </div>
 
         {/* 昼休み */}
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>昼休みあり</label>
-            <div
-              onClick={() => update('has_lunch_break', settings.has_lunch_break === 'false' ? 'true' : 'false')}
-              style={{
-                width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+            <div onClick={() => update('has_lunch_break', settings.has_lunch_break === 'false' ? 'true' : 'false')}
+              style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
                 background: settings.has_lunch_break === 'false' ? '#d1d5db' : '#2563eb',
-                position: 'relative', transition: 'background 0.2s',
-              }}
-            >
-              <div style={{
-                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                position: 'relative' }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff',
                 position: 'absolute', top: 3,
                 left: settings.has_lunch_break === 'false' ? 3 : 23,
-                transition: 'left 0.2s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </div>
           </div>
           {settings.has_lunch_break !== 'false' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み開始</label>
-                <input
-                  type="time" value={settings.lunch_start || '13:00'}
+                <input type="time" value={settings.lunch_start || '13:00'}
                   onChange={e => update('lunch_start', e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-                />
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み終了</label>
-                <input
-                  type="time" value={settings.lunch_end || '14:00'}
+                <input type="time" value={settings.lunch_end || '14:00'}
                   onChange={e => update('lunch_end', e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }}
-                />
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
               </div>
             </div>
-          )}
-          {settings.has_lunch_break === 'false' && (
-            <p style={{ fontSize: 12, color: '#6b7280', margin: 0, background: '#f0fdf4', padding: '8px 12px', borderRadius: 6 }}>
-              昼休みなし（終日診療）
-            </p>
           )}
         </div>
 
         {/* プレビュー */}
-        <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px', marginTop: 12 }}>
+        <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px' }}>
           <span style={{ fontSize: 12, color: '#6b7280' }}>診療日：</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>
-            {openDays.length === 0
-              ? '休診日なし（設定なし）'
-              : DOW_LABELS.filter((_, i) => openDays.includes(i)).join('・') + '曜日'}
+            {openDays.length === 0 ? '未設定' : DOW_LABELS.filter((_, i) => openDays.includes(i)).join('・') + '曜日'}
           </span>
           <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 16 }}>
             {settings.open_time || '09:00'}〜{settings.close_time || '18:30'}
-            　{settings.has_lunch_break === 'false'
-              ? '昼休みなし'
-              : `昼休み ${settings.lunch_start || '13:00'}〜${settings.lunch_end || '14:00'}`}
           </span>
+        </div>
+      </div>
+
+      {/* ── 【4】カレンダー表示時間（診療時間外） ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>カレンダー表示時間</h2>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>
+            診療時間外でもスタッフが予約を入れられるよう、カレンダーの表示範囲を設定します。
+            診療時間外はLINE予約には影響しません。
+          </p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+              表示開始時刻
+              <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 6 }}>（診療開始より前）</span>
+            </label>
+            <input type="time" value={settings.calendar_display_start || '07:00'}
+              onChange={e => update('calendar_display_start', e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+              表示終了時刻
+              <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 6 }}>（診療終了より後）</span>
+            </label>
+            <input type="time" value={settings.calendar_display_end || '21:00'}
+              onChange={e => update('calendar_display_end', e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 12, color: '#92400e' }}>
+          💡 例: 診療時間が 09:00〜18:30 でも、表示を 07:00〜21:00 にすると時間外予約が可能になります
         </div>
       </div>
 
       {/* その他の設定グループ */}
       {SETTING_GROUPS.map(group => (
-        <div key={group.title} style={{
-          background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
-          padding: 24, marginBottom: 16,
-        }}>
+        <div key={group.title} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
           <div style={{ marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{group.title}</h2>
             {group.desc && <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>{group.desc}</p>}
@@ -291,34 +264,23 @@ export default function AdminSettings() {
               <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <label style={{ fontSize: 14, color: '#374151', flex: 1 }}>{label}</label>
                 {type === 'bool' ? (
-                  <div
-                    onClick={() => update(key, settings[key] === 'true' ? 'false' : 'true')}
-                    style={{
-                      width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                  <div onClick={() => update(key, settings[key] === 'true' ? 'false' : 'true')}
+                    style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
                       background: settings[key] === 'true' ? '#2563eb' : '#d1d5db',
-                      position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                      position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff',
                       position: 'absolute', top: 3,
                       left: settings[key] === 'true' ? 23 : 3,
-                      transition: 'left 0.2s',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                    }} />
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                   </div>
                 ) : type === 'number' ? (
-                  <input
-                    type="number" value={settings[key] || ''}
+                  <input type="number" value={settings[key] || ''}
                     onChange={e => update(key, e.target.value)}
-                    style={{ width: 80, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' }}
-                  />
+                    style={{ width: 80, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' }} />
                 ) : (
-                  <input
-                    type="text" value={settings[key] || ''}
+                  <input type="text" value={settings[key] || ''}
                     onChange={e => update(key, e.target.value)}
-                    style={{ width: 260, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14 }}
-                  />
+                    style={{ width: 260, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14 }} />
                 )}
               </div>
             ))}
