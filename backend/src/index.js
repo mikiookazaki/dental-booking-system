@@ -118,6 +118,29 @@ const runMigrations = async () => {
     await pool.query(
       "INSERT INTO clinic_settings (key, value, description) VALUES ('calendar_display_end', '21:00', 'カレンダー表示終了時刻') ON CONFLICT (key) DO NOTHING"
     );
+    // age_group カラム追加
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS age_group VARCHAR(20)');
+    // 既存患者で生年月日がある場合は年代を自動計算
+    await pool.query(`
+      UPDATE patients SET age_group =
+        CASE
+          WHEN birth_date IS NOT NULL THEN
+            CONCAT(FLOOR(DATE_PART('year', AGE(birth_date)) / 10) * 10, '代')
+          ELSE age_group
+        END
+      WHERE birth_date IS NOT NULL AND (age_group IS NULL OR age_group = '')
+    `);
+    console.log('  ✅ patients.age_group');
+
+    // 曜日別カスタム診療時間の設定キーを追加
+    for (const dow of [0,1,2,3,4,5,6]) {
+      await pool.query(
+        "INSERT INTO clinic_settings (key, value, description) VALUES ($1, '', $2) ON CONFLICT (key) DO NOTHING",
+        [`custom_hours_${dow}`, `曜日別カスタム診療時間(${dow})`]
+      );
+    }
+    console.log('  ✅ custom_hours settings');
+
     // スタッフユーザーの自動作成（初回のみ）
     const bcrypt = require('bcryptjs');
     const staffExists = await pool.query(

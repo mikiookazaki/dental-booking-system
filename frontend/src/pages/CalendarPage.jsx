@@ -854,11 +854,12 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
 }
 
 // =============================================
-// 予約詳細モーダル
+// 予約詳細モーダル【1】患者編集対応
 // =============================================
 function AppointmentDetailModal({ appt, onClose, onUpdate }) {
-  const [notes, setNotes]   = useState(appt.notes || '');
-  const [saving, setSaving] = useState(false);
+  const [notes, setNotes]         = useState(appt.notes || '');
+  const [saving, setSaving]       = useState(false);
+  const [editPatient, setEditPatient] = useState(false);
   const color = getTreatmentColor(appt.treatment_type);
 
   async function handleSave() {
@@ -872,13 +873,34 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
     catch { alert('キャンセルに失敗しました'); }
   }
 
+  if (editPatient) {
+    return (
+      <PatientEditModal
+        patientId={appt.patient_id}
+        onClose={() => setEditPatient(false)}
+        onSave={() => { setEditPatient(false); onUpdate(); }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="px-5 py-4 rounded-t-2xl" style={{ background: color.light }}>
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
+                {/* 【1】鉛筆マーク - 患者編集 */}
+                <button onClick={() => setEditPatient(true)}
+                  className="p-1 rounded-lg hover:bg-black/10 transition-colors"
+                  title="患者情報を編集">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+              </div>
               <div className="text-sm opacity-75" style={{ color: color.text }}>{appt.patient_name}</div>
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
@@ -914,6 +936,146 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
           <button onClick={handleSave} disabled={saving}
             className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
             {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// 患者編集モーダル（カレンダーから開く）
+// =============================================
+function PatientEditModal({ patientId, onClose, onSave }) {
+  const [patient, setPatient] = useState(null);
+  const [form, setForm]       = useState({});
+  const [saving, setSaving]   = useState(false);
+  const [kanaError, setKanaError] = useState('');
+
+  useEffect(() => {
+    axios.get(`/api/patients/${patientId}`)
+      .then(r => { setPatient(r.data); setForm(r.data); })
+      .catch(() => alert('患者情報の取得に失敗しました'));
+  }, [patientId]);
+
+  // 年代を生年月日から自動計算
+  function calcAgeGroup(birthDate) {
+    if (!birthDate) return null;
+    const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
+    return `${Math.floor(age / 10) * 10}代`;
+  }
+
+  function validateKana(val) {
+    if (!val) { setKanaError('フリガナは必須です'); return false; }
+    if (!/^[ァ-ヶー　\s]+$/.test(val)) { setKanaError('カタカナで入力してください'); return false; }
+    setKanaError(''); return true;
+  }
+
+  async function handleSave() {
+    if (!validateKana(form.name_kana)) return;
+    setSaving(true);
+    try {
+      // 生年月日があれば年代を自動更新
+      const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
+      await axios.put(`/api/patients/${patientId}`, { ...form, age_group });
+      onSave();
+    } catch (err) {
+      alert(err.response?.data?.error || '保存に失敗しました');
+    } finally { setSaving(false); }
+  }
+
+  if (!patient) return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" /></div>
+    </div>
+  );
+
+  const AGE_GROUPS = ['10代','20代','30代','40代','50代','60代','70代','80代','90代以上'];
+  const autoAgeGroup = form.birth_date ? calcAgeGroup(form.birth_date) : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-800">患者情報編集</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">氏名 *</label>
+              <input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">フリガナ *</label>
+              <input value={form.name_kana || ''}
+                onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm ${kanaError ? 'border-red-400' : 'border-gray-200'}`} />
+              {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">電話番号</label>
+              <input value={form.phone || ''} onChange={e => setForm(f => ({...f, phone: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">性別</label>
+              <select value={form.gender || ''} onChange={e => setForm(f => ({...f, gender: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                <option value="">未設定</option>
+                <option value="male">男性</option>
+                <option value="female">女性</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 【2】年代フィールド */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">
+              年代
+              {autoAgeGroup && <span className="ml-2 text-blue-500 font-normal">（生年月日から自動: {autoAgeGroup}）</span>}
+            </label>
+            {autoAgeGroup ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700 font-medium">
+                {autoAgeGroup}（生年月日から自動計算）
+              </div>
+            ) : (
+              <div className="grid grid-cols-5 gap-1">
+                {AGE_GROUPS.map(ag => (
+                  <button key={ag} type="button"
+                    onClick={() => setForm(f => ({...f, age_group: ag}))}
+                    className={`py-1.5 rounded-lg text-xs font-medium transition-all border
+                      ${form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50'}`}>
+                    {ag}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">生年月日</label>
+            <input type="date" value={form.birth_date?.substring(0,10) || ''}
+              onChange={e => setForm(f => ({...f, birth_date: e.target.value}))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <p className="text-xs text-gray-400 mt-0.5">入力すると年代が自動計算されます</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">備考・アレルギー</label>
+            <textarea value={form.notes || ''} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
+              rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">キャンセル</button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50">
+            {saving ? '保存中...' : '保存する'}
           </button>
         </div>
       </div>

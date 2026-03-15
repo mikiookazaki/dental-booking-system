@@ -8,33 +8,32 @@ function isValidKana(str) {
   return /^[ァ-ヶー　\s]+$/.test(str);
 }
 
-// =============================================
+// 生年月日から年代を計算
+function calcAgeGroup(birthDate) {
+  if (!birthDate) return null;
+  const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
+  const decade = Math.floor(age / 10) * 10;
+  return decade >= 90 ? '90代以上' : `${decade}代`;
+}
+
 // GET /api/patients
-// 【3】検索パラメータを q と search 両方対応
-// =============================================
 router.get('/', requireAuth, async (req, res) => {
   try {
     const search = req.query.q || req.query.search || '';
     let query = `
       SELECT id, patient_code, name, name_kana, phone, email,
-             birth_date, gender, address, notes,
+             birth_date, gender, address, notes, age_group,
              line_user_id, total_visits, created_at
       FROM patients
       WHERE is_active = TRUE
     `;
     const params = [];
-
     if (search) {
       params.push(`%${search}%`);
-      query += ` AND (
-        name ILIKE $1 OR name_kana ILIKE $1
-        OR phone LIKE $1 OR patient_code ILIKE $1
-      )`;
+      query += ` AND (name ILIKE $1 OR name_kana ILIKE $1 OR phone LIKE $1 OR patient_code ILIKE $1)`;
     }
-
     query += ' ORDER BY created_at DESC';
     const result = await pool.query(query, params);
-    // patients配列として返す（既存フロントと互換）
     res.json({ patients: result.rows });
   } catch (err) {
     console.error('GET patients error:', err);
@@ -42,15 +41,10 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// =============================================
 // GET /api/patients/:id
-// =============================================
 router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM patients WHERE id = $1',
-      [req.params.id]
-    );
+    const result = await pool.query('SELECT * FROM patients WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
     res.json(result.rows[0]);
   } catch (err) {
@@ -58,9 +52,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// =============================================
 // GET /api/patients/:id/qr
-// =============================================
 router.get('/:id/qr', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -72,40 +64,31 @@ router.get('/:id/qr', requireAuth, async (req, res) => {
     const lineId = process.env.LINE_BOT_BASIC_ID || '@210vmmzk';
     const qr_url = `https://line.me/R/ti/p/${lineId}?patientCode=${p.patient_code}`;
     res.json({
-      id: p.id,
-      patient_code: p.patient_code,
-      name: p.name,
-      name_kana: p.name_kana,
-      line_linked: !!p.line_user_id,
-      qr_url,
+      id: p.id, patient_code: p.patient_code,
+      name: p.name, name_kana: p.name_kana,
+      line_linked: !!p.line_user_id, qr_url,
     });
   } catch (err) {
     res.status(500).json({ error: 'サーバーエラー' });
   }
 });
 
-// =============================================
-// POST /api/patients 新患登録【8】カタカナ必須
-// =============================================
+// POST /api/patients
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, birth_date, gender, address, notes } = req.body;
+    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
+    if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
+    if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
 
-    if (!name || !name?.trim()) {
-      return res.status(400).json({ error: '氏名は必須です' });
-    }
-    if (!name_kana || !name_kana?.trim()) {
-      return res.status(400).json({ error: 'フリガナ（カタカナ）は必須です' });
-    }
-    if (!isValidKana(name_kana.trim())) {
-      return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
-    }
+    // 年代：生年月日があれば自動計算、なければ入力値
+    const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : (age_group || null);
 
     const result = await pool.query(`
-      INSERT INTO patients (name, name_kana, phone, email, birth_date, gender, address, notes)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      INSERT INTO patients (name, name_kana, phone, email, birth_date, gender, address, notes, age_group)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
-    `, [name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes]);
+    `, [name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -114,20 +97,18 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-// =============================================
 // PUT /api/patients/:id
-// =============================================
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, birth_date, gender, address, notes } = req.body;
-
-    if (name !== undefined && !name?.trim()) {
-      return res.status(400).json({ error: '氏名は必須です' });
-    }
+    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group } = req.body;
+    if (name !== undefined && !name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
     if (name_kana !== undefined) {
       if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
       if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
     }
+
+    // 生年月日があれば年代を自動更新
+    const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : age_group;
 
     const result = await pool.query(`
       UPDATE patients SET
@@ -139,10 +120,11 @@ router.put('/:id', requireAuth, async (req, res) => {
         gender     = COALESCE($6, gender),
         address    = COALESCE($7, address),
         notes      = COALESCE($8, notes),
+        age_group  = COALESCE($9, age_group),
         updated_at = NOW()
-      WHERE id = $9
+      WHERE id = $10
       RETURNING *
-    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, req.params.id]);
+    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, req.params.id]);
 
     if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
     res.json(result.rows[0]);

@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import axios from '../api'
 import { Search, Plus, X, QrCode } from 'lucide-react'
 
+// 年代自動計算
+function calcAgeGroup(birthDate) {
+  if (!birthDate) return null;
+  const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
+  return `${Math.floor(age / 10) * 10}代`;
+}
+
+const AGE_GROUPS = ['10代','20代','30代','40代','50代','60代','70代','80代','90代以上'];
+
 // カタカナバリデーション
 function validateKana(val) {
   if (!val || !val.trim()) return 'フリガナ（カタカナ）は必須です'
@@ -18,7 +27,7 @@ export default function PatientsPage() {
   const [qrData, setQrData]           = useState(null)
   const [qrLoading, setQrLoading]     = useState(false)
   const [form, setForm] = useState({
-    name: '', name_kana: '', phone: '', birth_date: '', gender: ''
+    name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: ''
   })
   const [errors, setErrors] = useState({})
 
@@ -62,9 +71,10 @@ export default function PatientsPage() {
     e.preventDefault()
     if (!validate()) return
     try {
-      await axios.post('/api/patients', form)
+      const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
+      await axios.post('/api/patients', { ...form, age_group })
       setShowModal(false)
-      setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '' })
+      setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '' })
       setErrors({})
       fetchPatients()
     } catch (err) {
@@ -74,7 +84,7 @@ export default function PatientsPage() {
 
   function handleCloseModal() {
     setShowModal(false)
-    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '' })
+    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '' })
     setErrors({})
   }
 
@@ -124,6 +134,7 @@ export default function PatientsPage() {
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">患者番号</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">氏名</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">カナ</th>
+              <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">年代</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">電話番号</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">来院回数</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">LINE</th>
@@ -147,6 +158,9 @@ export default function PatientsPage() {
                 </td>
                 <td className="p-3 font-medium text-gray-800">{p.name}</td>
                 <td className="p-3 text-gray-500">{p.name_kana || '-'}</td>
+                <td className="p-3 text-gray-600">
+                  {p.birth_date ? calcAgeGroup(p.birth_date) : (p.age_group || '-')}
+                </td>
                 <td className="p-3 text-gray-600">{p.phone || '-'}</td>
                 <td className="p-3 text-gray-600">{p.total_visits}回</td>
                 <td className="p-3">

@@ -218,6 +218,66 @@ export default function AdminSettings() {
         </div>
       </div>
 
+      {/* ── 【4】曜日別カスタム診療時間 ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>曜日別カスタム診療時間</h2>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>
+            通常の診療時間と異なる曜日がある場合に設定します。例: 土曜日は午前のみ、特定曜日は休診など。
+          </p>
+        </div>
+        {['月','火','水','木','金','土','日'].map((day, idx) => {
+          const dow = [1,2,3,4,5,6,0][idx];
+          const key = `custom_hours_${dow}`;
+          const val = settings[key] ? JSON.parse(settings[key]) : null;
+          const isOpen = openDays.includes(dow);
+          return (
+            <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: '10px 12px', background: '#f9fafb', borderRadius: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14,
+                background: isOpen ? (dow === 0 ? '#fee2e2' : dow === 6 ? '#dbeafe' : '#dbeafe') : '#f3f4f6',
+                color: isOpen ? (dow === 0 ? '#dc2626' : '#2563eb') : '#9ca3af' }}>
+                {day}
+              </div>
+              <span style={{ fontSize: 13, color: '#6b7280', width: 80 }}>
+                {isOpen ? '通常診療' : '休診日'}
+              </span>
+              <label style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox"
+                  checked={!!settings[key]}
+                  onChange={e => {
+                    if (e.target.checked) {
+                      update(key, JSON.stringify({ open: settings.open_time || '09:00', close: settings.close_time || '18:30' }))
+                    } else {
+                      update(key, '')
+                    }
+                  }}
+                />
+                カスタム時間を設定
+              </label>
+              {settings[key] && (() => {
+                let parsed = { open: '09:00', close: '18:30' };
+                try { parsed = JSON.parse(settings[key]); } catch {}
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="time" value={parsed.open}
+                      onChange={e => update(key, JSON.stringify({ ...parsed, open: e.target.value }))}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }} />
+                    <span style={{ color: '#9ca3af' }}>〜</span>
+                    <input type="time" value={parsed.close}
+                      onChange={e => update(key, JSON.stringify({ ...parsed, close: e.target.value }))}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }} />
+                    <span style={{ fontSize: 11, color: '#059669' }}>({day}曜のみ適用)</span>
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })}
+        <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 4, fontSize: 12, color: '#92400e' }}>
+          💡 設定した曜日はLINE予約・カレンダーの空き枠計算に反映されます
+        </div>
+      </div>
+
       {/* ── 【4】カレンダー表示時間（診療時間外） ── */}
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
         <div style={{ marginBottom: 16 }}>
