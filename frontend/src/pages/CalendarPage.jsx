@@ -290,12 +290,13 @@ export default function CalendarPage() {
 
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
-                        <div className="absolute z-30 pointer-events-none"
-                          style={{ top: nowTop, left: -64, width: `${columns.length * 180 + 64}px` }}>
-                          <div className="relative">
-                            <div className="absolute left-14 right-0 h-0.5 bg-red-500 shadow-sm" />
-                            <div className="absolute left-12 -top-1.5 w-3 h-3 rounded-full bg-red-500 shadow" />
-                            <span className="absolute left-16 -top-3 text-xs text-red-500 font-bold bg-white px-1 rounded shadow-sm">
+                        <div className="pointer-events-none z-30"
+                          style={{ position: 'absolute', top: nowTop, left: -64,
+                            width: `calc(${columns.length} * (100% + 1px) + 64px)` }}>
+                          <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', left: 56, right: 0, height: 2, background: '#ef4444', boxShadow: '0 1px 3px rgba(239,68,68,0.4)' }} />
+                            <div style={{ position: 'absolute', left: 48, top: -6, width: 12, height: 12, borderRadius: '50%', background: '#ef4444', boxShadow: '0 1px 4px rgba(239,68,68,0.5)' }} />
+                            <span style={{ position: 'absolute', left: 60, top: -12, fontSize: 11, color: '#ef4444', fontWeight: 700, background: '#fff', padding: '0 4px', borderRadius: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                               {now.getHours().toString().padStart(2,'0')}:{now.getMinutes().toString().padStart(2,'0')}
                             </span>
                           </div>

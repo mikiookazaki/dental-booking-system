@@ -118,6 +118,19 @@ const runMigrations = async () => {
     await pool.query(
       "INSERT INTO clinic_settings (key, value, description) VALUES ('calendar_display_end', '21:00', 'カレンダー表示終了時刻') ON CONFLICT (key) DO NOTHING"
     );
+    // スタッフユーザーの自動作成（初回のみ）
+    const bcrypt = require('bcryptjs');
+    const staffExists = await pool.query(
+      "SELECT id FROM admin_users WHERE username = 'staff'"
+    );
+    if (staffExists.rows.length === 0) {
+      const hash = await bcrypt.hash('dental2026', 10);
+      await pool.query(
+        "INSERT INTO admin_users (username, password_hash, role, is_active) VALUES ('staff', $1, 'staff', TRUE)",
+        [hash]
+      );
+      console.log('  ✅ スタッフユーザー作成 (staff / dental2026)');
+    }
     console.log('✅ マイグレーション完了');
   } catch (err) {
     console.error('❌ マイグレーションエラー:', err.message);
