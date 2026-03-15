@@ -167,16 +167,17 @@ export default function Sidebar() {
                 className={`relative flex flex-col items-center justify-center rounded-md py-0.5 transition-all
                   ${isToday ? 'bg-blue-600 text-white' : ''}
                   ${!isToday && isOpen && !isPast ? 'hover:bg-blue-50 text-gray-700' : ''}
-                  ${!isToday && !isOpen ? 'text-gray-300' : ''}
+                  ${!isToday && !isOpen ? 'bg-gray-100 text-gray-400' : ''}
                   ${!isToday && isOpen && isPast ? 'text-gray-400' : ''}`}
               >
                 <span className={`text-xs leading-none font-medium
-                  ${dow === 0 && !isToday ? 'text-red-400' : ''}
-                  ${dow === 6 && !isToday ? 'text-blue-400' : ''}`}>
+                  ${dow === 0 && !isToday && isOpen ? 'text-red-400' : ''}
+                  ${dow === 6 && !isToday && isOpen ? 'text-blue-400' : ''}
+                  ${!isOpen ? 'text-gray-400' : ''}`}>
                   {d}
                 </span>
-                {/* 予約件数ドット */}
-                {count > 0 && !isToday && (
+                {/* 予約件数ドット（診療日のみ） */}
+                {count > 0 && !isToday && isOpen && (
                   <div className="flex gap-0.5 mt-0.5">
                     {[...Array(Math.min(count, 3))].map((_, i) => (
                       <div key={i} className="w-1 h-1 rounded-full bg-blue-400" />
@@ -189,7 +190,7 @@ export default function Sidebar() {
                 )}
                 {/* 休診マーク */}
                 {!isOpen && (
-                  <span className="text-gray-300" style={{ fontSize: 7 }}>休</span>
+                  <span className="text-gray-400 font-medium" style={{ fontSize: 7, marginTop: 1 }}>休</span>
                 )}
               </button>
             )

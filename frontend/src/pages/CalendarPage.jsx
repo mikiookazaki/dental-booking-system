@@ -141,9 +141,28 @@ export default function CalendarPage() {
   const displayEnd     = settings.displayEnd   || settings.closeTime;
   const openMin        = toMinutes(displayStart);
   const closeMin       = toMinutes(displayEnd);
-  // 診療時間（グレーアウト判定用）
-  const clinicOpenMin  = toMinutes(settings.openTime);
-  const clinicCloseMin = toMinutes(settings.closeTime);
+
+  // 曜日別カスタム時間を考慮した診療時間（グレーアウト判定用）
+  const dow = new Date(selectedDate).getDay();
+  const customHour = settings.customHours?.[dow];
+  let clinicOpenMin, clinicCloseMin;
+  if (customHour) {
+    try {
+      const parsed = typeof customHour === 'string' ? JSON.parse(customHour) : customHour;
+      clinicOpenMin  = toMinutes(parsed.open  || settings.openTime);
+      clinicCloseMin = toMinutes(parsed.close || settings.closeTime);
+    } catch {
+      clinicOpenMin  = toMinutes(settings.openTime);
+      clinicCloseMin = toMinutes(settings.closeTime);
+    }
+  } else {
+    clinicOpenMin  = toMinutes(settings.openTime);
+    clinicCloseMin = toMinutes(settings.closeTime);
+  }
+
+  // 休診日判定（open_daysに含まれない曜日 = 終日グレーアウト）
+  const openDays   = settings.openDays || [1,2,3,4,5,6];
+  const isClosedDay = !openDays.includes(dow);
 
   // 診療時間外のスロットも生成してslotsを拡張
   function genExtraSlots(fromMin, toMin, dur) {
@@ -330,9 +349,9 @@ export default function CalendarPage() {
                         return (
                           <div key={appt.id}
                             draggable
-                            onDragStart={e => handleDragStart(e, appt)}
+                            onDragStart={e => { handleDragStart(e, appt); }}
                             onDragEnd={handleDragEnd}
-                            onClick={() => setDetailModal(appt)}
+                            onClick={e => { if (!dragging) setDetailModal(appt); }}
                             className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing
                               shadow-sm transition-all select-none z-20
                               ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
@@ -378,8 +397,8 @@ export default function CalendarPage() {
                         );
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
-                        // 診療時間外判定
-                        const isOutOfHours = slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
+                        // 診療時間外判定（休診日 or 時間外）
+                        const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         return (
                           <div key={slot}
                             className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group
@@ -857,9 +876,10 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
 // 予約詳細モーダル【1】患者編集対応
 // =============================================
 function AppointmentDetailModal({ appt, onClose, onUpdate }) {
-  const [notes, setNotes]         = useState(appt.notes || '');
-  const [saving, setSaving]       = useState(false);
+  const [notes, setNotes]             = useState(appt.notes || '');
+  const [saving, setSaving]           = useState(false);
   const [editPatient, setEditPatient] = useState(false);
+  const [reschedule, setReschedule]   = useState(false); // 日程変更モード
   const color = getTreatmentColor(appt.treatment_type);
 
   async function handleSave() {
@@ -883,6 +903,16 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
     );
   }
 
+  if (reschedule) {
+    return (
+      <RescheduleModal
+        appt={appt}
+        onClose={() => setReschedule(false)}
+        onSave={() => { setReschedule(false); onUpdate(); }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
@@ -891,10 +921,8 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
             <div>
               <div className="flex items-center gap-2">
                 <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
-                {/* 【1】鉛筆マーク - 患者編集 */}
                 <button onClick={() => setEditPatient(true)}
-                  className="p-1 rounded-lg hover:bg-black/10 transition-colors"
-                  title="患者情報を編集">
+                  className="p-1 rounded-lg hover:bg-black/10 transition-colors" title="患者情報を編集">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -909,6 +937,10 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
         <div className="p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 rounded-lg p-2">
+              <div className="text-xs text-gray-400">日付</div>
+              <div className="font-bold text-gray-800">{appt.appointment_date}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2">
               <div className="text-xs text-gray-400">時間</div>
               <div className="font-bold text-gray-800">{appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}</div>
             </div>
@@ -920,22 +952,188 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               <div className="text-xs text-gray-400">チェア</div>
               <div className="font-bold text-gray-800">{appt.chair_name}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-2">
-              <div className="text-xs text-gray-400">担当</div>
-              <div className="font-bold text-gray-800">{appt.doctor_name || '未設定'}</div>
-            </div>
           </div>
+
+          {/* 日程変更ボタン */}
+          <button onClick={() => setReschedule(true)}
+            className="w-full border border-blue-200 text-blue-600 rounded-xl py-2 text-sm font-medium hover:bg-blue-50 flex items-center justify-center gap-2 transition-colors">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            日程・時間を変更する
+          </button>
+
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1 block">📋 申し送り</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" placeholder="申し送り事項を入力..." />
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2">
-          <button onClick={handleCancel} className="flex-1 border border-red-200 text-red-500 rounded-xl py-2 text-sm hover:bg-red-50">予約キャンセル</button>
+          <button onClick={handleCancel} className="flex-1 border border-red-200 text-red-500 rounded-xl py-2 text-sm hover:bg-red-50">キャンセル</button>
           <button onClick={handleSave} disabled={saving}
             className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
             {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// 日程変更モーダル（案A）
+// =============================================
+function RescheduleModal({ appt, onClose, onSave }) {
+  const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
+  const [newDate, setNewDate]       = useState(appt.appointment_date);
+  const [newTime, setNewTime]       = useState(appt.start_time?.substring(0,5));
+  const [newChairId, setNewChairId] = useState(appt.chair_id);
+  const [chairs, setChairs]         = useState([]);
+  const [slots, setSlots]           = useState([]);
+  const [saving, setSaving]         = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const color = getTreatmentColor(appt.treatment_type);
+
+  // チェア一覧取得
+  useEffect(() => {
+    axios.get('/api/appointments/calendar/' + newDate)
+      .then(r => { setChairs(r.data?.chairs || []); })
+      .catch(() => {});
+  }, []);
+
+  // 日付変更時に空き枠を取得
+  useEffect(() => {
+    setLoadingSlots(true);
+    axios.get(`/api/appointments/available-slots/${newDate}`)
+      .then(r => {
+        // 自分以外の枠を取得
+        const allSlots = r.data?.slots || [];
+        setSlots(allSlots);
+      })
+      .catch(() => { setSlots([]); })
+      .finally(() => setLoadingSlots(false));
+  }, [newDate]);
+
+  const newEndTime = toTimeStr(toMinutes(newTime) + durationMin);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await axios.put(`/api/appointments/${appt.id}`, {
+        appointment_date: newDate,
+        start_time: newTime,
+        end_time:   newEndTime,
+        chair_id:   newChairId,
+      });
+      onSave();
+    } catch (err) {
+      alert(err.response?.data?.error || '変更に失敗しました');
+    } finally { setSaving(false); }
+  }
+
+  const isChanged = newDate !== appt.appointment_date ||
+    newTime !== appt.start_time?.substring(0,5) ||
+    newChairId !== appt.chair_id;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        {/* ヘッダー */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-gray-800">日程・時間を変更</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{appt.name_kana} / {appt.treatment_type}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* 現在の予約 */}
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
+            <div className="text-xs text-orange-500 font-medium mb-1">変更前</div>
+            <div className="text-orange-800 font-medium">
+              {appt.appointment_date} &nbsp;
+              {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
+            </div>
+          </div>
+
+          {/* 新しい日付 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">新しい日付</label>
+            <input type="date" value={newDate}
+              onChange={e => setNewDate(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          {/* 新しい時間（空き枠から選択） */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
+              新しい時間
+              <span className="ml-1 font-normal text-gray-400">（所要時間: {durationMin}分 → 終了: {newEndTime}）</span>
+            </label>
+            {loadingSlots ? (
+              <div className="text-xs text-gray-400 text-center py-3">読み込み中...</div>
+            ) : (
+              <div className="grid grid-cols-4 gap-1.5 max-h-36 overflow-y-auto">
+                {slots.map(slot => {
+                  const isAvailable = slot.available || slot.time === appt.start_time?.substring(0,5);
+                  const isSelected  = slot.time === newTime;
+                  return (
+                    <button key={slot.time} type="button"
+                      onClick={() => isAvailable && setNewTime(slot.time)}
+                      disabled={!isAvailable}
+                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all
+                        ${isSelected ? 'bg-blue-600 text-white border-blue-600' :
+                          isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' :
+                          'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'}`}>
+                      {slot.time}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* チェア選択 */}
+          {chairs.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
+              <div className="grid grid-cols-3 gap-2">
+                {chairs.map(c => (
+                  <button key={c.id} type="button"
+                    onClick={() => setNewChairId(c.id)}
+                    className={`py-2 rounded-lg text-xs font-medium border transition-all
+                      ${newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'}`}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 変更後プレビュー */}
+          {isChanged && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
+              <div className="text-xs text-blue-500 font-medium mb-1">変更後</div>
+              <div className="text-blue-800 font-medium">
+                {newDate} &nbsp; {newTime}〜{newEndTime}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 pb-5 flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+            戻る
+          </button>
+          <button onClick={handleSave} disabled={saving || !isChanged}
+            className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-colors"
+            style={{ background: isChanged ? color.bg : '#9ca3af' }}>
+            {saving ? '変更中...' : '変更を保存'}
           </button>
         </div>
       </div>

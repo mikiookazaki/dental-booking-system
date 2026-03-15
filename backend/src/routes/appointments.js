@@ -15,7 +15,9 @@ async function getClinicSettings() {
       'open_days', 'open_time', 'close_time',
       'lunch_start', 'lunch_end', 'slot_minutes',
       'can_patient_book',
-      'calendar_display_start', 'calendar_display_end'
+      'calendar_display_start', 'calendar_display_end',
+      'custom_hours_0','custom_hours_1','custom_hours_2','custom_hours_3',
+      'custom_hours_4','custom_hours_5','custom_hours_6'
     )
   `);
   const settings = {};
@@ -31,6 +33,15 @@ async function getClinicSettings() {
     patientBookingEnabled: settings.can_patient_book !== 'false',
     displayStart: settings.calendar_display_start || null,
     displayEnd:   settings.calendar_display_end   || null,
+    customHours: {
+      0: settings.custom_hours_0 || null,
+      1: settings.custom_hours_1 || null,
+      2: settings.custom_hours_2 || null,
+      3: settings.custom_hours_3 || null,
+      4: settings.custom_hours_4 || null,
+      5: settings.custom_hours_5 || null,
+      6: settings.custom_hours_6 || null,
+    },
   };
 }
 
@@ -241,6 +252,8 @@ router.get('/calendar/:date', requireAuth, async (req, res) => {
         maxChairs:    chairs.length,
         displayStart: settings.displayStart || settings.openTime,
         displayEnd:   settings.displayEnd   || settings.closeTime,
+        customHours:  settings.customHours,
+        openDays:     settings.openDays,
       },
       chairs,
       slots:        allSlots,

@@ -90,6 +90,22 @@ async function handleEvent(event) {
       const data    = new URLSearchParams(event.postback.data);
       const action  = data.get('action');
       const patient = await getPatientByLineId(lineUserId);
+
+      // ② タイムスタンプチェック：30分以上前のpostbackは無効
+      const ts = data.get('ts');
+      const timeoutActions = ['select_date','select_time','confirm_booking','cancel_appointment'];
+      if (ts && timeoutActions.includes(action)) {
+        const elapsed = Date.now() - parseInt(ts);
+        if (elapsed > 30 * 60 * 1000) {
+          await replyMessage(replyToken, [{
+            type: 'text',
+            text: '⏰ このボタンの有効期限が切れました。
+もう一度メニューから操作してください。',
+          }]);
+          break;
+        }
+      }
+
       switch (action) {
         case 'select_treatment':   await handleTreatmentSelect(replyToken, data.get('treatment_id'), patient); break;
         case 'select_date':        await handleDateSelect(replyToken, data.get('treatment_id'), data.get('date'), patient); break;
@@ -202,17 +218,32 @@ async function startBookingFlow(replyToken, patient) {
 }
 
 async function handleTreatmentSelect(replyToken, treatmentId, patient) {
+  // ① DB の clinic_settings から open_days を取得して休診日を除外
+  const settingsResult = await db.query(
+    "SELECT value FROM clinic_settings WHERE key = 'open_days'"
+  );
+  const openDays = settingsResult.rows.length
+    ? JSON.parse(settingsResult.rows[0].value)
+    : [1,2,3,4,5,6];
+
   const dates = [];
   const today = new Date();
-  for (let i = 1; i <= 14; i++) {
+  for (let i = 1; i <= 30; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    if (d.getDay() !== 0) dates.push(d.toISOString().split('T')[0]);
+    const dow = d.getDay();
+    if (openDays.includes(dow)) dates.push(d.toISOString().split('T')[0]);
     if (dates.length >= 4) break;
   }
+
+  if (!dates.length) {
+    await replyMessage(replyToken, [{ type: 'text', text: '現在予約可能な日程がありません。お電話でお問い合わせください。' }]);
+    return;
+  }
+
   const actions = dates.map(date => ({
     type: 'postback', label: formatDateJP(date),
-    data: `action=select_date&treatment_id=${treatmentId}&date=${date}`,
+    data: `action=select_date&treatment_id=${treatmentId}&date=${date}&ts=${Date.now()}`,
   }));
   await replyMessage(replyToken, [{ type: 'template', altText: '日程を選択してください', template: { type: 'buttons', text: '診察日を選択してください', actions } }]);
 }
@@ -227,7 +258,7 @@ async function handleDateSelect(replyToken, treatmentId, date, patient) {
   }
   const actions = slots.slice(0, 4).map(slot => ({
     type: 'postback', label: `${slot.time}〜`,
-    data: `action=select_time&treatment_id=${treatmentId}&date=${date}&time=${slot.time}`,
+    data: `action=select_time&treatment_id=${treatmentId}&date=${date}&time=${slot.time}&ts=${Date.now()}`,
   }));
   await replyMessage(replyToken, [{ type: 'template', altText: '時間を選択してください', template: { type: 'buttons', text: `${formatDateJP(date)}の空き時間`, actions } }]);
 }
@@ -243,7 +274,7 @@ async function handleTimeSelect(replyToken, data, patient) {
       type: 'confirm',
       text: `以下で予約しますか？\n\n📅 ${formatDateJP(date)}\n⏰ ${time}〜\n🦷 ${t.name}（${t.duration}分）`,
       actions: [
-        { type: 'postback', label: '✅ 予約する', data: `action=confirm_booking&treatment_id=${treatmentId}&date=${date}&time=${time}` },
+        { type: 'postback', label: '✅ 予約する', data: `action=confirm_booking&treatment_id=${treatmentId}&date=${date}&time=${time}&ts=${Date.now()}` },
         { type: 'postback', label: '❌ やり直す', data: 'action=restart' },
       ],
     },
