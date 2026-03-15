@@ -410,7 +410,7 @@ export default function CalendarPage() {
 }
 
 // =============================================
-// 【1】月カレンダービュー
+// 【月カレンダー強化版】
 // =============================================
 function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelectDate, onSwitchToDay }) {
   const [year, month] = currentMonth.split('-').map(Number);
@@ -418,10 +418,24 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
   const firstDow      = new Date(year, month-1, 1).getDay();
   const today         = new Date().toISOString().split('T')[0];
 
+  // 月合計統計
+  const monthStats = Object.values(monthData).reduce((acc, data) => {
+    if (!data) return acc;
+    acc.total += data.appointments?.length || 0;
+    return acc;
+  }, { total: 0 });
+
   const cells = [];
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  }
+
+  // チェア稼働率計算（その日の最大チェア数に対する割合）
+  function getOccupancyRate(appts, maxChairs = 3) {
+    if (!appts || appts.length === 0) return 0;
+    // 簡易計算：予約数 / (営業スロット数 * チェア数) 
+    return Math.min(100, Math.round((appts.length / (16 * maxChairs)) * 100));
   }
 
   return (
@@ -434,6 +448,20 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             <button onClick={onSwitchToDay} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">日表示</button>
           </div>
         </div>
+      </div>
+
+      {/* 月間サマリー */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { label: '月間予約数', value: `${monthStats.total}件`, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: '診療日数', value: `${Object.values(monthData).filter(d => d?.appointments?.length > 0).length}日`, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: '平均/日', value: `${Object.values(monthData).filter(d => d?.appointments?.length > 0).length > 0 ? Math.round(monthStats.total / Object.values(monthData).filter(d => d?.appointments?.length > 0).length) : 0}件`, color: 'text-purple-600', bg: 'bg-purple-50' },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
+            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -457,39 +485,110 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         {/* 日付グリッド */}
         <div className="grid grid-cols-7">
           {cells.map((dateStr, idx) => {
-            if (!dateStr) return <div key={`empty-${idx}`} className="h-24 border-b border-r border-gray-50" />;
-            const data   = monthData[dateStr];
-            const appts  = data?.appointments || [];
-            const dow    = new Date(dateStr).getDay();
-            const isToday = dateStr === today;
-            const isPast  = dateStr < today;
+            if (!dateStr) return (
+              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50/30" />
+            );
+            const data     = monthData[dateStr];
+            const appts    = data?.appointments || [];
+            const settings = data?.settings;
+            const dow      = new Date(dateStr).getDay();
+            const isToday  = dateStr === today;
+            const isPast   = dateStr < today;
+            const isHoliday = data && settings && !data.slots?.length;
+
+            // 治療カラードット用（重複除去）
+            const treatmentColors = [...new Set(appts.map(a => a.treatment_type))]
+              .slice(0, 5)
+              .map(t => getTreatmentColor(t).bg);
+
+            // 稼働率バー
+            const maxChairs = settings?.maxChairs || 3;
+            const occupancy = getOccupancyRate(appts, maxChairs);
 
             return (
               <div key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
-                className={`h-24 border-b border-r border-gray-50 p-1 cursor-pointer transition-colors
-                  ${isToday ? 'bg-blue-50' : isPast ? 'bg-gray-50/50' : 'hover:bg-blue-50/30'}`}>
-                <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full
-                  ${isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
-                  {new Date(dateStr).getDate()}
+                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group
+                  ${isToday ? 'bg-blue-50 border-blue-100' : ''}
+                  ${isPast && !isToday ? 'bg-gray-50/40' : ''}
+                  ${!isPast && !isToday ? 'hover:bg-blue-50/20' : ''}`}>
+
+                {/* 日付 + 件数バッジ */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0
+                    ${isToday ? 'bg-blue-600 text-white' :
+                      dow === 0 ? 'text-red-500' :
+                      dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
+                    {new Date(dateStr).getDate()}
+                  </div>
+                  {appts.length > 0 && (
+                    <span className="text-xs bg-blue-100 text-blue-800 rounded-full px-1.5 py-0.5 font-medium leading-none flex-shrink-0">
+                      {appts.length}件
+                    </span>
+                  )}
                 </div>
+
+                {/* 稼働率バー */}
+                {appts.length > 0 && (
+                  <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
+                    <div className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${occupancy}%`,
+                        background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e'
+                      }} />
+                  </div>
+                )}
+
+                {/* 治療カラードット */}
+                {treatmentColors.length > 0 && (
+                  <div className="flex gap-1 mb-1">
+                    {treatmentColors.map((c, i) => (
+                      <div key={i} className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c }} />
+                    ))}
+                  </div>
+                )}
+
+                {/* 予約プレビュー */}
                 <div className="space-y-0.5 overflow-hidden">
-                  {appts.slice(0, 3).map(a => {
+                  {appts.slice(0, 2).map(a => {
                     const color = getTreatmentColor(a.treatment_type);
                     return (
-                      <div key={a.id} className="text-xs px-1 rounded truncate"
+                      <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight"
                         style={{ background: color.light, color: color.text, borderLeft: `2px solid ${color.bg}` }}>
                         {a.start_time?.substring(0,5)} {a.name_kana || a.patient_name}
                       </div>
                     );
                   })}
-                  {appts.length > 3 && (
-                    <div className="text-xs text-gray-400 pl-1">+{appts.length - 3}件</div>
+                  {appts.length > 2 && (
+                    <div className="text-xs text-gray-400 pl-1 leading-tight">
+                      +{appts.length - 2}件
+                    </div>
                   )}
                 </div>
+
+                {/* 予約なし・休診 */}
+                {appts.length === 0 && (
+                  <div className="text-xs text-gray-300 text-center mt-2">
+                    {dow === 0 ? '休診' : ''}
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+
+        {/* 凡例 */}
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <div className="w-8 h-1 rounded-full bg-green-400" />少ない
+          </span>
+          <span className="flex items-center gap-1">
+            <div className="w-8 h-1 rounded-full bg-blue-400" />普通
+          </span>
+          <span className="flex items-center gap-1">
+            <div className="w-8 h-1 rounded-full bg-red-400" />混んでいる
+          </span>
+          <span className="ml-auto text-gray-400">バーは稼働率を表示</span>
         </div>
       </div>
     </div>
