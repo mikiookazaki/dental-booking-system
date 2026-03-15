@@ -30,33 +30,43 @@ export default function Sidebar() {
 
   async function fetchMiniData() {
     try {
-      // 診療設定取得（カレンダーAPIのsettingsから）
-      const today2 = new Date().toISOString().split('T')[0]
-      const cfg = await axios.get(`/api/appointments/calendar/${today2}`).catch(() => null)
-      if (cfg?.data?.settings) {
-        // open_days は clinic_settings から別途取得
-      }
-      // admin settingsから診療曜日を取得
-      const adminCfg = await axios.get('/api/admin/settings').catch(() => null)
-      if (adminCfg?.data?.settings?.open_days?.value) {
-        try { setOpenDays(JSON.parse(adminCfg.data.settings.open_days.value)) } catch {}
-      }
-
-      // 月間予約件数取得（日別）
       const { year, month } = miniMonth
       const daysInMonth = new Date(year, month, 0).getDate()
       const counts = {}
+      const closedDays = new Set()
+
+      // 各日の予約件数と休診判定を取得
       const promises = []
       for (let d = 1; d <= daysInMonth; d++) {
         const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
         promises.push(
           axios.get(`/api/appointments/calendar/${ds}`)
-            .then(r => { counts[ds] = r.data?.appointments?.length || 0 })
+            .then(r => {
+              counts[ds] = r.data?.appointments?.length || 0
+              // slotsが空 = 休診日
+              if (!r.data?.slots?.length) closedDays.add(new Date(ds).getDay())
+            })
             .catch(() => { counts[ds] = 0 })
         )
       }
       await Promise.all(promises)
       setMonthAppts(counts)
+
+      // 休診曜日を診療曜日に変換（0-6のうち休診でない曜日）
+      const allDows = [0,1,2,3,4,5,6]
+      // available-slots で closed になる曜日を除外
+      const firstWeekDates = []
+      for (let d = 1; d <= 7 && d <= daysInMonth; d++) {
+        const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        firstWeekDates.push(ds)
+      }
+      const openDowSet = new Set()
+      await Promise.all(firstWeekDates.map(ds =>
+        axios.get(`/api/appointments/available-slots/${ds}`)
+          .then(r => { if (r.data?.available !== false) openDowSet.add(new Date(ds).getDay()) })
+          .catch(() => {})
+      ))
+      if (openDowSet.size > 0) setOpenDays([...openDowSet])
     } catch {}
   }
 

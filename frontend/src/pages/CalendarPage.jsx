@@ -136,17 +136,7 @@ export default function CalendarPage() {
 
   const { settings, chairs, slots: clinicSlots, appointments, blocks } = calendarData;
 
-  // 診療時間外のスロットも生成してslotsを拡張
-  function genExtraSlots(fromMin, toMin, dur) {
-    const s = [];
-    let c = fromMin;
-    while (c + dur <= toMin) { s.push(toTimeStr(c)); c += dur; }
-    return s;
-  }
-  const extraBefore = genExtraSlots(toMinutes(displayStart), clinicOpenMin,  settings.slotDuration);
-  const extraAfter  = genExtraSlots(clinicCloseMin, toMinutes(displayEnd),    settings.slotDuration);
-  const slots = [...extraBefore, ...clinicSlots, ...extraAfter];
-  // 表示時間（診療時間外含む）
+  // 表示時間（診療時間外含む）※ 先に定義
   const displayStart   = settings.displayStart || settings.openTime;
   const displayEnd     = settings.displayEnd   || settings.closeTime;
   const openMin        = toMinutes(displayStart);
@@ -154,6 +144,17 @@ export default function CalendarPage() {
   // 診療時間（グレーアウト判定用）
   const clinicOpenMin  = toMinutes(settings.openTime);
   const clinicCloseMin = toMinutes(settings.closeTime);
+
+  // 診療時間外のスロットも生成してslotsを拡張
+  function genExtraSlots(fromMin, toMin, dur) {
+    const s = [];
+    let c = fromMin;
+    while (c + dur <= toMin) { s.push(toTimeStr(c)); c += dur; }
+    return s;
+  }
+  const extraBefore = genExtraSlots(openMin, clinicOpenMin, settings.slotDuration);
+  const extraAfter  = genExtraSlots(clinicCloseMin, closeMin, settings.slotDuration);
+  const slots = [...extraBefore, ...clinicSlots, ...extraAfter];
   const totalMin = closeMin - openMin;
   const SLOT_HEIGHT   = 72;
   const HEADER_HEIGHT = 48;
