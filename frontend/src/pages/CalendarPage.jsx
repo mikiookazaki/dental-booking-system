@@ -321,11 +321,11 @@ export default function CalendarPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* ヘッダー固定【3】 */}
-      <div className="sticky top-0 z-50 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 shadow-sm px-4 py-3">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* 月/週/日切替 */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm px-4 py-3" style={{ marginLeft: 224 }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 月/週/日切替 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
@@ -370,24 +370,21 @@ export default function CalendarPage() {
             className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
             🔄 更新
           </button>
+          </div>
         </div>
-      </div>
-      </div>{/* /sticky header */}
+        {/* 凡例 */}
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
+            <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
+            </span>
+          ))}
+        </div>
+      </div>{/* /fixed header */}
 
-      {/* 凡例 */}
-      <div className="px-4 pt-3">
-      <div className="flex flex-wrap gap-2 mb-4">
-        {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-          <span key={name} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium"
-            style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
-            <span className="w-2 h-2 rounded-full inline-block" style={{ background: color.bg }} />{name}
-          </span>
-        ))}
-      </div>
-
-      </div>{/* /px-4 */}
-
-      <div className="px-4">
+      {/* スクロール領域（ヘッダー高さ分パディング） */}
+      <div className="px-4 py-3" style={{ paddingTop: 120 }}>
       {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
 
       {/* ドクターモードで予約なし */}
@@ -576,7 +573,7 @@ export default function CalendarPage() {
           onUpdate={() => { setDetailModal(null); fetchCalendar(); }}
         />
       )}
-      </div>{/* /px-4 */}
+      </div>{/* /content */}
     </div>
   );
 }
@@ -681,32 +678,51 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   // 【2】同時刻の予約を重なり表示するレイアウト計算
   function calcOverlapLayout(appts) {
     if (!appts.length) return [];
-    // 時刻順にソート
     const sorted = [...appts].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
-    const groups = []; // [[appt, ...], ...]
+
+    // 各予約に「列」を割り当てる（Googleカレンダー方式）
+    const cols = []; // cols[i] = その列に最後に入れた予約のend_time(分)
+    const colIdx = {}; // appt.id → 列インデックス
 
     sorted.forEach(appt => {
+      const start = toMinutes(appt.start_time);
+      const end   = toMinutes(appt.end_time);
+      // 空いている列を探す
       let placed = false;
-      for (const group of groups) {
-        // グループの中で重なるものがあるか
-        const overlaps = group.some(g =>
-          toMinutes(g.start_time) < toMinutes(appt.end_time) &&
-          toMinutes(g.end_time)   > toMinutes(appt.start_time)
-        );
-        if (overlaps) { group.push(appt); placed = true; break; }
+      for (let i = 0; i < cols.length; i++) {
+        if (cols[i] <= start) { // この列は空いている
+          cols[i] = end;
+          colIdx[appt.id] = i;
+          placed = true;
+          break;
+        }
       }
-      if (!placed) groups.push([appt]);
+      if (!placed) { // 新しい列を追加
+        colIdx[appt.id] = cols.length;
+        cols.push(end);
+      }
     });
 
-    // 各予約に left%, width% を割り当て
-    const result = [];
-    groups.forEach(group => {
-      const n = group.length;
-      group.forEach((appt, i) => {
-        result.push({ appt, left: (i / n) * 100, width: (1 / n) * 100, zIndex: 20 + i });
-      });
+    const totalCols = cols.length;
+
+    // 各予約が重なるグループを検出してwidth調整
+    // 単純に: 同じ時間帯に重なる予約の最大列数に合わせてwidthを決める
+    return sorted.map(appt => {
+      const col = colIdx[appt.id];
+      const aStart = toMinutes(appt.start_time);
+      const aEnd   = toMinutes(appt.end_time);
+      // この予約と重なる全予約を取得
+      const overlapping = sorted.filter(b =>
+        toMinutes(b.start_time) < aEnd && toMinutes(b.end_time) > aStart
+      );
+      const maxCol = Math.max(...overlapping.map(b => colIdx[b.id])) + 1;
+      return {
+        appt,
+        left:   (col / maxCol) * 100,
+        width:  (1 / maxCol) * 100,
+        zIndex: 20 + col,
+      };
     });
-    return result;
   }
 
   // 週の範囲表示
@@ -716,59 +732,54 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* ヘッダー固定 */}
-      <div className="sticky top-0 z-50 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 shadow-sm px-4 py-3">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* ビュー切替 */
-          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
-              <button key={v} onClick={() => onSwitchView(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors
-                  ${v === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                {label}表示
+      {/* 週ヘッダー fixed */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm" style={{ marginLeft: 224 }}>
+        <div className="px-4 py-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h1 className="text-xl font-bold text-gray-800">📅 診療カレンダー</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
+                  <button key={v} onClick={() => onSwitchView(v)}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors
+                      ${v === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    {label}表示
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-1.5">
+                <button onClick={onPrevWeek} className="text-gray-500 hover:text-blue-600 text-sm">◀</button>
+                <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
+                <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
+              </div>
+              <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
+                  <button key={v} onClick={() => onViewModeChange(v)}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors
+                      ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={onRefresh}
+                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
+                🔄 更新
               </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
+              <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
+              </span>
             ))}
           </div>
-
-          {/* 週ナビ */}
-          <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
-            <button onClick={onPrevWeek} className="text-gray-500 hover:text-blue-600 text-sm">◀</button>
-            <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
-            <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
-          </div>
-
-          {/* チェア/ドクター切替 */}
-          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
-              <button key={v} onClick={() => onViewModeChange(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors
-                  ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <button onClick={onRefresh}
-            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
-            🔄 更新
-          </button>
         </div>
       </div>
-      </div>{/* /sticky header */}
 
-      <div className="px-4">
-      {/* 凡例 */}
-      <div className="flex flex-wrap gap-2 mb-4 pt-3">
-        {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-          <span key={name} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium"
-            style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
-            <span className="w-2 h-2 rounded-full inline-block" style={{ background: color.bg }} />{name}
-          </span>
-        ))}
-      </div>
-
+      {/* コンテンツ（ヘッダー分パディング） */}
+      <div className="px-4" style={{ paddingTop: 110 }}>
       {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
 
       {/* 週グリッド */}
@@ -777,9 +788,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
           {/* 曜日ヘッダー */}
           <div className="flex border-b border-gray-100" style={{ height: HEADER_H }}>
-            {/* 時刻軸ヘッダー */}
             <div style={{ width: TIME_W, flexShrink: 0 }} className="bg-gray-50 border-r border-gray-100" />
-            {/* 各日ヘッダー */}
             {weekDates.map(dateStr => {
               const d        = new Date(dateStr);
               const dow      = d.getDay();
@@ -792,7 +801,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   style={{ width: COL_W, flexShrink: 0 }}
                   className={`border-r border-gray-100 last:border-r-0 flex flex-col items-center justify-center cursor-pointer
                     ${isToday ? 'bg-blue-50' : isClosed ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
-                  onClick={() => { onSelectDate(dateStr); }}>
+                  onClick={() => onSelectDate(dateStr)}>
                   <div className={`text-xs font-bold
                     ${dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
                     {DOW_LABEL[dow]}
@@ -813,12 +822,12 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           {/* タイムライン */}
           <div className="flex">
             {/* 時刻軸 */}
-            <div className="bg-gray-50 border-r border-gray-100 relative" style={{ width: TIME_W, flexShrink: 0, height: timelineH }}>
+            <div className="bg-gray-50 border-r border-gray-100 relative flex-shrink-0"
+              style={{ width: TIME_W, height: timelineH }}>
               {allSlots.map(slot => (
                 <div key={slot} className="absolute right-1 text-right"
                   style={{ top: slotTop(slot), height: SLOT_H }}>
-                  <span className="text-xs text-gray-400 font-mono leading-none"
-                    style={{ fontSize: 10 }}>{slot}</span>
+                  <span className="text-gray-400 font-mono" style={{ fontSize: 10 }}>{slot}</span>
                 </div>
               ))}
             </div>
@@ -833,6 +842,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const isToday     = dateStr === today;
               const lunchS      = slotTop(settings.lunchStart);
               const lunchH2     = durPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
+              const layout      = calcOverlapLayout(dayAppts);
 
               return (
                 <div key={dateStr}
@@ -849,35 +859,31 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {/* 時間外グレーアウト（上） */}
                   {!isClosed && clinicH.open > openMin && (
-                    <div className="absolute left-0 right-0 bg-gray-50/80 z-5"
-                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX }} />
+                    <div className="absolute left-0 right-0 bg-gray-50/80"
+                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 1 }} />
                   )}
                   {/* 時間外グレーアウト（下） */}
                   {!isClosed && clinicH.close < closeMin && (
-                    <div className="absolute left-0 right-0 bg-gray-50/80 z-5"
-                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0 }} />
+                    <div className="absolute left-0 right-0 bg-gray-50/80"
+                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 1 }} />
                   )}
 
                   {/* 昼休み */}
                   <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                     style={{ top: lunchS, height: lunchH2 }}>
-                    {dayIdx === 0 && <span className="text-xs text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>}
+                    {dayIdx === 0 && <span className="text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>}
                   </div>
 
                   {/* 現在時刻ライン */}
                   {showNow && dayIdx === 0 && (
                     <div className="pointer-events-none z-30"
-                      style={{ position: 'absolute', top: nowTop, left: 0,
-                        width: COL_W * 7 + 'px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: '#ef4444' }} />
-                        <div style={{ position: 'absolute', left: -4, top: -5, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
-                      </div>
+                      style={{ position: 'absolute', top: nowTop, left: 0, width: COL_W * 7, height: 2, background: '#ef4444' }}>
+                      <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
                     </div>
                   )}
 
-                  {/* 【2】予約ブロック（重なり対応） */}
-                  {calcOverlapLayout(dayAppts).map(({ appt, left, width, zIndex }) => {
+                  {/* 【2】重なり対応予約ブロック */}
+                  {layout.map(({ appt, left, width, zIndex }) => {
                     const top    = (toMinutes(appt.start_time) - openMin) * MIN_PX;
                     const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
                     const color  = getTreatmentColor(appt.treatment_type);
@@ -887,12 +893,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                         draggable
                         onDragStart={e => handleDragStart(e, appt, dateStr)}
                         onDragEnd={handleDragEnd}
-                        onClick={e => { if (!dragging) setDetailModal({ appt, dateStr }); }}
-                        className={`absolute rounded cursor-grab active:cursor-grabbing
-                          select-none transition-all overflow-hidden
-                          ${isDrag ? 'opacity-40' : 'hover:shadow-lg hover:z-40'}`}
+                        onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }}
+                        className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all
+                          ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
                         style={{
-                          top: top + 1, height: height - 2,
+                          top: top + 1, height: Math.max(height - 2, 18),
                           left: `${left + 0.5}%`, width: `${width - 1}%`,
                           zIndex: isDrag ? 5 : zIndex,
                           background: color.light,
@@ -905,28 +910,19 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                             {appt.name_kana || appt.patient_name}
                           </div>
                           {height > 30 && (
-                            <div style={{ color: color.bg, fontSize: 9 }} className="leading-tight">
-                              {appt.treatment_type}
-                            </div>
+                            <div style={{ color: color.bg, fontSize: 9 }} className="leading-tight">{appt.treatment_type}</div>
                           )}
-                          {height > 45 && (
-                            <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }}>
-                              {appt.start_time?.substring(0,5)}〜
-                            </div>
-                          )}
-                          {appt.notes && height > 60 && (
-                            <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }} className="truncate italic">
-                              📋{appt.notes}
-                            </div>
+                          {height > 44 && (
+                            <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }}>{appt.start_time?.substring(0,5)}〜</div>
                           )}
                         </div>
                       </div>
                     );
                   })}
 
-                  {/* 週D&D: 列全体でドロップ受け取り・ピクセル計算 */}
+                  {/* ドロップゾーン */}
                   {!isClosed && (
-                    <div className="absolute inset-0 z-0"
+                    <div className="absolute inset-0" style={{ zIndex: 2 }}
                       onDragOver={e => {
                         e.preventDefault();
                         const time = weekPixelToTime(e, e.currentTarget);
@@ -941,17 +937,14 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                         const newEnd = toTimeStr(toMinutes(time) + durMin);
                         setDragging(null); setDragOver(null);
                         try {
-                          await axios.put(`/api/appointments/${appt.id}`, {
-                            appointment_date: dateStr, start_time: time, end_time: newEnd,
-                          });
+                          await axios.put(`/api/appointments/${appt.id}`, { appointment_date: dateStr, start_time: time, end_time: newEnd });
                           onRefresh();
                         } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
                       }}
                       onClick={e => {
                         if (dragging) return;
                         const rect = e.currentTarget.getBoundingClientRect();
-                        const y = e.clientY - rect.top;
-                        const rawMin = openMin + (y / MIN_PX);
+                        const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX);
                         const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration;
                         const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration)));
                         const firstChair = weekData[dateStr]?.chairs?.[0];
@@ -962,23 +955,24 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {/* D&Dプレビューライン */}
                   {dragOver?.dateStr === dateStr && (
-                    <div className="absolute left-0 right-0 pointer-events-none z-30"
-                      style={{ top: slotTop(dragOver.slot), height: 2, background: '#3b82f6' }}>
-                      <div style={{ position: 'absolute', left: 0, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
-                      <span style={{ position: 'absolute', left: 10, top: -10, fontSize: 10, color: '#3b82f6', fontWeight: 700, background: 'white', padding: '0 2px', borderRadius: 3 }}>
-                        {dragOver.slot}
-                      </span>
+                    <div className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(dragOver.slot), zIndex: 40 }}>
+                      <div style={{ height: 2, background: '#3b82f6', position: 'relative' }}>
+                        <div style={{ position: 'absolute', left: -4, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
+                        <span style={{ position: 'absolute', left: 8, top: -10, fontSize: 10, color: '#3b82f6', fontWeight: 700, background: 'white', padding: '0 2px', borderRadius: 3 }}>
+                          {dragOver.slot}
+                        </span>
+                      </div>
                     </div>
                   )}
 
-                  {/* スロット罫線（視認性のため） */}
+                  {/* スロット罫線 */}
                   {allSlots.map(slot => {
-                    const slotMin = toMinutes(slot);
-                    const isHour  = slotMin % 60 === 0;
+                    const isHour = toMinutes(slot) % 60 === 0;
                     return (
                       <div key={slot} className="absolute left-0 right-0 pointer-events-none"
                         style={{ top: slotTop(slot), height: SLOT_H,
-                          borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6' }} />
+                          borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6',
+                          zIndex: 0 }} />
                     );
                   })}
                 </div>
@@ -1009,10 +1003,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           onUpdate={() => { setDetailModal(null); onRefresh(); }}
         />
       )}
-      </div>{/* /px-4 */}
+      </div>
     </div>
   );
 }
+
 
 // =============================================
 // 【月カレンダー強化版】
