@@ -38,7 +38,7 @@ function formatDate(dateStr) {
 // メインコンポーネント
 // =============================================
 export default function CalendarPage() {
-  const [viewType, setViewType]           = useState('day');   // 'month' | 'day'
+  const [viewType, setViewType]           = useState('day');   // 'month' | 'week' | 'day'
   const [viewMode, setViewMode]           = useState('chair'); // 'chair' | 'doctor'
   const [searchParams] = useSearchParams();
   const [selectedDate, setSelectedDate]   = useState(
@@ -50,6 +50,7 @@ export default function CalendarPage() {
   });
   const [calendarData, setCalendarData]   = useState(null);
   const [monthData, setMonthData]         = useState({});
+  const [weekData, setWeekData]           = useState({});  // { 'YYYY-MM-DD': calendarData }
   const [loading, setLoading]             = useState(false);
   const [dragging, setDragging]           = useState(null);
   const [dragOver, setDragOver]           = useState(null);
@@ -57,6 +58,23 @@ export default function CalendarPage() {
   const [detailModal, setDetailModal]     = useState(null);
   const [allStaff, setAllStaff]           = useState([]);
   const [now, setNow]                     = useState(new Date());
+
+  // 週の開始日（月曜）を計算
+  function getWeekStart(dateStr) {
+    const d = new Date(dateStr);
+    const dow = d.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow; // 月曜始まり
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  }
+  function getWeekDates(dateStr) {
+    const start = getWeekStart(dateStr);
+    return Array.from({length: 7}, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d.toISOString().split('T')[0];
+    });
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
@@ -105,6 +123,27 @@ export default function CalendarPage() {
 
   useEffect(() => { if (viewType === 'month') fetchMonth(); }, [viewType, fetchMonth]);
 
+  // 週別データ取得
+  const fetchWeek = useCallback(async () => {
+    setLoading(true);
+    try {
+      const dates = getWeekDates(selectedDate);
+      const results = await Promise.all(
+        dates.map(d =>
+          axios.get(`/api/appointments/calendar/${d}`)
+            .then(r => ({ date: d, data: r.data }))
+            .catch(() => ({ date: d, data: null }))
+        )
+      );
+      const map = {};
+      results.forEach(({ date, data }) => { map[date] = data; });
+      setWeekData(map);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [selectedDate]);
+
+  useEffect(() => { if (viewType === 'week') fetchWeek(); }, [viewType, fetchWeek]);
+
   // ── 月カレンダービュー ──────────────────────────
   if (viewType === 'month') {
     return (
@@ -123,6 +162,32 @@ export default function CalendarPage() {
         }}
         onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
         onSwitchToDay={() => setViewType('day')}
+      />
+    );
+  }
+
+  // ── 週表示ビュー ──────────────────────────────────
+  if (viewType === 'week') {
+    return (
+      <WeekView
+        selectedDate={selectedDate}
+        weekData={weekData}
+        viewMode={viewMode}
+        allStaff={allStaff}
+        loading={loading}
+        now={now}
+        onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
+        onPrevWeek={() => {
+          const d = new Date(selectedDate); d.setDate(d.getDate() - 7);
+          setSelectedDate(d.toISOString().split('T')[0]);
+        }}
+        onNextWeek={() => {
+          const d = new Date(selectedDate); d.setDate(d.getDate() + 7);
+          setSelectedDate(d.toISOString().split('T')[0]);
+        }}
+        onSwitchView={v => setViewType(v)}
+        onViewModeChange={m => setViewMode(m)}
+        onRefresh={fetchWeek}
       />
     );
   }
@@ -231,9 +296,9 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 月/日切替【1】 */}
+          {/* 月/週/日切替 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['month','月'], ['day','日']].map(([v, label]) => (
+            {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
                 className={`px-3 py-2 text-sm font-medium transition-colors
                   ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
@@ -465,6 +530,386 @@ export default function CalendarPage() {
           appt={detailModal}
           onClose={() => setDetailModal(null)}
           onUpdate={() => { setDetailModal(null); fetchCalendar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// =============================================
+// 週表示カレンダー（案B）
+// =============================================
+function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
+  onSelectDate, onPrevWeek, onNextWeek, onSwitchView, onViewModeChange, onRefresh }) {
+
+  const [dragging, setDragging]       = useState(null);
+  const [dragOver, setDragOver]       = useState(null);
+  const [newApptModal, setNewApptModal] = useState(null);
+  const [detailModal, setDetailModal]   = useState(null);
+
+  // 週の日付リスト（月〜日）
+  function getWeekStart(ds) {
+    const d = new Date(ds); const dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return d.toISOString().split('T')[0];
+  }
+  const weekStart = getWeekStart(selectedDate);
+  const weekDates = Array.from({length: 7}, (_, i) => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + i);
+    return d.toISOString().split('T')[0];
+  });
+
+  // 設定は最初の有効な日から取得
+  const firstData  = Object.values(weekData).find(d => d?.settings);
+  const settings   = firstData?.settings;
+  const chairs     = firstData?.chairs || [];
+  const today      = new Date().toISOString().split('T')[0];
+
+  if (!settings) return (
+    <div className="p-4 bg-gray-50 min-h-screen">
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+      </div>
+    </div>
+  );
+
+  const openDays   = settings.openDays || [1,2,3,4,5,6];
+  const displayStart = settings.displayStart || settings.openTime;
+  const displayEnd   = settings.displayEnd   || settings.closeTime;
+  const openMin    = toMinutes(displayStart);
+  const closeMin   = toMinutes(displayEnd);
+  const totalMin   = closeMin - openMin;
+
+  const SLOT_H     = 48;  // 週表示は少し細め
+  const MIN_PX     = SLOT_H / settings.slotDuration;
+  const HEADER_H   = 52;
+  const COL_W      = 120; // 各日の幅(px)
+  const TIME_W     = 48;  // 時刻軸幅(px)
+  const timelineH  = totalMin * MIN_PX;
+
+  function slotTop(t) { return (toMinutes(t) - openMin) * MIN_PX; }
+  function durPx(m)   { return m * MIN_PX; }
+
+  // スロット生成（全日共通）
+  function genSlots(oMin, cMin, dur) {
+    const s = []; let c = oMin;
+    while (c + dur <= cMin) { s.push(toTimeStr(c)); c += dur; }
+    return s;
+  }
+  const allSlots = genSlots(openMin, closeMin, settings.slotDuration);
+
+  // 診療時間（曜日別カスタム考慮）
+  function getClinicHours(dateStr) {
+    const dow = new Date(dateStr).getDay();
+    const ch  = settings.customHours?.[dow];
+    if (ch) {
+      try {
+        const p = typeof ch === 'string' ? JSON.parse(ch) : ch;
+        return { open: toMinutes(p.open || settings.openTime), close: toMinutes(p.close || settings.closeTime) };
+      } catch {}
+    }
+    return { open: toMinutes(settings.openTime), close: toMinutes(settings.closeTime) };
+  }
+
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const nowTop = (nowMin - openMin) * MIN_PX;
+  const showNow = nowMin >= openMin && nowMin <= closeMin && weekDates.includes(today);
+  const todayColIdx = weekDates.indexOf(today);
+
+  // D&D（日またぎ対応）
+  function handleDragStart(e, appt, fromDate) {
+    setDragging({ appt, fromDate });
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragOver(e, slot, dateStr) {
+    e.preventDefault();
+    setDragOver({ slot, dateStr });
+  }
+  async function handleDrop(e, slot, dateStr) {
+    e.preventDefault();
+    if (!dragging) return;
+    const { appt, fromDate } = dragging;
+    const durMin     = toMinutes(appt.end_time) - toMinutes(appt.start_time);
+    const newEndTime = toTimeStr(toMinutes(slot) + durMin);
+    setDragging(null); setDragOver(null);
+    if (dateStr === fromDate && slot === appt.start_time?.substring(0,5)) return;
+    try {
+      await axios.put(`/api/appointments/${appt.id}`, {
+        appointment_date: dateStr,
+        start_time: slot,
+        end_time: newEndTime,
+      });
+      onRefresh();
+    } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
+  }
+  function handleDragEnd() { setDragging(null); setDragOver(null); }
+
+  // 週の範囲表示
+  const wStart = new Date(weekStart);
+  const wEnd   = new Date(weekDates[6]);
+  const rangeStr = `${wStart.getMonth()+1}/${wStart.getDate()} 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
+
+  return (
+    <div className="p-4 bg-gray-50 min-h-screen">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* ビュー切替 */}
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
+              <button key={v} onClick={() => onSwitchView(v)}
+                className={`px-3 py-2 text-sm font-medium transition-colors
+                  ${v === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {label}表示
+              </button>
+            ))}
+          </div>
+
+          {/* 週ナビ */}
+          <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
+            <button onClick={onPrevWeek} className="text-gray-500 hover:text-blue-600 text-sm">◀</button>
+            <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
+            <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
+          </div>
+
+          {/* チェア/ドクター切替 */}
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
+              <button key={v} onClick={() => onViewModeChange(v)}
+                className={`px-3 py-2 text-sm font-medium transition-colors
+                  ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={onRefresh}
+            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
+            🔄 更新
+          </button>
+        </div>
+      </div>
+
+      {/* 凡例 */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
+          <span key={name} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium"
+            style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
+            <span className="w-2 h-2 rounded-full inline-block" style={{ background: color.bg }} />{name}
+          </span>
+        ))}
+      </div>
+
+      {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
+
+      {/* 週グリッド */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+        <div style={{ minWidth: TIME_W + COL_W * 7 }}>
+
+          {/* 曜日ヘッダー */}
+          <div className="flex border-b border-gray-100" style={{ height: HEADER_H }}>
+            {/* 時刻軸ヘッダー */}
+            <div style={{ width: TIME_W, flexShrink: 0 }} className="bg-gray-50 border-r border-gray-100" />
+            {/* 各日ヘッダー */}
+            {weekDates.map(dateStr => {
+              const d        = new Date(dateStr);
+              const dow      = d.getDay();
+              const isToday  = dateStr === today;
+              const isClosed = !openDays.includes(dow);
+              const dayAppts = weekData[dateStr]?.appointments || [];
+              const DOW_LABEL = ['日','月','火','水','木','金','土'];
+              return (
+                <div key={dateStr}
+                  style={{ width: COL_W, flexShrink: 0 }}
+                  className={`border-r border-gray-100 last:border-r-0 flex flex-col items-center justify-center cursor-pointer
+                    ${isToday ? 'bg-blue-50' : isClosed ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+                  onClick={() => { onSelectDate(dateStr); }}>
+                  <div className={`text-xs font-bold
+                    ${dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
+                    {DOW_LABEL[dow]}
+                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5
+                    ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
+                    {d.getDate()}
+                  </div>
+                  {dayAppts.length > 0 && (
+                    <div className="text-xs text-blue-500 font-medium">{dayAppts.length}件</div>
+                  )}
+                  {isClosed && <div className="text-xs text-gray-400">休診</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* タイムライン */}
+          <div className="flex">
+            {/* 時刻軸 */}
+            <div className="bg-gray-50 border-r border-gray-100 relative" style={{ width: TIME_W, flexShrink: 0, height: timelineH }}>
+              {allSlots.map(slot => (
+                <div key={slot} className="absolute right-1 text-right"
+                  style={{ top: slotTop(slot), height: SLOT_H }}>
+                  <span className="text-xs text-gray-400 font-mono leading-none"
+                    style={{ fontSize: 10 }}>{slot}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 各日列 */}
+            {weekDates.map((dateStr, dayIdx) => {
+              const dow         = new Date(dateStr).getDay();
+              const isClosed    = !openDays.includes(dow);
+              const dayData     = weekData[dateStr];
+              const dayAppts    = dayData?.appointments || [];
+              const clinicH     = getClinicHours(dateStr);
+              const isToday     = dateStr === today;
+              const lunchS      = slotTop(settings.lunchStart);
+              const lunchH2     = durPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
+
+              return (
+                <div key={dateStr}
+                  style={{ width: COL_W, flexShrink: 0, height: timelineH }}
+                  className={`relative border-r border-gray-100 last:border-r-0
+                    ${isToday ? 'bg-blue-50/30' : ''}`}>
+
+                  {/* 休診日オーバーレイ */}
+                  {isClosed && (
+                    <div className="absolute inset-0 bg-gray-100/70 z-10 flex items-center justify-center">
+                      <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
+                    </div>
+                  )}
+
+                  {/* 時間外グレーアウト（上） */}
+                  {!isClosed && clinicH.open > openMin && (
+                    <div className="absolute left-0 right-0 bg-gray-50/80 z-5"
+                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX }} />
+                  )}
+                  {/* 時間外グレーアウト（下） */}
+                  {!isClosed && clinicH.close < closeMin && (
+                    <div className="absolute left-0 right-0 bg-gray-50/80 z-5"
+                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0 }} />
+                  )}
+
+                  {/* 昼休み */}
+                  <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
+                    style={{ top: lunchS, height: lunchH2 }}>
+                    {dayIdx === 0 && <span className="text-xs text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>}
+                  </div>
+
+                  {/* 現在時刻ライン */}
+                  {showNow && dayIdx === 0 && (
+                    <div className="pointer-events-none z-30"
+                      style={{ position: 'absolute', top: nowTop, left: 0,
+                        width: COL_W * 7 + 'px' }}>
+                      <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: '#ef4444' }} />
+                        <div style={{ position: 'absolute', left: -4, top: -5, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 予約ブロック */}
+                  {dayAppts.map(appt => {
+                    const top    = (toMinutes(appt.start_time) - openMin) * MIN_PX;
+                    const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
+                    const color  = getTreatmentColor(appt.treatment_type);
+                    const isDragging = dragging?.appt?.id === appt.id;
+                    return (
+                      <div key={appt.id}
+                        draggable
+                        onDragStart={e => handleDragStart(e, appt, dateStr)}
+                        onDragEnd={handleDragEnd}
+                        onClick={e => { if (!dragging) setDetailModal({ appt, dateStr }); }}
+                        className={`absolute left-0.5 right-0.5 rounded cursor-grab active:cursor-grabbing
+                          select-none z-20 transition-all overflow-hidden
+                          ${isDragging ? 'opacity-40' : 'hover:shadow-md hover:z-30'}`}
+                        style={{ top: top + 1, height: height - 2,
+                          background: color.light,
+                          borderLeft: `3px solid ${color.bg}`,
+                          border: `0.5px solid ${color.border}`,
+                          borderLeftWidth: 3 }}>
+                        <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
+                          <div className="font-bold leading-tight" style={{ color: color.text, fontSize: 10 }}>
+                            {appt.name_kana || appt.patient_name}
+                          </div>
+                          {height > 30 && (
+                            <div style={{ color: color.bg, fontSize: 9 }} className="leading-tight">
+                              {appt.treatment_type}
+                            </div>
+                          )}
+                          {height > 45 && (
+                            <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }}>
+                              {appt.start_time?.substring(0,5)}〜
+                            </div>
+                          )}
+                          {appt.notes && height > 60 && (
+                            <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }} className="truncate italic">
+                              📋{appt.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* 空きスロット（D&Dターゲット） */}
+                  {!isClosed && allSlots.map(slot => {
+                    const slotMin    = toMinutes(slot);
+                    const slotEndMin = slotMin + settings.slotDuration;
+                    const isLunch    = slotMin >= toMinutes(settings.lunchStart) && slotMin < toMinutes(settings.lunchEnd);
+                    if (isLunch) return null;
+                    const hasAppt    = dayAppts.some(a =>
+                      toMinutes(a.start_time) < slotEndMin && toMinutes(a.end_time) > slotMin
+                    );
+                    if (hasAppt) return null;
+                    const isOutOfHours = slotMin < clinicH.open || slotMin >= clinicH.close;
+                    const isDragTarget = dragOver?.slot === slot && dragOver?.dateStr === dateStr;
+                    return (
+                      <div key={slot}
+                        className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group
+                          ${isDragTarget ? 'bg-blue-100 border-blue-300 z-25' :
+                            isOutOfHours ? 'border-gray-50' : 'border-gray-50 hover:bg-blue-50/40'}`}
+                        style={{ top: slotTop(slot), height: SLOT_H, zIndex: isDragTarget ? 25 : 1 }}
+                        onDragOver={e => handleDragOver(e, slot, dateStr)}
+                        onDrop={e => handleDrop(e, slot, dateStr)}
+                        onClick={() => {
+                          const firstChair = weekData[dateStr]?.chairs?.[0];
+                          setNewApptModal({ slot, chairId: firstChair?.id, date: dateStr });
+                        }}>
+                        {isDragTarget && (
+                          <div className="absolute inset-0.5 border border-dashed border-blue-400 rounded flex items-center justify-center z-30">
+                            <span className="text-blue-500 font-medium" style={{ fontSize: 10 }}>ここに移動</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 新規予約モーダル */}
+      {newApptModal && (
+        <NewAppointmentModal
+          slot={newApptModal.slot}
+          chairId={newApptModal.chairId}
+          chairs={weekData[newApptModal.date]?.chairs || []}
+          date={newApptModal.date}
+          settings={settings}
+          onClose={() => setNewApptModal(null)}
+          onSave={() => { setNewApptModal(null); onRefresh(); }}
+        />
+      )}
+
+      {/* 詳細モーダル */}
+      {detailModal && (
+        <AppointmentDetailModal
+          appt={detailModal.appt}
+          onClose={() => setDetailModal(null)}
+          onUpdate={() => { setDetailModal(null); onRefresh(); }}
         />
       )}
     </div>
