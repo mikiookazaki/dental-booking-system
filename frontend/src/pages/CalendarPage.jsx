@@ -58,6 +58,7 @@ export default function CalendarPage() {
   const [detailModal, setDetailModal]     = useState(null);
   const [allStaff, setAllStaff]           = useState([]);
   const [now, setNow]                     = useState(new Date());
+  const timelineRef                       = useRef(null);  // D&D用
 
   // 週の開始日（月曜）を計算
   function getWeekStart(dateStr) {
@@ -269,8 +270,6 @@ export default function CalendarPage() {
   // =============================================
   // 【1】D&D: ピクセル位置から5分単位で時刻計算
   // =============================================
-  const timelineRef = useRef(null);
-
   function pixelToTime(e, containerEl) {
     const rect = containerEl.getBoundingClientRect();
     const y    = e.clientY - rect.top;
