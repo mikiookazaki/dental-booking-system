@@ -1,11 +1,11 @@
 const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/database');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 // GET /api/analytics/age
-// 年代別分析データを返す
-router.get('/age', requireAdmin, async (req, res) => {
+// 年代別分析データを返す（スタッフ・管理者共通）
+router.get('/age', requireAuth, async (req, res) => {
   try {
     const thisMonth = (() => {
       const d = new Date();

@@ -291,11 +291,11 @@ export default function AdminDashboard() {
 
   const totalPatients = ageData?.ageGroups?.reduce((s,d) => s+parseInt(d.count),0) || 0
   const unknownCount  = ageData?.ageGroups?.find(d=>d.age_group==='不明')?.count || 0
-  const lineRate = ageData?.lineStats
-    ? Math.round(parseInt(ageData.lineStats.linked)/Math.max(parseInt(ageData.lineStats.total),1)*100)
-    : 0
-  const monthTrend = ageData?.lastMonthAppts > 0
-    ? Math.round((ageData.thisMonthAppts - ageData.lastMonthAppts)/ageData.lastMonthAppts*100)
+  const lineLinked    = parseInt(ageData?.lineStats?.linked || 0)
+  const lineTotal     = parseInt(ageData?.lineStats?.total  || 0)
+  const lineRate      = lineTotal > 0 ? Math.round(lineLinked / lineTotal * 100) : 0
+  const monthTrend    = (ageData?.lastMonthAppts || 0) > 0
+    ? Math.round(((ageData.thisMonthAppts||0) - ageData.lastMonthAppts) / ageData.lastMonthAppts * 100)
     : null
 
   const cardStyle = { background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20 }
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
                 { label:'今月の予約',     value:`${ageData.thisMonthAppts}件`, color:'#10b981', bg:'#f0fdf4',
                   sub: monthTrend!==null ? `先月比: ${monthTrend>0?'▲':'▼'}${Math.abs(monthTrend)}%` : '先月比: -' },
                 { label:'LINE連携率',     value:`${lineRate}%`, color:'#06b6d4', bg:'#ecfeff',
-                  sub:`${ageData.lineStats.linked}/${ageData.lineStats.total}名` },
+                  sub:`${lineLinked}/${lineTotal}名` },
                 { label:'年代未登録',     value:`${unknownCount}名`, color:'#f59e0b', bg:'#fffbeb',
                   sub:'登録促進が必要' },
               ].map(kpi => (
