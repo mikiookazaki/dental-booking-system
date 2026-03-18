@@ -1,1 +1,76 @@
 @import "tailwindcss";
+
+/* ダークモード: html要素に dark クラスで切替 */
+@variant dark (&:where(.dark, .dark *));
+
+/* ダークモード用カラー変数 */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #374151;
+  --card-bg: #ffffff;
+}
+
+.dark {
+  --bg-primary: #1f2937;
+  --bg-secondary: #111827;
+  --bg-tertiary: #0f172a;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --border-color: #374151;
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #e2e8f0;
+  --card-bg: #1f2937;
+}
+
+/* ダークモード基本スタイル */
+.dark body {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
+.dark .bg-white { background-color: #1f2937 !important; }
+.dark .bg-gray-50 { background-color: #111827 !important; }
+.dark .bg-gray-100 { background-color: #1f2937 !important; }
+.dark .bg-gray-200 { background-color: #374151 !important; }
+
+.dark .text-gray-800 { color: #f3f4f6 !important; }
+.dark .text-gray-700 { color: #e5e7eb !important; }
+.dark .text-gray-600 { color: #d1d5db !important; }
+.dark .text-gray-500 { color: #9ca3af !important; }
+.dark .text-gray-400 { color: #6b7280 !important; }
+.dark .text-gray-900 { color: #f9fafb !important; }
+
+.dark .border-gray-100 { border-color: #374151 !important; }
+.dark .border-gray-200 { border-color: #374151 !important; }
+
+.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px rgba(0,0,0,0.4) !important; }
+
+/* サイドバー */
+.dark aside {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* カード・パネル */
+.dark .rounded-2xl,
+.dark .rounded-xl {
+  background-color: #1f2937;
+}
+
+/* 予約ブロックのダークモード対応 */
+.dark .hover\:bg-blue-50\/30:hover { background-color: rgba(59,130,246,0.1) !important; }
+.dark .hover\:bg-gray-50:hover { background-color: #374151 !important; }
+
+/* スクロールバー（ダーク） */
+.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dark ::-webkit-scrollbar-track { background: #1f2937; }
+.dark ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }

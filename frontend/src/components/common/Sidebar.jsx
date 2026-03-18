@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Users, UserCog, LogOut, BarChart2 } from 'lucide-react'
+import { Calendar, Users, UserCog, LogOut, BarChart2, Sun, Moon } from 'lucide-react'
 import axios from '../../api'
+import { useDarkMode } from '../../hooks/useDarkMode'
 
 // =============================================
 // 【2】日本の祝日計算
@@ -69,6 +70,7 @@ const DOW = ['日','月','火','水','木','金','土']
 
 export default function Sidebar() {
   const location = useLocation()
+  const [isDark, setIsDark] = useDarkMode()
 
   // ミニカレンダー用 state
   const today = new Date()
@@ -343,6 +345,24 @@ export default function Sidebar() {
 
       {/* フッター */}
       <div className="p-3 border-t border-gray-200 space-y-2 flex-shrink-0">
+        {/* ダークモードトグル */}
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {isDark ? <Moon size={16} className="text-blue-400" /> : <Sun size={16} className="text-yellow-500" />}
+            <span className="text-xs">{isDark ? 'ダーク' : 'ライト'}</span>
+          </div>
+          {/* トグルスイッチ */}
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none
+              ${isDark ? 'bg-blue-600' : 'bg-gray-300'}`}
+            title={isDark ? 'ライトモードに切替' : 'ダークモードに切替'}
+          >
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform
+              ${isDark ? 'translate-x-4' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors w-full"
