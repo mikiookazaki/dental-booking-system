@@ -38,12 +38,12 @@ function formatDate(dateStr) {
 // メインコンポーネント
 // =============================================
 export default function CalendarPage() {
+  const [searchParams] = useSearchParams();  // 先に定義
   const [viewType, setViewType]           = useState(() => {
     const v = searchParams.get('view')
     return (v === 'month' || v === 'week' || v === 'week5') ? v : 'day'
   });  // 'month' | 'week' | 'week5' | 'day'
   const [viewMode, setViewMode]           = useState('chair'); // 'chair' | 'doctor'
-  const [searchParams] = useSearchParams();
   const [selectedDate, setSelectedDate]   = useState(
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
