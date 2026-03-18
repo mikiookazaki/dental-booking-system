@@ -38,7 +38,10 @@ function formatDate(dateStr) {
 // メインコンポーネント
 // =============================================
 export default function CalendarPage() {
-  const [viewType, setViewType]           = useState('day');   // 'month' | 'week' | 'day'
+  const [viewType, setViewType]           = useState(() => {
+    const v = searchParams.get('view')
+    return (v === 'month' || v === 'week' || v === 'week5') ? v : 'day'
+  });  // 'month' | 'week' | 'week5' | 'day'
   const [viewMode, setViewMode]           = useState('chair'); // 'chair' | 'doctor'
   const [searchParams] = useSearchParams();
   const [selectedDate, setSelectedDate]   = useState(
@@ -143,7 +146,7 @@ export default function CalendarPage() {
     finally { setLoading(false); }
   }, [selectedDate]);
 
-  useEffect(() => { if (viewType === 'week') fetchWeek(); }, [viewType, fetchWeek]);
+  useEffect(() => { if (viewType === 'week' || viewType === 'week5') fetchWeek(); }, [viewType, fetchWeek]);
 
   // ── 月カレンダービュー ──────────────────────────
   if (viewType === 'month') {
@@ -162,13 +165,13 @@ export default function CalendarPage() {
           setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
         }}
         onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
-        onSwitchToDay={() => setViewType('day')}
+        onSwitchToDay={(v) => setViewType(v || 'day')}
       />
     );
   }
 
   // ── 週表示ビュー ──────────────────────────────────
-  if (viewType === 'week') {
+  if (viewType === 'week' || viewType === 'week5') {
     return (
       <WeekView
         selectedDate={selectedDate}
@@ -177,6 +180,7 @@ export default function CalendarPage() {
         allStaff={allStaff}
         loading={loading}
         now={now}
+        weekOnly={viewType === 'week5'}
         onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
         onPrevWeek={() => {
           const d = new Date(selectedDate); d.setDate(d.getDate() - 7);
@@ -324,9 +328,9 @@ export default function CalendarPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* 月/週/日切替 */}
+            {/* 月/週/5日/日切替 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
+            {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
                 className={`px-3 py-2 text-sm font-medium transition-colors
                   ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
@@ -584,6 +588,7 @@ export default function CalendarPage() {
 // 週表示カレンダー（案B）
 // =============================================
 function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
+  weekOnly,  // trueなら平日(月〜金)のみ表示
   onSelectDate, onPrevWeek, onNextWeek, onSwitchView, onViewModeChange, onRefresh }) {
 
   const [dragging, setDragging]       = useState(null);
@@ -598,10 +603,14 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
     return d.toISOString().split('T')[0];
   }
   const weekStart = getWeekStart(selectedDate);
-  const weekDates = Array.from({length: 7}, (_, i) => {
+  const allWeekDates = Array.from({length: 7}, (_, i) => {
     const d = new Date(weekStart); d.setDate(d.getDate() + i);
     return d.toISOString().split('T')[0];
   });
+  // 5日表示なら土日を除外
+  const weekDates = weekOnly
+    ? allWeekDates.filter(ds => { const dow = new Date(ds).getDay(); return dow >= 1 && dow <= 5; })
+    : allWeekDates;
 
   // 設定は最初の有効な日から取得
   const firstData  = Object.values(weekData).find(d => d?.settings);
@@ -626,8 +635,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
   const SLOT_H     = 48;
   const MIN_PX     = SLOT_H / settings.slotDuration;
-  const HEADER_H   = 72;  // サマリーバー分を拡大
-  const COL_W      = 120;
+  const HEADER_H   = 72;
+  const COL_W      = weekOnly ? 160 : 120;  // 5日表示は列幅を広く
   const TIME_W     = 48;
   const timelineH  = totalMin * MIN_PX;
 
@@ -745,9 +754,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   }
 
   // 週の範囲表示
-  const wStart = new Date(weekStart);
-  const wEnd   = new Date(weekDates[6]);
-  const rangeStr = `${wStart.getMonth()+1}/${wStart.getDate()} 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
+  const wStart = new Date(weekDates[0]);
+  const wEnd   = new Date(weekDates[weekDates.length - 1]);
+  const rangeStr = weekOnly
+    ? `${wStart.getMonth()+1}/${wStart.getDate()}(月) 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}(金)`
+    : `${wStart.getMonth()+1}/${wStart.getDate()} 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -758,10 +769,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
             <h1 className="text-xl font-bold text-gray-800">📅 診療カレンダー</h1>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                {[['month','月'], ['week','週'], ['day','日']].map(([v, label]) => (
+                {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
                   <button key={v} onClick={() => onSwitchView(v)}
                     className={`px-3 py-1.5 text-sm font-medium transition-colors
-                      ${v === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                      ${(v === 'week' && !weekOnly) || (v === 'week5' && weekOnly)
+                        ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                     {label}表示
                   </button>
                 ))}
@@ -1125,7 +1137,9 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white">月表示</button>
-            <button onClick={onSwitchToDay} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">日表示</button>
+            <button onClick={() => onSwitchToDay('week')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">週表示</button>
+            <button onClick={() => onSwitchToDay('week5')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">5日表示</button>
+            <button onClick={() => onSwitchToDay('day')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">日表示</button>
           </div>
         </div>
       </div>

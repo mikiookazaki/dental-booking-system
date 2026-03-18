@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Calendar, Users, UserCog, LogOut } from 'lucide-react'
+import { Calendar, Users, UserCog, LogOut, BarChart2 } from 'lucide-react'
 import axios from '../../api'
 
 // =============================================
@@ -58,6 +58,11 @@ const navItems = [
   { path: '/calendar', label: '予約カレンダー', icon: Calendar },
   { path: '/patients', label: '患者管理',       icon: Users },
   { path: '/staff',    label: 'スタッフ管理',   icon: UserCog },
+]
+
+// 管理者専用メニュー
+const adminNavItems = [
+  { path: '/admin/dashboard', label: 'ダッシュボード', icon: BarChart2 },
 ]
 
 const DOW = ['日','月','火','水','木','金','土']
@@ -127,8 +132,14 @@ export default function Sidebar() {
   }
 
   function handleDayClick(dateStr) {
-    // カレンダーページに遷移（URLパラメータで日付を渡す）
-    window.location.href = `/calendar?date=${dateStr}`
+    // 現在のviewTypeを保持しつつカレンダーページへ遷移
+    // 週表示中なら週表示を維持、それ以外は日表示
+    const currentPath = window.location.pathname
+    const currentParams = new URLSearchParams(window.location.search)
+    const currentView = currentParams.get('view') || 'day'
+    // 週表示中（week or week5）なら週表示を維持
+    const nextView = (currentView === 'week' || currentView === 'week5') ? currentView : 'day'
+    window.location.href = `/calendar?date=${dateStr}&view=${nextView}`
   }
 
   const { year, month } = miniMonth
@@ -136,6 +147,25 @@ export default function Sidebar() {
   const firstDow    = new Date(year, month - 1, 1).getDay()
   const todayStr    = today.toISOString().split('T')[0]
   const holidays    = getHolidays(year)  // 【2】祝日マップ
+
+  // 現在の週表示中かどうかと、選択中の週の日付範囲を取得
+  const currentParams = new URLSearchParams(window.location.search)
+  const currentView   = currentParams.get('view') || 'day'
+  const currentDate   = currentParams.get('date') || todayStr
+  const isWeekView    = currentView === 'week' || currentView === 'week5'
+
+  function getWeekRange(dateStr) {
+    const d = new Date(dateStr)
+    const dow = d.getDay()
+    const startD = new Date(d)
+    startD.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+    const endD = new Date(startD)
+    endD.setDate(startD.getDate() + 6)
+    const start = startD.toISOString().split('T')[0]
+    const end   = endD.toISOString().split('T')[0]
+    return { start, end }
+  }
+  const selectedWeek = isWeekView ? getWeekRange(currentDate) : null
 
   const cells = []
   for (let i = 0; i < firstDow; i++) cells.push(null)
@@ -221,7 +251,8 @@ export default function Sidebar() {
                   ${!isToday && !isOpen ? 'bg-gray-100 text-gray-400' : ''}
                   ${!isToday && isOpen && holidays[ds] ? 'bg-red-50' : ''}
                   ${!isToday && isOpen && !holidays[ds] && !isPast ? 'hover:bg-blue-50 text-gray-700' : ''}
-                  ${!isToday && isOpen && !holidays[ds] && isPast ? 'text-gray-400' : ''}`}
+                  ${!isToday && isOpen && !holidays[ds] && isPast ? 'text-gray-400' : ''}
+                  ${isWeekView && selectedWeek && ds >= selectedWeek.start && ds <= selectedWeek.end && !isToday ? 'ring-1 ring-blue-300 ring-inset' : ''}`}
               >
                 <span className={`text-xs leading-none font-medium
                   ${isToday ? 'text-white' : ''}
@@ -282,6 +313,32 @@ export default function Sidebar() {
             </Link>
           )
         })}
+
+        {/* 管理者専用メニュー */}
+        {localStorage.getItem('admin_role') === 'admin' && (
+          <>
+            <div className="pt-2 pb-1 px-3">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">管理者</span>
+            </div>
+            {adminNavItems.map(({ path, label, icon: Icon }) => {
+              const active = location.pathname === path
+              return (
+                <Link
+                  key={path}
+                  to={path}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    active
+                      ? 'bg-purple-50 text-purple-700 font-medium'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon size={18} />
+                  {label}
+                </Link>
+              )
+            })}
+          </>
+        )}
       </nav>
 
       {/* フッター */}
