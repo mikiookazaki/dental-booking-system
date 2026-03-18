@@ -621,12 +621,29 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const closeMin   = toMinutes(displayEnd);
   const totalMin   = closeMin - openMin;
 
-  const SLOT_H     = 48;  // 週表示は少し細め
+  const SLOT_H     = 48;
   const MIN_PX     = SLOT_H / settings.slotDuration;
-  const HEADER_H   = 52;
-  const COL_W      = 120; // 各日の幅(px)
-  const TIME_W     = 48;  // 時刻軸幅(px)
+  const HEADER_H   = 72;  // サマリーバー分を拡大
+  const COL_W      = 120;
+  const TIME_W     = 48;
   const timelineH  = totalMin * MIN_PX;
+
+  // チェア別カラー（最大8チェア対応）
+  const CHAIR_COLORS = [
+    { bg: '#3b82f6', light: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }, // blue
+    { bg: '#10b981', light: '#f0fdf4', border: '#a7f3d0', text: '#065f46' }, // green
+    { bg: '#f59e0b', light: '#fffbeb', border: '#fde68a', text: '#92400e' }, // amber
+    { bg: '#8b5cf6', light: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' }, // violet
+    { bg: '#ef4444', light: '#fef2f2', border: '#fecaca', text: '#991b1b' }, // red
+    { bg: '#06b6d4', light: '#ecfeff', border: '#a5f3fc', text: '#155e75' }, // cyan
+    { bg: '#ec4899', light: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' }, // pink
+    { bg: '#84cc16', light: '#f7fee7', border: '#d9f99d', text: '#3f6212' }, // lime
+  ];
+
+  // 週全体の最大予約数（稼働率バーの基準）
+  const weekMaxAppts = Math.max(
+    ...weekDates.map(ds => (weekData[ds]?.appointments?.length || 0)), 1
+  );
 
   function slotTop(t) { return (toMinutes(t) - openMin) * MIN_PX; }
   function durPx(m)   { return m * MIN_PX; }
@@ -785,34 +802,89 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
         <div style={{ minWidth: TIME_W + COL_W * 7 }}>
 
-          {/* 曜日ヘッダー */}
-          <div className="flex border-b border-gray-100" style={{ height: HEADER_H }}>
-            <div style={{ width: TIME_W, flexShrink: 0 }} className="bg-gray-50 border-r border-gray-100" />
-            {weekDates.map(dateStr => {
+          {/* 曜日ヘッダー（週サマリーバー + チェア別カラー） */}
+          <div className="flex border-b border-gray-200" style={{ height: HEADER_H }}>
+            {/* 時刻軸ヘッダー */}
+            <div style={{ width: TIME_W, flexShrink: 0 }}
+              className="bg-gray-50 border-r border-gray-100 flex flex-col items-center justify-end pb-1.5">
+              <span className="text-gray-400" style={{ fontSize: 9 }}>時刻</span>
+            </div>
+
+            {weekDates.map((dateStr, colIdx) => {
               const d        = new Date(dateStr);
               const dow      = d.getDay();
               const isToday  = dateStr === today;
               const isClosed = !openDays.includes(dow);
               const dayAppts = weekData[dateStr]?.appointments || [];
               const DOW_LABEL = ['日','月','火','水','木','金','土'];
+              const count    = dayAppts.length;
+              const barPct   = Math.round((count / weekMaxAppts) * 100);
+              // 混雑度カラー
+              const barColor = isClosed ? '#e5e7eb'
+                : barPct >= 80 ? '#ef4444'
+                : barPct >= 50 ? '#3b82f6'
+                : '#22c55e';
+              // チェアカラー（列インデックスでなく日付ベースで固定）
+              const chColor = isClosed ? { bg:'#9ca3af', light:'#f9fafb', border:'#e5e7eb', text:'#6b7280' }
+                : CHAIR_COLORS[colIdx % CHAIR_COLORS.length];
+
               return (
                 <div key={dateStr}
-                  style={{ width: COL_W, flexShrink: 0 }}
-                  className={`border-r border-gray-100 last:border-r-0 flex flex-col items-center justify-center cursor-pointer
-                    ${isToday ? 'bg-blue-50' : isClosed ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
-                  onClick={() => onSelectDate(dateStr)}>
-                  <div className={`text-xs font-bold
-                    ${dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
-                    {DOW_LABEL[dow]}
+                  onClick={() => onSelectDate(dateStr)}
+                  style={{
+                    width: COL_W, flexShrink: 0,
+                    borderLeft: `3px solid ${isClosed ? '#e5e7eb' : chColor.bg}`,
+                    background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff',
+                    cursor: 'pointer',
+                  }}
+                  className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
+
+                  {/* 上段: 曜日 + 日付 */}
+                  <div className="flex items-center justify-between mb-1">
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: isClosed ? '#9ca3af'
+                        : dow === 0 ? '#ef4444'
+                        : dow === 6 ? '#3b82f6'
+                        : chColor.bg
+                    }}>
+                      {DOW_LABEL[dow]}
+                    </span>
+                    <span style={{
+                      width: 24, height: 24, borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700,
+                      background: isToday ? chColor.bg : 'transparent',
+                      color: isToday ? '#fff' : isClosed ? '#9ca3af' : '#374151',
+                    }}>
+                      {d.getDate()}
+                    </span>
                   </div>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5
-                    ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
-                    {d.getDate()}
-                  </div>
-                  {dayAppts.length > 0 && (
-                    <div className="text-xs text-blue-500 font-medium">{dayAppts.length}件</div>
+
+                  {/* 下段: サマリーバー + 件数 */}
+                  {isClosed ? (
+                    <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', marginTop: 2 }}>休診</div>
+                  ) : (
+                    <>
+                      <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
+                        <div style={{
+                          width: `${barPct}%`, height: '100%',
+                          background: barColor, borderRadius: 3,
+                          transition: 'width 0.4s ease',
+                        }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: barColor, fontWeight: 600 }}>
+                          {count > 0 ? `${count}件` : '空き'}
+                        </span>
+                        {barPct >= 80 && (
+                          <span style={{ fontSize: 9, background: '#fef2f2', color: '#dc2626', borderRadius: 3, padding: '0 3px', fontWeight: 600 }}>
+                            混
+                          </span>
+                        )}
+                      </div>
+                    </>
                   )}
-                  {isClosed && <div className="text-xs text-gray-400">休診</div>}
                 </div>
               );
             })}
@@ -842,12 +914,18 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const lunchS      = slotTop(settings.lunchStart);
               const lunchH2     = durPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
               const layout      = calcOverlapLayout(dayAppts);
+              const chColor     = isClosed
+                ? { bg:'#e5e7eb', light:'#f9fafb', border:'#e5e7eb', text:'#9ca3af' }
+                : CHAIR_COLORS[dayIdx % CHAIR_COLORS.length];
 
               return (
                 <div key={dateStr}
-                  style={{ width: COL_W, flexShrink: 0, height: timelineH }}
-                  className={`relative border-r border-gray-100 last:border-r-0
-                    ${isToday ? 'bg-blue-50/30' : ''}`}>
+                  style={{
+                    width: COL_W, flexShrink: 0, height: timelineH,
+                    borderLeft: `2px solid ${chColor.border}`,
+                    background: isToday ? chColor.light + '60' : 'transparent',
+                  }}
+                  className="relative border-r border-gray-100 last:border-r-0">
 
                   {/* 休診日オーバーレイ */}
                   {isClosed && (
