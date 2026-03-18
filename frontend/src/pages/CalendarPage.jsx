@@ -371,14 +371,17 @@ export default function CalendarPage() {
           </button>
           </div>
         </div>
-        {/* 凡例 */}
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        {/* 治療凡例 */}
+        <div className="flex flex-wrap gap-1.5 mt-2 items-center">
           {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
             <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
               style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
             </span>
           ))}
+          <span style={{ fontSize:11, color:'var(--color-text-secondary)', marginLeft:8 }}>
+            ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
+          </span>
         </div>
       </div>{/* /fixed header */}
 
@@ -768,15 +771,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
                 <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
               </div>
-              <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
-                  <button key={v} onClick={() => onViewModeChange(v)}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors
-                      ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {/* 週表示はチェア/ドクター切替不要のためコメントアウト */}
               <button onClick={onRefresh}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
                 🔄 更新
@@ -983,8 +978,16 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                           borderLeftWidth: 3,
                         }}>
                         <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
-                          <div className="font-bold leading-tight" style={{ color: color.text, fontSize: 10 }}>
-                            {appt.name_kana || appt.patient_name}
+                          <div style={{ display:'flex', alignItems:'center', gap:2, marginBottom:1 }}>
+                            <div className="font-bold leading-tight truncate" style={{ color: color.text, fontSize: 10, flex:1 }}>
+                              {appt.name_kana || appt.patient_name}
+                            </div>
+                            {appt.chair_name && (
+                              <span style={{
+                                fontSize: 8, padding: '0 3px', borderRadius: 3, flexShrink: 0,
+                                background: color.bg, color: '#fff', fontWeight: 700, lineHeight: '14px',
+                              }}>{appt.chair_name.replace('チェア','C')}</span>
+                            )}
                           </div>
                           {height > 30 && (
                             <div style={{ color: color.bg, fontSize: 9 }} className="leading-tight">{appt.treatment_type}</div>
