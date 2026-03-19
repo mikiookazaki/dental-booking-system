@@ -429,7 +429,25 @@ export default function CalendarPage() {
                       </span>
                     </div>
 
-                    <div className="relative" style={{ height: timelineHeight }}>
+                    <div className="relative" style={{ height: timelineHeight }}
+                      onDragOver={e => {
+                        e.preventDefault();
+                        const time = pixelToTime(e, e.currentTarget);
+                        setDragOver({ slot: time, colId: col.id });
+                      }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        if (!dragging) return;
+                        const appt = dragging.appointment;
+                        const time = pixelToTime(e, e.currentTarget);
+                        const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
+                        const newEndTime  = toTimeStr(toMinutes(time) + durationMin);
+                        const body = { appointment_date: selectedDate, start_time: time, end_time: newEndTime };
+                        if (viewMode === 'chair') body.chair_id = col.id;
+                        else body.staff_id = col.id;
+                        moveAppointment(appt.id, body);
+                        setDragging(null); setDragOver(null);
+                      }}>
                       {/* 昼休み */}
                       <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                         style={{ top: lunchTop, height: lunchHeight }}>
@@ -821,7 +839,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const d        = new Date(dateStr);
               const dow      = d.getDay();
               const isToday  = dateStr === today;
-              const isClosed = !openDays.includes(dow);
+              // customHoursが設定されている場合はopenDaysになくても診療あり
+              const hasCustomHours = !!(settings.customHours?.[dow]);
+              const isClosed = !openDays.includes(dow) && !hasCustomHours;
+              // 部分診療判定（openDaysにあるがcustomHoursで短縮されている）
+              const isPartialDay = hasCustomHours && openDays.includes(dow);
               const dayAppts = weekData[dateStr]?.appointments || [];
               const DOW_LABEL = ['日','月','火','水','木','金','土'];
               const count    = dayAppts.length;
@@ -871,6 +893,17 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   {/* 下段: サマリーバー + 件数 */}
                   {isClosed ? (
                     <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', marginTop: 2 }}>休診</div>
+                  ) : isPartialDay ? (
+                    <>
+                      <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
+                        <div style={{ width: `${barPct}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
+                          {count > 0 ? `${count}件` : '午前のみ'}
+                        </span>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
@@ -913,7 +946,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
             {/* 各日列 */}
             {weekDates.map((dateStr, dayIdx) => {
               const dow         = new Date(dateStr).getDay();
-              const isClosed    = !openDays.includes(dow);
+              const hasCustomH  = !!(settings.customHours?.[dow]);
+              const isClosed    = !openDays.includes(dow) && !hasCustomH;
               const dayData     = weekData[dateStr];
               const dayAppts    = dayData?.appointments || [];
               const clinicH     = getClinicHours(dateStr);
