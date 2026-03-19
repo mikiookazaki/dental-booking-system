@@ -969,7 +969,34 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     borderLeft: `2px solid ${chColor.border}`,
                     background: isToday ? chColor.light + '60' : 'transparent',
                   }}
-                  className="relative border-r border-gray-100 last:border-r-0">
+                  className="relative border-r border-gray-100 last:border-r-0"
+                  onDragOver={e => {
+                    e.preventDefault();
+                    const time = weekPixelToTime(e, e.currentTarget);
+                    setDragOver({ slot: time, dateStr });
+                  }}
+                  onDrop={async e => {
+                    e.preventDefault();
+                    if (!dragging) return;
+                    const { appt } = dragging;
+                    const time = weekPixelToTime(e, e.currentTarget);
+                    const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
+                    const newEnd = toTimeStr(toMinutes(time) + durMin);
+                    setDragging(null); setDragOver(null);
+                    try {
+                      await axios.put(`/api/appointments/${appt.id}`, { appointment_date: dateStr, start_time: time, end_time: newEnd });
+                      onRefresh();
+                    } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
+                  }}
+                  onClick={e => {
+                    if (dragging || e.target !== e.currentTarget) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX);
+                    const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration;
+                    const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration)));
+                    const firstChair = weekData[dateStr]?.chairs?.[0];
+                    setNewApptModal({ slot: time, chairId: firstChair?.id, date: dateStr });
+                  }}>
 
                   {/* 休診日オーバーレイ */}
                   {isClosed && (
@@ -1049,38 +1076,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     );
                   })}
 
-                  {/* ドロップゾーン - 予約ブロックより高いzIndexで全体を覆う */}
-                  {!isClosed && (
-                    <div className="absolute inset-0" style={{ zIndex: 50, background: 'transparent' }}
-                      onDragOver={e => {
-                        e.preventDefault();
-                        const time = weekPixelToTime(e, e.currentTarget);
-                        setDragOver({ slot: time, dateStr });
-                      }}
-                      onDrop={async e => {
-                        e.preventDefault();
-                        if (!dragging) return;
-                        const { appt } = dragging;
-                        const time = weekPixelToTime(e, e.currentTarget);
-                        const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
-                        const newEnd = toTimeStr(toMinutes(time) + durMin);
-                        setDragging(null); setDragOver(null);
-                        try {
-                          await axios.put(`/api/appointments/${appt.id}`, { appointment_date: dateStr, start_time: time, end_time: newEnd });
-                          onRefresh();
-                        } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
-                      }}
-                      onClick={e => {
-                        if (dragging) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX);
-                        const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration;
-                        const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration)));
-                        const firstChair = weekData[dateStr]?.chairs?.[0];
-                        setNewApptModal({ slot: time, chairId: firstChair?.id, date: dateStr });
-                      }}
-                    />
-                  )}
+                  {/* ドロップゾーンは列全体のdivで処理 - 下のonDragOver/onDropを使用 */}
 
                   {/* D&Dプレビューライン */}
                   {dragOver?.dateStr === dateStr && (
