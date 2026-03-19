@@ -690,10 +690,13 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   function getClinicHours(dateStr) {
     const dow = new Date(dateStr).getDay();
     const ch  = settings.customHours?.[dow];
-    if (ch) {
+    // 空文字・null・undefinedはカスタム設定なし
+    if (ch && ch !== '') {
       try {
         const p = typeof ch === 'string' ? JSON.parse(ch) : ch;
-        return { open: toMinutes(p.open || settings.openTime), close: toMinutes(p.close || settings.closeTime) };
+        if (p && p.open && p.close) {
+          return { open: toMinutes(p.open), close: toMinutes(p.close) };
+        }
       } catch {}
     }
     return { open: toMinutes(settings.openTime), close: toMinutes(settings.closeTime) };
@@ -977,13 +980,13 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {/* 時間外グレーアウト（上） */}
                   {!isClosed && clinicH.open > openMin && (
-                    <div className="absolute left-0 right-0 bg-gray-50/80"
-                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 1 }} />
+                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
+                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
-                  {/* 時間外グレーアウト（下） */}
+                  {/* 時間外グレーアウト（下） - closeMin(displayEnd)との比較に修正 */}
                   {!isClosed && clinicH.close < closeMin && (
-                    <div className="absolute left-0 right-0 bg-gray-50/80"
-                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 1 }} />
+                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
+                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
 
                   {/* 昼休み */}
@@ -1046,9 +1049,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     );
                   })}
 
-                  {/* ドロップゾーン */}
+                  {/* ドロップゾーン - 予約ブロックより高いzIndexで全体を覆う */}
                   {!isClosed && (
-                    <div className="absolute inset-0" style={{ zIndex: 2 }}
+                    <div className="absolute inset-0" style={{ zIndex: 50, background: 'transparent' }}
                       onDragOver={e => {
                         e.preventDefault();
                         const time = weekPixelToTime(e, e.currentTarget);
