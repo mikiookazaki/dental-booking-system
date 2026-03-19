@@ -62,6 +62,7 @@ export default function CalendarPage() {
   const [allStaff, setAllStaff]           = useState([]);
   const [now, setNow]                     = useState(new Date());
   const timelineRef                       = useRef(null);  // D&D用
+  const [tooltip, setTooltip]             = useState({ visible: false, appt: null, x: 0, y: 0 });
 
   // 週の開始日（月曜）を計算
   function getWeekStart(dateStr) {
@@ -477,9 +478,12 @@ export default function CalendarPage() {
                         return (
                           <div key={appt.id}
                             draggable
-                            onDragStart={e => { handleDragStart(e, appt); }}
+                            onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }}
                             onDragEnd={handleDragEnd}
                             onClick={e => { if (!dragging) setDetailModal(appt); }}
+                            onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
+                            onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
+                            onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                             className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing
                               shadow-sm transition-all select-none z-20
                               ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
@@ -597,6 +601,7 @@ export default function CalendarPage() {
           onUpdate={() => { setDetailModal(null); fetchCalendar(); }}
         />
       )}
+      <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
       </div>{/* /content */}
     </div>
   );
@@ -613,6 +618,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const [dragOver, setDragOver]       = useState(null);
   const [newApptModal, setNewApptModal] = useState(null);
   const [detailModal, setDetailModal]   = useState(null);
+  const [tooltip, setTooltip]           = useState({ visible: false, appt: null, x: 0, y: 0 });
 
   // 週の日付リスト（月〜日）
   function getWeekStart(ds) {
@@ -1039,9 +1045,12 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     return (
                       <div key={appt.id}
                         draggable
-                        onDragStart={e => handleDragStart(e, appt, dateStr)}
+                        onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }}
                         onDragEnd={handleDragEnd}
                         onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }}
+                        onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
+                        onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
+                        onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                         className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all
                           ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
                         style={{
@@ -1133,6 +1142,49 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   );
 }
 
+
+// =============================================
+// ②ホバーツールチップ
+// =============================================
+function ApptTooltip({ appt, visible, x, y }) {
+  if (!visible || !appt) return null;
+  return (
+    <div style={{
+      position: 'fixed', left: x + 12, top: y - 8,
+      zIndex: 9999, pointerEvents: 'none',
+      background: '#1f2937', color: '#f9fafb',
+      borderRadius: 8, padding: '8px 12px',
+      fontSize: 12, lineHeight: 1.6,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+      maxWidth: 220, whiteSpace: 'nowrap',
+    }}>
+      <div style={{ fontWeight: 700, marginBottom: 3, fontSize: 13 }}>
+        {appt.name_kana || appt.patient_name}
+      </div>
+      <div style={{ color: '#d1fae5' }}>{appt.treatment_type}</div>
+      <div style={{ color: '#bfdbfe', marginTop: 2 }}>
+        {appt.appointment_date} &nbsp;
+        {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
+      </div>
+      <div style={{ color: '#fde68a', marginTop: 1 }}>
+        {appt.chair_name} / Dr.{appt.doctor_name || '未定'}
+      </div>
+      {appt.notes && (
+        <div style={{ color: '#fca5a5', marginTop: 2, maxWidth: 200, whiteSpace: 'normal', fontSize: 11 }}>
+          📋 {appt.notes}
+        </div>
+      )}
+      {/* 三角形 */}
+      <div style={{
+        position: 'absolute', left: -6, top: 12,
+        width: 0, height: 0,
+        borderTop: '5px solid transparent',
+        borderBottom: '5px solid transparent',
+        borderRight: '6px solid #1f2937',
+      }} />
+    </div>
+  );
+}
 
 // =============================================
 // 【月カレンダー強化版】
@@ -1604,7 +1656,10 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               </div>
               <div className="text-sm opacity-75" style={{ color: color.text }}>{appt.patient_name}</div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+            {/* ①Xボタンを強調 */}
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
+              title="閉じる">✕</button>
           </div>
         </div>
         <div className="p-5 space-y-3">
@@ -1645,7 +1700,14 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2">
-          <button onClick={handleCancel} className="flex-1 border border-red-200 text-red-500 rounded-xl py-2 text-sm hover:bg-red-50">キャンセル</button>
+          {/* ①「キャンセル」→「予約キャンセル」に変更 */}
+          <button onClick={handleCancel}
+            className="flex-1 border-2 border-red-300 text-red-600 rounded-xl py-2 text-sm font-semibold hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            予約キャンセル
+          </button>
           <button onClick={handleSave} disabled={saving}
             className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
             {saving ? '保存中...' : '保存'}
