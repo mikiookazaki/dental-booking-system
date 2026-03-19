@@ -1137,6 +1137,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           onUpdate={() => { setDetailModal(null); onRefresh(); }}
         />
       )}
+      {/* ホバーツールチップ */}
+      <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
       </div>
     </div>
   );
@@ -1148,40 +1150,105 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 // =============================================
 function ApptTooltip({ appt, visible, x, y }) {
   if (!visible || !appt) return null;
+
+  // ダークモード判定
+  const isDark = document.documentElement.classList.contains('dark');
+  const bg        = isDark ? '#f1f5f9' : '#1e293b';   // ダーク時は白系、ライト時は濃紺
+  const textMain  = isDark ? '#0f172a' : '#f8fafc';
+  const textSub   = isDark ? '#334155' : '#cbd5e1';
+  const textGreen = isDark ? '#065f46' : '#6ee7b7';
+  const textBlue  = isDark ? '#1e40af' : '#93c5fd';
+  const textAmber = isDark ? '#92400e' : '#fde68a';
+  const textRed   = isDark ? '#991b1b' : '#fca5a5';
+  const border    = isDark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)';
+  const shadow    = isDark
+    ? '0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08)'
+    : '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)';
+
+  // 画面右端にはみ出さないよう位置調整
+  const tooltipW  = 230;
+  const left = x + 14 + tooltipW > window.innerWidth ? x - tooltipW - 8 : x + 14;
+  const arrowLeft = x + 14 + tooltipW > window.innerWidth;
+
   return (
     <div style={{
-      position: 'fixed', left: x + 12, top: y - 8,
+      position: 'fixed', left: left, top: y - 12,
       zIndex: 9999, pointerEvents: 'none',
-      background: '#1f2937', color: '#f9fafb',
-      borderRadius: 8, padding: '8px 12px',
-      fontSize: 12, lineHeight: 1.6,
-      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-      maxWidth: 220, whiteSpace: 'nowrap',
+      background: bg,
+      borderRadius: 10, padding: '10px 14px',
+      fontSize: 12, lineHeight: 1.65,
+      boxShadow: shadow,
+      width: tooltipW,
+      border: `1px solid ${border}`,
     }}>
-      <div style={{ fontWeight: 700, marginBottom: 3, fontSize: 13 }}>
+      {/* 患者名 */}
+      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+          background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
         {appt.name_kana || appt.patient_name}
       </div>
-      <div style={{ color: '#d1fae5' }}>{appt.treatment_type}</div>
-      <div style={{ color: '#bfdbfe', marginTop: 2 }}>
-        {appt.appointment_date} &nbsp;
-        {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
+      {appt.patient_name && appt.name_kana && (
+        <div style={{ color: textSub, fontSize: 11, marginBottom: 4, marginLeft: 14 }}>
+          {appt.patient_name}
+        </div>
+      )}
+
+      {/* 区切り線 */}
+      <div style={{ borderTop: `1px solid ${isDark ? '#e2e8f0' : '#334155'}`, margin: '5px 0' }} />
+
+      {/* 治療内容 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+        <span style={{ fontSize: 10, color: textSub }}>治療</span>
+        <span style={{ fontWeight: 600, color: textGreen }}>{appt.treatment_type}</span>
       </div>
-      <div style={{ color: '#fde68a', marginTop: 1 }}>
-        {appt.chair_name} / Dr.{appt.doctor_name || '未定'}
+
+      {/* 日時 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+        <span style={{ fontSize: 10, color: textSub }}>日時</span>
+        <span style={{ color: textBlue }}>
+          {appt.appointment_date} &nbsp;
+          {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
+        </span>
       </div>
+
+      {/* チェア・担当 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ fontSize: 10, color: textSub }}>担当</span>
+        <span style={{ color: textAmber }}>
+          {appt.chair_name} &nbsp;/&nbsp; Dr.{appt.doctor_name || '未定'}
+        </span>
+      </div>
+
+      {/* 申し送り */}
       {appt.notes && (
-        <div style={{ color: '#fca5a5', marginTop: 2, maxWidth: 200, whiteSpace: 'normal', fontSize: 11 }}>
+        <div style={{
+          marginTop: 5, padding: '4px 6px',
+          background: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.15)',
+          borderRadius: 5, fontSize: 11,
+          color: textRed,
+        }}>
           📋 {appt.notes}
         </div>
       )}
-      {/* 三角形 */}
-      <div style={{
-        position: 'absolute', left: -6, top: 12,
-        width: 0, height: 0,
-        borderTop: '5px solid transparent',
-        borderBottom: '5px solid transparent',
-        borderRight: '6px solid #1f2937',
-      }} />
+
+      {/* 三角形（左向き or 右向き） */}
+      {!arrowLeft ? (
+        <div style={{
+          position: 'absolute', left: -7, top: 16,
+          width: 0, height: 0,
+          borderTop: '6px solid transparent',
+          borderBottom: '6px solid transparent',
+          borderRight: `7px solid ${bg}`,
+        }} />
+      ) : (
+        <div style={{
+          position: 'absolute', right: -7, top: 16,
+          width: 0, height: 0,
+          borderTop: '6px solid transparent',
+          borderBottom: '6px solid transparent',
+          borderLeft: `7px solid ${bg}`,
+        }} />
+      )}
     </div>
   );
 }
