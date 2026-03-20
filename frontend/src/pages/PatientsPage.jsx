@@ -27,7 +27,7 @@ export default function PatientsPage() {
   const [qrData, setQrData]           = useState(null)
   const [qrLoading, setQrLoading]     = useState(false)
   const [form, setForm] = useState({
-    name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: ''
+    name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: ''
   })
   const [errors, setErrors] = useState({})
 
@@ -74,7 +74,7 @@ export default function PatientsPage() {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
       await axios.post('/api/patients', { ...form, age_group })
       setShowModal(false)
-      setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '' })
+      setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: '' })
       setErrors({})
       fetchPatients()
     } catch (err) {
@@ -84,7 +84,7 @@ export default function PatientsPage() {
 
   function handleCloseModal() {
     setShowModal(false)
-    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '' })
+    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: '' })
     setErrors({})
   }
 
@@ -136,6 +136,8 @@ export default function PatientsPage() {
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">カナ</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">年代</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">電話番号</th>
+              <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">郵便番号</th>
+              <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">来院きっかけ</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">来院回数</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">LINE</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">QR</th>
@@ -162,6 +164,14 @@ export default function PatientsPage() {
                   {p.birth_date ? calcAgeGroup(p.birth_date) : (p.age_group || '-')}
                 </td>
                 <td className="p-3 text-gray-600">{p.phone || '-'}</td>
+                <td className="p-3 text-gray-500 font-mono text-xs">{p.postal_code || '-'}</td>
+                <td className="p-3">
+                  {p.referral_source ? (
+                    <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
+                      {p.referral_source}
+                    </span>
+                  ) : '-'}
+                </td>
                 <td className="p-3 text-gray-600">{p.total_visits}回</td>
                 <td className="p-3">
                   {p.line_user_id
@@ -319,6 +329,34 @@ export default function PatientsPage() {
                   <option value="male">男性</option>
                   <option value="female">女性</option>
                   <option value="other">その他</option>
+                </select>
+              </div>
+
+              {/* 郵便番号 */}
+              <div>
+                <label className="text-xs text-gray-500">郵便番号（任意）</label>
+                <input
+                  value={form.postal_code}
+                  onChange={e => setField('postal_code', e.target.value)}
+                  placeholder="150-0001"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+
+              {/* 来院きっかけ */}
+              <div>
+                <label className="text-xs text-gray-500">来院きっかけ（任意）</label>
+                <select
+                  value={form.referral_source}
+                  onChange={e => setField('referral_source', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  <option value="">選択してください</option>
+                  <option value="インターネット検索">インターネット検索</option>
+                  <option value="SNS・Instagram">SNS・Instagram</option>
+                  <option value="ご紹介">ご紹介</option>
+                  <option value="看板・チラシ">看板・チラシ</option>
+                  <option value="その他">その他</option>
                 </select>
               </div>
 

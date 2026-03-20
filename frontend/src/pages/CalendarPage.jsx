@@ -2070,6 +2070,26 @@ function PatientEditModal({ patientId, onClose, onSave }) {
             <textarea value={form.notes || ''} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
               rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">郵便番号</label>
+              <input value={form.postal_code || ''} onChange={e => setForm(f => ({...f, postal_code: e.target.value}))}
+                placeholder="150-0001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">来院きっかけ</label>
+              <select value={form.referral_source || ''} onChange={e => setForm(f => ({...f, referral_source: e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                <option value="">-</option>
+                <option value="インターネット検索">インターネット検索</option>
+                <option value="SNS・Instagram">SNS・Instagram</option>
+                <option value="ご紹介">ご紹介</option>
+                <option value="看板・チラシ">看板・チラシ</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">キャンセル</button>
