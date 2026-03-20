@@ -2086,6 +2086,8 @@ function PatientEditModal({ patientId, onClose, onSave }) {
                 <option value="SNS・Instagram">SNS・Instagram</option>
                 <option value="ご紹介">ご紹介</option>
                 <option value="看板・チラシ">看板・チラシ</option>
+                <option value="TVCM">TVCM</option>
+                <option value="公式HP">公式HP</option>
                 <option value="その他">その他</option>
               </select>
             </div>

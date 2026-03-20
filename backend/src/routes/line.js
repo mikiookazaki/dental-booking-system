@@ -349,6 +349,13 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
     return;
   }
 
+  if (action === 'inq_referral_cat') {
+    // 大分類選択後に詳細を表示
+    await saveSession(lineUserId, 'referral', sData);
+    await askReferralDetail(replyToken, data.get('cat'));
+    return;
+  }
+
   if (action === 'inq_referral') {
     sData.referral_source = data.get('source');
     await saveSession(lineUserId, 'memo', sData);
@@ -377,13 +384,33 @@ async function askReferral(replyToken, lineUserId) {
     altText: 'クリニックをどこで知りましたか？',
     template: {
       type: 'buttons',
-      text: '【5/6】当クリニックをどこでお知りになりましたか？',
+      text: '【5/6】当クリニックをどこでお知りになりましたか？\nカテゴリを選んでください。',
       actions: [
-        { type: 'postback', label: 'インターネット検索', data: 'action=inq_referral&source=インターネット検索' },
-        { type: 'postback', label: 'SNS・Instagram', data: 'action=inq_referral&source=SNS・Instagram' },
-        { type: 'postback', label: 'ご紹介', data: 'action=inq_referral&source=ご紹介' },
-        { type: 'postback', label: '看板・チラシ', data: 'action=inq_referral&source=看板・チラシ' },
+        { type: 'postback', label: 'Web・デジタル系', data: 'action=inq_referral_cat&cat=web' },
+        { type: 'postback', label: '口コミ・広告系',  data: 'action=inq_referral_cat&cat=ads' },
       ],
+    },
+  }]);
+}
+
+async function askReferralDetail(replyToken, cat) {
+  const webActions = [
+    { type: 'postback', label: 'インターネット検索', data: 'action=inq_referral&source=インターネット検索' },
+    { type: 'postback', label: 'SNS・Instagram',    data: 'action=inq_referral&source=SNS・Instagram' },
+    { type: 'postback', label: '公式HP',             data: 'action=inq_referral&source=公式HP' },
+  ];
+  const adsActions = [
+    { type: 'postback', label: 'ご紹介',      data: 'action=inq_referral&source=ご紹介' },
+    { type: 'postback', label: '看板・チラシ', data: 'action=inq_referral&source=看板・チラシ' },
+    { type: 'postback', label: 'TVCM',        data: 'action=inq_referral&source=TVCM' },
+  ];
+  await replyMessage(replyToken, [{
+    type: 'template',
+    altText: '来院きっかけを選んでください',
+    template: {
+      type: 'buttons',
+      text: '具体的にどちらですか？',
+      actions: cat === 'web' ? webActions : adsActions,
     },
   }]);
 }
