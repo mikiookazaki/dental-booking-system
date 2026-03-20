@@ -405,11 +405,11 @@ function ReferralTreeMap({ data, total, colors }) {
 // バブルマップ（Leaflet.js使用）
 // ============================================================
 function BubbleMap({ postalData, maxCount }) {
-  const mapRef = React.useRef(null)
-  const leafletMap = React.useRef(null)
-  const markersRef = React.useRef([])
+  const mapRef = useRef(null)
+  const leafletMap = useRef(null)
+  const markersRef = useRef([])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!mapRef.current) return
     if (leafletMap.current) {
       // マーカー更新
