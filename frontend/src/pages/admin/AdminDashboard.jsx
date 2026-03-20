@@ -481,10 +481,11 @@ function ReferralTreeMap({ data, total, colors }) {
 // ============================================================
 // バブルマップ（Leaflet.js使用）
 // ============================================================
-function BubbleMap({ postalData, maxCount }) {
+function BubbleMap({ postalData, maxCount, clinicLocation }) {
   const mapRef = useRef(null)
   const leafletMap = useRef(null)
   const markersRef = useRef([])
+  const clinicMarkerRef = useRef(null)
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -492,6 +493,10 @@ function BubbleMap({ postalData, maxCount }) {
       // マーカー更新
       markersRef.current.forEach(m => m.remove())
       markersRef.current = []
+      if (clinicMarkerRef.current) {
+        clinicMarkerRef.current.remove()
+        clinicMarkerRef.current = null
+      }
       addMarkers()
       return
     }
@@ -506,8 +511,12 @@ function BubbleMap({ postalData, maxCount }) {
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.onload = () => {
       const L = window.L
+      // クリニック座標があればそちらを中心に、なければデフォルト
+      const center = (clinicLocation?.lat && clinicLocation?.lng)
+        ? [clinicLocation.lat, clinicLocation.lng]
+        : [35.659, 139.700]
       leafletMap.current = L.map(mapRef.current, {
-        center: [35.659, 139.700],
+        center,
         zoom: 13,
         zoomControl: true,
       })
@@ -522,6 +531,8 @@ function BubbleMap({ postalData, maxCount }) {
     function addMarkers() {
       const L = window.L
       if (!L || !leafletMap.current) return
+
+      // 患者バブルマーカー
       postalData.forEach(d => {
         const radius = Math.max(12, Math.sqrt(d.count / maxCount) * 40)
         const circle = L.circleMarker([d.coords.lat, d.coords.lng], {
@@ -538,10 +549,37 @@ function BubbleMap({ postalData, maxCount }) {
         circle.addTo(leafletMap.current)
         markersRef.current.push(circle)
       })
+
+      // 医院マーカー
+      if (clinicLocation?.lat && clinicLocation?.lng) {
+        const clinicIcon = L.divIcon({
+          html: `
+            <div style="
+              background:#dc2626; color:#fff;
+              border:3px solid #fff; border-radius:50% 50% 50% 0;
+              transform:rotate(-45deg); width:32px; height:32px;
+              box-shadow:0 2px 8px rgba(0,0,0,0.35);
+              display:flex; align-items:center; justify-content:center;
+            ">
+              <span style="transform:rotate(45deg); font-size:16px; line-height:1;">🦷</span>
+            </div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -34],
+          className: '',
+        })
+        clinicMarkerRef.current = L.marker(
+          [clinicLocation.lat, clinicLocation.lng],
+          { icon: clinicIcon, zIndexOffset: 1000 }
+        ).bindPopup(`
+          <b style="color:#dc2626">🦷 ${clinicLocation.name}</b><br>
+          ${clinicLocation.address}
+        `).addTo(leafletMap.current)
+      }
     }
 
     return () => { /* cleanup */ }
-  }, [postalData])
+  }, [postalData, clinicLocation])
 
   return (
     <div ref={mapRef} style={{ height: 400, borderRadius: 8, border:'1px solid #e5e7eb', overflow:'hidden' }} />
@@ -856,7 +894,7 @@ export default function AdminDashboard() {
       {activeTab === 'map' && (
         ageLoading ? <div style={{ textAlign:'center', padding:60, color:'#9ca3af' }}>読み込み中...</div>
         : !ageData ? null : (
-          <MapAndReferralTab ageData={ageData} />
+          <MapAndReferralTab ageData={ageData} clinicLocation={ageData.clinicLocation} />
         )
       )}
     </div>
@@ -866,7 +904,7 @@ export default function AdminDashboard() {
 // ============================================================
 // 地域・流入分析タブ
 // ============================================================
-function MapAndReferralTab({ ageData }) {
+function MapAndReferralTab({ ageData, clinicLocation }) {
   const cardStyle = { background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20 }
 
   // 流入チャネルデータ
@@ -979,7 +1017,7 @@ function MapAndReferralTab({ ageData }) {
             {postalData.length}エリア / {postalData.reduce((s,d)=>s+d.count,0)}名
           </div>
         </div>
-        <BubbleMap postalData={postalData} maxCount={maxCount} />
+        <BubbleMap postalData={postalData} maxCount={maxCount} clinicLocation={clinicLocation} />
 
         {/* エリア別ランキング */}
         <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:8 }}>

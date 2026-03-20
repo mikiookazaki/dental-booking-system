@@ -75,11 +75,34 @@ export default function AdminSettings() {
     setLoading(false)
   }
 
+  // 住所→座標変換（OpenStreetMap Nominatim）
+  async function geocodeAddress(address) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=ja`
+      const res = await fetch(url, { headers: { 'User-Agent': 'SmileDental/1.0' } })
+      const data = await res.json()
+      if (data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+      }
+    } catch {}
+    return null
+  }
+
   async function handleSave() {
     setSaving(true)
     setError('')
     try {
       const updates = { ...settings, open_days: JSON.stringify(openDays) }
+
+      // 住所が入力されていればジオコーディングして座標も保存
+      if (settings.clinic_address) {
+        const coords = await geocodeAddress(settings.clinic_address)
+        if (coords) {
+          updates.clinic_lat = String(coords.lat)
+          updates.clinic_lng = String(coords.lng)
+        }
+      }
+
       const res = await fetch(`${API}/api/admin/settings`, {
         method: 'PUT', headers: authHeader(),
         body: JSON.stringify({ updates }),

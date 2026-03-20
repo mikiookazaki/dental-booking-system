@@ -118,6 +118,14 @@ router.get('/age', requireAuth, async (req, res) => {
       ORDER BY count DESC
     `);
 
+    // クリニック座標（clinic_settings から取得）
+    const clinicSettings = await pool.query(`
+      SELECT key, value FROM clinic_settings
+      WHERE key IN ('clinic_address', 'clinic_lat', 'clinic_lng', 'clinic_name')
+    `);
+    const clinicMap = {};
+    clinicSettings.rows.forEach(r => { clinicMap[r.key] = r.value });
+
     res.json({
       ageGroups:   ageGroups.rows,
       monthly:     monthly.rows,
@@ -130,6 +138,12 @@ router.get('/age', requireAuth, async (req, res) => {
       thisMonthAppts: parseInt(thisM.rows[0].count),
       lastMonthAppts: parseInt(lastM.rows[0].count),
       newPatientsMonth: parseInt(newP.rows[0].count),
+      clinicLocation: {
+        name:    clinicMap.clinic_name    || 'スマイル歯科',
+        address: clinicMap.clinic_address || '',
+        lat:     clinicMap.clinic_lat     ? parseFloat(clinicMap.clinic_lat)  : null,
+        lng:     clinicMap.clinic_lng     ? parseFloat(clinicMap.clinic_lng) : null,
+      },
     });
   } catch (err) {
     console.error('analytics/age error:', err);
