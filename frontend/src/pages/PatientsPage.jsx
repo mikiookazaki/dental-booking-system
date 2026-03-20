@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from '../api'
-import { Search, Plus, X, QrCode } from 'lucide-react'
+import { Search, Plus, X, QrCode, Pencil } from 'lucide-react'
 
 // 年代自動計算
 function calcAgeGroup(birthDate) {
@@ -24,6 +24,7 @@ export default function PatientsPage() {
   const [loading, setLoading]         = useState(true)
   const [showModal, setShowModal]     = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [editPatient, setEditPatient] = useState(null)  // 編集対象患者
   const [qrData, setQrData]           = useState(null)
   const [qrLoading, setQrLoading]     = useState(false)
   const [form, setForm] = useState({
@@ -32,6 +33,41 @@ export default function PatientsPage() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => { fetchPatients() }, [])
+
+  // 編集ボタンクリック
+  function handleEdit(p) {
+    setEditPatient(p)
+    setForm({
+      name:             p.name || '',
+      name_kana:        p.name_kana || '',
+      phone:            p.phone || '',
+      birth_date:       p.birth_date?.substring(0,10) || '',
+      gender:           p.gender || '',
+      age_group:        p.age_group || '',
+      postal_code:      p.postal_code || '',
+      referral_source:  p.referral_source || '',
+      notes:            p.notes || '',
+    })
+    setErrors({})
+    setShowModal(true)
+  }
+
+  // 編集保存
+  async function handleUpdate(e) {
+    e.preventDefault()
+    const kanaErr = validateKana(form.name_kana)
+    if (kanaErr) { setErrors({ name_kana: kanaErr }); return }
+    try {
+      const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group
+      await axios.put(`/api/patients/${editPatient.id}`, { ...form, age_group })
+      setShowModal(false)
+      setEditPatient(null)
+      setForm({ name:'', name_kana:'', phone:'', birth_date:'', gender:'', age_group:'', postal_code:'', referral_source:'', notes:'' })
+      fetchPatients()
+    } catch (err) {
+      alert(err.response?.data?.error || '更新に失敗しました')
+    }
+  }
 
   async function fetchPatients() {
     setLoading(true)
@@ -84,7 +120,8 @@ export default function PatientsPage() {
 
   function handleCloseModal() {
     setShowModal(false)
-    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: '' })
+    setEditPatient(null)
+    setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: '', notes: '' })
     setErrors({})
   }
 
@@ -141,6 +178,7 @@ export default function PatientsPage() {
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">来院回数</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">LINE</th>
               <th className="text-left p-3 border-b border-gray-200 text-gray-600 font-medium">QR</th>
+              <th className="p-3 border-b border-gray-200"></th>
             </tr>
           </thead>
           <tbody>
@@ -185,6 +223,14 @@ export default function PatientsPage() {
                     className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100"
                   >
                     <QrCode size={14} />QR
+                  </button>
+                </td>
+                <td className="p-3">
+                  <button
+                    onClick={() => handleEdit(p)}
+                    className="flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-600 rounded-lg text-xs hover:bg-gray-100 border border-gray-200"
+                  >
+                    <Pencil size={13} />編集
                   </button>
                 </td>
               </tr>
@@ -253,7 +299,7 @@ export default function PatientsPage() {
             <p className="text-xs text-gray-500 mb-4">
               ※ 患者番号は自動採番されます。詳細情報は登録後に追加できます。
             </p>
-            <form onSubmit={handleCreate} className="space-y-3">
+            <form onSubmit={editPatient ? handleUpdate : handleCreate} className="space-y-3">
 
               {/* 氏名 */}
               <div>
@@ -332,6 +378,20 @@ export default function PatientsPage() {
                 </select>
               </div>
 
+              {/* 備考・アレルギー（編集時のみ表示） */}
+              {editPatient && (
+                <div>
+                  <label className="text-xs text-gray-500">備考・アレルギー</label>
+                  <textarea
+                    value={form.notes || ''}
+                    onChange={e => setField('notes', e.target.value)}
+                    rows={2}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                    placeholder="アレルギー、服用中のお薬など"
+                  />
+                </div>
+              )}
+
               {/* 郵便番号 */}
               <div>
                 <label className="text-xs text-gray-500">郵便番号（任意）</label>
@@ -368,7 +428,7 @@ export default function PatientsPage() {
                 <button
                   type="submit"
                   className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                >登録する</button>
+                >{editPatient ? '保存する' : '登録する'}</button>
               </div>
             </form>
           </div>
