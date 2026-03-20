@@ -50,6 +50,12 @@ const SETTING_GROUPS = [
   },
 ]
 
+// マニュアル表示モード（localStorageで管理）
+const MANUAL_MODES = [
+  { value: 'tab',    label: '新しいタブで開く',       desc: 'シンプル・使い慣れた方法' },
+  { value: 'window', label: '別ウィンドウで開く',     desc: '画面を並べて確認できる' },
+]
+
 export default function AdminSettings() {
   const [settings, setSettings] = useState({})
   const [loading, setLoading]   = useState(true)
@@ -370,6 +376,67 @@ export default function AdminSettings() {
           </div>
         </div>
       ))}
+
+      {/* ── マニュアル表示設定 ── */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <span style={{ fontSize: 20 }}>📖</span>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>ヘルプマニュアルの表示方法</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>サイドバーの「マニュアル」ボタンを押した時の動作</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {MANUAL_MODES.map(mode => {
+            const current = localStorage.getItem('manual_display_mode') || 'tab'
+            const isSelected = current === mode.value
+            return (
+              <div key={mode.value}
+                onClick={() => { localStorage.setItem('manual_display_mode', mode.value); update('_manual_mode_ui', mode.value) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 18px', borderRadius: 10, cursor: 'pointer',
+                  border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`,
+                  background: isSelected ? '#eff6ff' : '#f9fafb',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${isSelected ? '#2563eb' : '#d1d5db'}`,
+                  background: isSelected ? '#2563eb' : '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isSelected && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: isSelected ? '#1e40af' : '#374151' }}>{mode.label}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>{mode.desc}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #a7f3d0' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>📖 マニュアルを今すぐ確認</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[
+              { label: '👑 管理者マニュアル', url: '/manual-admin.html' },
+              { label: '👩‍⚕️ スタッフマニュアル', url: '/manual-staff.html' },
+              { label: '📱 LINE予約ガイド',  url: '/manual-line.html'  },
+            ].map(m => (
+              <button key={m.url}
+                onClick={() => window.open(m.url, '_blank')}
+                style={{
+                  padding: '7px 14px', borderRadius: 8, border: '1px solid #059669',
+                  background: '#fff', color: '#059669', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >{m.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }

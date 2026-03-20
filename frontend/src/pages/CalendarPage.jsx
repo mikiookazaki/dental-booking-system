@@ -374,6 +374,15 @@ export default function CalendarPage() {
             className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
             🔄 更新
           </button>
+          <button
+            onClick={() => {
+              const mode = localStorage.getItem('manual_display_mode') || 'tab'
+              if (mode === 'tab') { window.open('/manual-staff.html', '_blank') }
+              else { window.open('/manual-staff.html', 'manual', 'width=900,height=700,scrollbars=yes,resizable=yes') }
+            }}
+            className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 shadow-sm font-medium">
+            📖 マニュアル
+          </button>
           </div>
         </div>
         {/* 治療凡例 */}
@@ -2086,8 +2095,6 @@ function PatientEditModal({ patientId, onClose, onSave }) {
                 <option value="SNS・Instagram">SNS・Instagram</option>
                 <option value="ご紹介">ご紹介</option>
                 <option value="看板・チラシ">看板・チラシ</option>
-                <option value="TVCM">TVCM</option>
-                <option value="公式HP">公式HP</option>
                 <option value="その他">その他</option>
               </select>
             </div>

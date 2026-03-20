@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/AdminLayout.jsx
 import { useState } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
-import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight } from 'lucide-react'
+import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen } from 'lucide-react'
 
 const NAV = [
   { path: '/admin/dashboard', label: 'ダッシュボード', icon: <BarChart2 size={18} /> },
@@ -13,6 +13,21 @@ export default function AdminLayout({ onLogout }) {
   const navigate  = useNavigate()
   const location  = useLocation()
   const adminName = localStorage.getItem('admin_name') || '管理者'
+
+  function openManual(type) {
+    const urls = {
+      admin: '/manual-admin.html',
+      staff: '/manual-staff.html',
+      line:  '/manual-line.html',
+    }
+    const url = urls[type] || urls.admin
+    const mode = localStorage.getItem('manual_display_mode') || 'tab'
+    if (mode === 'tab') {
+      window.open(url, '_blank')
+    } else {
+      window.open(url, 'manual', 'width=900,height=700,scrollbars=yes,resizable=yes')
+    }
+  }
 
   function handleLogout() {
     localStorage.removeItem('admin_token')
@@ -65,6 +80,29 @@ export default function AdminLayout({ onLogout }) {
             }}
           >
             <ChevronRight size={14} />一般管理画面へ
+          </button>
+        </div>
+        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <button
+            onClick={() => openManual('admin')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)', fontSize: 12,
+              marginBottom: 4,
+            }}
+          >
+            <BookOpen size={14} />管理者マニュアル
+          </button>
+          <button
+            onClick={() => openManual('line')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: 'rgba(255,255,255,0.55)', fontSize: 12,
+            }}
+          >
+            <BookOpen size={14} />LINE予約ガイド
           </button>
         </div>
         <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
