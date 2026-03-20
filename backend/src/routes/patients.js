@@ -23,6 +23,7 @@ router.get('/', requireAuth, async (req, res) => {
     let query = `
       SELECT id, patient_code, name, name_kana, phone, email,
              birth_date, gender, address, notes, age_group,
+             postal_code, referral_source,
              line_user_id, total_visits, created_at
       FROM patients
       WHERE is_active = TRUE
@@ -76,7 +77,7 @@ router.get('/:id/qr', requireAuth, async (req, res) => {
 // POST /api/patients
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group } = req.body;
+    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
     if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
     if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
@@ -85,10 +86,10 @@ router.post('/', requireAuth, async (req, res) => {
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : (age_group || null);
 
     const result = await pool.query(`
-      INSERT INTO patients (name, name_kana, phone, email, birth_date, gender, address, notes, age_group)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      INSERT INTO patients (name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *
-    `, [name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup]);
+    `, [name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, postal_code || null, referral_source || null]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -100,7 +101,7 @@ router.post('/', requireAuth, async (req, res) => {
 // PUT /api/patients/:id
 router.put('/:id', requireAuth, async (req, res) => {
   try {
-    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group } = req.body;
+    const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source } = req.body;
     if (name !== undefined && !name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
     if (name_kana !== undefined) {
       if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
@@ -112,19 +113,21 @@ router.put('/:id', requireAuth, async (req, res) => {
 
     const result = await pool.query(`
       UPDATE patients SET
-        name       = COALESCE($1, name),
-        name_kana  = COALESCE($2, name_kana),
-        phone      = COALESCE($3, phone),
-        email      = COALESCE($4, email),
-        birth_date = COALESCE($5, birth_date),
-        gender     = COALESCE($6, gender),
-        address    = COALESCE($7, address),
-        notes      = COALESCE($8, notes),
-        age_group  = COALESCE($9, age_group),
-        updated_at = NOW()
-      WHERE id = $10
+        name             = COALESCE($1, name),
+        name_kana        = COALESCE($2, name_kana),
+        phone            = COALESCE($3, phone),
+        email            = COALESCE($4, email),
+        birth_date       = COALESCE($5, birth_date),
+        gender           = COALESCE($6, gender),
+        address          = COALESCE($7, address),
+        notes            = COALESCE($8, notes),
+        age_group        = COALESCE($9, age_group),
+        postal_code      = COALESCE($10, postal_code),
+        referral_source  = COALESCE($11, referral_source),
+        updated_at       = NOW()
+      WHERE id = $12
       RETURNING *
-    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, req.params.id]);
+    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, postal_code, referral_source, req.params.id]);
 
     if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
     res.json(result.rows[0]);

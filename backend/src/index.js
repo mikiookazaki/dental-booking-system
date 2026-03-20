@@ -121,6 +121,15 @@ const runMigrations = async () => {
     );
     // age_group カラム追加
     await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS age_group VARCHAR(20)');
+    // postal_code（郵便番号）追加
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS postal_code VARCHAR(10)');
+    // referral_source（来院きっかけ）追加
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS referral_source VARCHAR(50)');
+    // line_inquiry_step（問診ステップ管理）追加
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS line_inquiry_step VARCHAR(50)');
+    // line_inquiry_data（問診途中データJSON）追加
+    await pool.query('ALTER TABLE patients ADD COLUMN IF NOT EXISTS line_inquiry_data TEXT');
+    console.log('  ✅ patients: postal_code, referral_source, line_inquiry_step, line_inquiry_data');
     // 既存患者で生年月日がある場合は年代を自動計算
     await pool.query(`
       UPDATE patients SET age_group =
@@ -132,6 +141,19 @@ const runMigrations = async () => {
       WHERE birth_date IS NOT NULL AND (age_group IS NULL OR age_group = '')
     `);
     console.log('  ✅ patients.age_group');
+
+    // 問診セッション管理テーブル
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS line_inquiry_sessions (
+        id           SERIAL PRIMARY KEY,
+        line_user_id VARCHAR(100) NOT NULL UNIQUE,
+        step         VARCHAR(50)  NOT NULL DEFAULT 'start',
+        data         JSONB        NOT NULL DEFAULT '{}',
+        created_at   TIMESTAMP    DEFAULT NOW(),
+        updated_at   TIMESTAMP    DEFAULT NOW()
+      )
+    `);
+    console.log('  ✅ line_inquiry_sessions テーブル');
 
     // 曜日別カスタム診療時間の設定キーを追加
     for (const dow of [0,1,2,3,4,5,6]) {
