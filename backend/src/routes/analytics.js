@@ -94,12 +94,38 @@ router.get('/age', requireAuth, async (req, res) => {
       pool.query(`SELECT COUNT(*) FROM patients WHERE TO_CHAR(created_at,'YYYY-MM')=$1 AND is_active=TRUE`, [thisMonth]),
     ]);
 
+    // 流入チャネル集計
+    const referralResult = await pool.query(`
+      SELECT
+        COALESCE(NULLIF(referral_source,''), 'その他') AS source,
+        COUNT(*) AS count
+      FROM patients
+      WHERE is_active = TRUE
+      GROUP BY 1
+      ORDER BY 2 DESC
+    `);
+
+    // 郵便番号別患者数（来院地域マップ用）
+    const postalResult = await pool.query(`
+      SELECT
+        postal_code,
+        COUNT(*) AS count
+      FROM patients
+      WHERE is_active = TRUE
+        AND postal_code IS NOT NULL
+        AND postal_code != ''
+      GROUP BY postal_code
+      ORDER BY count DESC
+    `);
+
     res.json({
       ageGroups:   ageGroups.rows,
       monthly:     monthly.rows,
       dowStats:    dowStats.rows,
       hourStats:   hourStats.rows,
       crossTab:    crossTab.rows,
+      referralSources: referralResult.rows,
+      postalCounts:    postalResult.rows,
       lineStats:   lineStats.rows[0],
       thisMonthAppts: parseInt(thisM.rows[0].count),
       lastMonthAppts: parseInt(lastM.rows[0].count),

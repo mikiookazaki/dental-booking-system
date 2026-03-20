@@ -241,9 +241,330 @@ function CrossTable({ data }) {
           })}
         </tbody>
       </table>
+
+      {/* ── タブ3: 地域・流入分析 ── */}
+      {activeTab === 'map' && (
+        ageLoading ? <div style={{ textAlign:'center', padding:60, color:'#9ca3af' }}>読み込み中...</div>
+        : !ageData ? null : (
+          <MapAndReferralTab ageData={ageData} />
+        )
+      )}
     </div>
   )
 }
+
+// ============================================================
+// 地域・流入分析タブ
+// ============================================================
+function MapAndReferralTab({ ageData }) {
+  const cardStyle = { background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20 }
+
+  // 流入チャネルデータ
+  const referralData = ageData.referralSources || []
+  const totalReferral = referralData.reduce((s,d) => s+parseInt(d.count), 0)
+
+  // 郵便番号データを座標に変換
+  const postalData = (ageData.postalCounts || [])
+    .map(d => ({
+      ...d,
+      count: parseInt(d.count),
+      coords: POSTAL_COORDS[d.postal_code],
+    }))
+    .filter(d => d.coords)
+
+  const maxCount = Math.max(...postalData.map(d => d.count), 1)
+
+  // ツリーマップのカラー
+  const TREE_COLORS = [
+    '#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'
+  ]
+
+  return (
+    <div>
+      {/* KPI */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:20 }}>
+        <div style={{ background:'#eff6ff', borderRadius:12, padding:'18px 20px', border:'1px solid #bfdbfe' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>郵便番号登録済み</div>
+          <div style={{ fontSize:24, fontWeight:700, color:'#3b82f6' }}>
+            {(ageData.postalCounts||[]).reduce((s,d)=>s+parseInt(d.count),0)}名
+          </div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {postalData.length}エリア
+          </div>
+        </div>
+        <div style={{ background:'#f5f3ff', borderRadius:12, padding:'18px 20px', border:'1px solid #ddd6fe' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>来院きっかけ登録済み</div>
+          <div style={{ fontSize:24, fontWeight:700, color:'#8b5cf6' }}>{totalReferral}名</div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {referralData.length}チャネル
+          </div>
+        </div>
+        <div style={{ background:'#f0fdf4', borderRadius:12, padding:'18px 20px', border:'1px solid #a7f3d0' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>最多流入チャネル</div>
+          <div style={{ fontSize:18, fontWeight:700, color:'#10b981' }}>
+            {referralData[0]?.source || '-'}
+          </div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {referralData[0] ? `${referralData[0].count}名 (${Math.round(parseInt(referralData[0].count)/Math.max(totalReferral,1)*100)}%)` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+
+        {/* 流入チャネル ツリーマップ */}
+        <div style={cardStyle}>
+          <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:'0 0 14px' }}>
+            流入チャネル（ツリーマップ）
+          </h2>
+          <ReferralTreeMap data={referralData} total={totalReferral} colors={TREE_COLORS} />
+          {/* 凡例 */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:12 }}>
+            {referralData.map((d,i) => (
+              <div key={d.source} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11 }}>
+                <span style={{ width:8, height:8, borderRadius:2, background:TREE_COLORS[i%TREE_COLORS.length], display:'inline-block' }} />
+                <span style={{ color:'#374151' }}>{d.source}</span>
+                <span style={{ color:'#9ca3af' }}>{d.count}名</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* チャネル別棒グラフ */}
+        <div style={cardStyle}>
+          <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:'0 0 14px' }}>
+            チャネル別患者数
+          </h2>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {referralData.map((d,i) => {
+              const pct = totalReferral > 0 ? Math.round(parseInt(d.count)/totalReferral*100) : 0
+              const bar = totalReferral > 0 ? (parseInt(d.count)/totalReferral*100) : 0
+              return (
+                <div key={d.source}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:3 }}>
+                    <span style={{ color:'#374151', fontWeight:500 }}>{d.source}</span>
+                    <span style={{ color:'#6b7280' }}>{d.count}名 ({pct}%)</span>
+                  </div>
+                  <div style={{ background:'#f3f4f6', borderRadius:4, height:8, overflow:'hidden' }}>
+                    <div style={{ width:`${bar}%`, height:8, borderRadius:4,
+                      background:TREE_COLORS[i%TREE_COLORS.length], transition:'width 0.5s' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 来院地域バブルマップ */}
+      <div style={cardStyle}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <div>
+            <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:0 }}>来院地域マップ</h2>
+            <p style={{ fontSize:11, color:'#9ca3af', margin:'3px 0 0' }}>
+              バブルの大きさ = 患者数　渋谷区・代々木周辺エリア
+            </p>
+          </div>
+          <div style={{ fontSize:11, color:'#6b7280' }}>
+            {postalData.length}エリア / {postalData.reduce((s,d)=>s+d.count,0)}名
+          </div>
+        </div>
+        <BubbleMap postalData={postalData} maxCount={maxCount} />
+
+        {/* エリア別ランキング */}
+        <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:8 }}>
+          {postalData.sort((a,b)=>b.count-a.count).slice(0,8).map((d,i) => (
+            <div key={d.postal_code} style={{
+              display:'flex', alignItems:'center', gap:8,
+              background:'#f9fafb', borderRadius:8, padding:'8px 10px',
+              border:'1px solid #e5e7eb',
+            }}>
+              <div style={{
+                width:24, height:24, borderRadius:'50%', flexShrink:0,
+                background: i===0?'#fbbf24':i===1?'#d1d5db':i===2?'#d97706':'#eff6ff',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:11, fontWeight:700, color: i<3?'#fff':'#3b82f6',
+              }}>{i+1}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'#374151', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                  {d.coords?.area || d.postal_code}
+                </div>
+                <div style={{ fontSize:10, color:'#9ca3af' }}>{d.postal_code} / {d.count}名</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// ツリーマップ（SVGで実装）
+// ============================================================
+function ReferralTreeMap({ data, total, colors }) {
+  if (!data?.length) return <div style={{ color:'#9ca3af', textAlign:'center', padding:40 }}>データなし</div>
+
+  const W = 400, H = 220
+  // シンプルな行分割ツリーマップ
+  function squarify(items, rect) {
+    if (!items.length) return []
+    const sorted = [...items].sort((a,b) => b.val - a.val)
+    const totalVal = sorted.reduce((s,d) => s+d.val, 0)
+    const result = []
+    let remaining = [...sorted]
+    let x = rect.x, y = rect.y, w = rect.w, h = rect.h
+
+    while (remaining.length > 0) {
+      const isWide = w >= h
+      const rowItems = []
+      let rowSum = 0
+      for (const item of remaining) {
+        rowItems.push(item)
+        rowSum += item.val
+        if (rowItems.length >= 2) {
+          const prev = rowItems.slice(0,-1).reduce((s,d)=>s+d.val,0)
+          const ratio = isWide
+            ? (h * rowSum / totalVal * W) / (h * prev / totalVal * W)
+            : (w * rowSum / totalVal * H) / (w * prev / totalVal * H)
+          if (ratio < 1) break
+        }
+      }
+      const rowRatio = rowSum / totalVal
+      rowItems.forEach((item, i) => {
+        const itemRatio = item.val / rowSum
+        if (isWide) {
+          const rw = w * rowRatio
+          result.push({ ...item, x, y: y + h * (1-rowRatio) + h * rowRatio * (1 - itemRatio - rowItems.slice(0,i).reduce((s,d)=>s+d.val,0)/rowSum),
+            w: rw, h: h * rowRatio * itemRatio })
+        } else {
+          const rh = h * rowRatio
+          result.push({ ...item, x: x + w * rowItems.slice(0,i).reduce((s,d)=>s+d.val,0)/rowSum,
+            y, w: w * itemRatio, h: rh })
+        }
+      })
+      remaining = remaining.slice(rowItems.length)
+      if (isWide) { x += w * rowRatio } else { y += h * rowRatio }
+      w = isWide ? w * (1-rowRatio) : w
+      h = isWide ? h : h * (1-rowRatio)
+      totalVal -= rowSum
+    }
+    return result
+  }
+
+  // シンプルな行ベース分割
+  function simpleLayout(items, W, H) {
+    const total = items.reduce((s,d)=>s+d.val,0)
+    const sorted = [...items].sort((a,b)=>b.val-a.val)
+    const result = []
+    let y = 0
+    for (let i=0; i<sorted.length; i++) {
+      const item = sorted[i]
+      const h = (item.val/total)*H
+      result.push({ ...item, x:0, y, w:W, h: Math.max(h,1) })
+      y += h
+    }
+    return result
+  }
+
+  const items = data.map((d,i) => ({ ...d, val: parseInt(d.count), color: colors[i%colors.length] }))
+  const boxes = simpleLayout(items, W, H)
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:220, borderRadius:8, overflow:'hidden' }}>
+      {boxes.map((box, i) => {
+        const pct = total > 0 ? Math.round(box.val/total*100) : 0
+        return (
+          <g key={box.source}>
+            <rect x={box.x+1} y={box.y+1} width={Math.max(box.w-2,0)} height={Math.max(box.h-2,0)}
+              rx={4} fill={box.color} opacity={0.9} />
+            {box.h > 22 && (
+              <text x={box.x+8} y={box.y+18} fill="#fff" fontSize={Math.min(13,box.h*0.45)} fontWeight={700}>
+                {box.source}
+              </text>
+            )}
+            {box.h > 38 && (
+              <text x={box.x+8} y={box.y+34} fill="rgba(255,255,255,0.85)" fontSize={11}>
+                {box.val}名 ({pct}%)
+              </text>
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ============================================================
+// バブルマップ（Leaflet.js使用）
+// ============================================================
+function BubbleMap({ postalData, maxCount }) {
+  const mapRef = React.useRef(null)
+  const leafletMap = React.useRef(null)
+  const markersRef = React.useRef([])
+
+  React.useEffect(() => {
+    if (!mapRef.current) return
+    if (leafletMap.current) {
+      // マーカー更新
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+      addMarkers()
+      return
+    }
+
+    // Leafletを動的ロード
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    script.onload = () => {
+      const L = window.L
+      leafletMap.current = L.map(mapRef.current, {
+        center: [35.659, 139.700],
+        zoom: 13,
+        zoomControl: true,
+      })
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18,
+      }).addTo(leafletMap.current)
+      addMarkers()
+    }
+    document.head.appendChild(script)
+
+    function addMarkers() {
+      const L = window.L
+      if (!L || !leafletMap.current) return
+      postalData.forEach(d => {
+        const radius = Math.max(12, Math.sqrt(d.count / maxCount) * 40)
+        const circle = L.circleMarker([d.coords.lat, d.coords.lng], {
+          radius,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.55,
+          color: '#1d4ed8',
+          weight: 1.5,
+        }).bindPopup(`
+          <b>${d.coords.area}</b><br>
+          郵便番号: ${d.postal_code}<br>
+          患者数: <b>${d.count}名</b>
+        `)
+        circle.addTo(leafletMap.current)
+        markersRef.current.push(circle)
+      })
+    }
+
+    return () => { /* cleanup */ }
+  }, [postalData])
+
+  return (
+    <div ref={mapRef} style={{ height: 400, borderRadius: 8, border:'1px solid #e5e7eb', overflow:'hidden' }} />
+  )
+}
+
 
 // ── メインダッシュボード ──────────────────────────────────
 export default function AdminDashboard() {
@@ -253,7 +574,7 @@ export default function AdminDashboard() {
   const [ageData, setAgeData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [ageLoading, setAgeLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview') // 'overview' | 'age'
+  const [activeTab, setActiveTab] = useState('overview') // 'overview' | 'age' | 'map'
 
   useEffect(() => { fetchData() }, [month])
   useEffect(() => { fetchAgeData() }, [])
@@ -326,7 +647,7 @@ export default function AdminDashboard() {
 
       {/* タブ切替 */}
       <div style={{ display:'flex', gap:4, marginBottom:20, borderBottom:'2px solid #e5e7eb' }}>
-        {[['overview','📋 月次概要'], ['age','📊 年代分析']].map(([v, label]) => (
+        {[['overview','📋 月次概要'], ['age','📊 年代分析'], ['map','🗺️ 地域・流入分析']].map(([v, label]) => (
           <button key={v} onClick={()=>setActiveTab(v)}
             style={{
               padding:'8px 18px', fontSize:13, fontWeight:600, border:'none', cursor:'pointer',
@@ -547,6 +868,327 @@ export default function AdminDashboard() {
           </>
         )
       )}
+
+      {/* ── タブ3: 地域・流入分析 ── */}
+      {activeTab === 'map' && (
+        ageLoading ? <div style={{ textAlign:'center', padding:60, color:'#9ca3af' }}>読み込み中...</div>
+        : !ageData ? null : (
+          <MapAndReferralTab ageData={ageData} />
+        )
+      )}
     </div>
   )
 }
+
+// ============================================================
+// 地域・流入分析タブ
+// ============================================================
+function MapAndReferralTab({ ageData }) {
+  const cardStyle = { background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20 }
+
+  // 流入チャネルデータ
+  const referralData = ageData.referralSources || []
+  const totalReferral = referralData.reduce((s,d) => s+parseInt(d.count), 0)
+
+  // 郵便番号データを座標に変換
+  const postalData = (ageData.postalCounts || [])
+    .map(d => ({
+      ...d,
+      count: parseInt(d.count),
+      coords: POSTAL_COORDS[d.postal_code],
+    }))
+    .filter(d => d.coords)
+
+  const maxCount = Math.max(...postalData.map(d => d.count), 1)
+
+  // ツリーマップのカラー
+  const TREE_COLORS = [
+    '#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'
+  ]
+
+  return (
+    <div>
+      {/* KPI */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:20 }}>
+        <div style={{ background:'#eff6ff', borderRadius:12, padding:'18px 20px', border:'1px solid #bfdbfe' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>郵便番号登録済み</div>
+          <div style={{ fontSize:24, fontWeight:700, color:'#3b82f6' }}>
+            {(ageData.postalCounts||[]).reduce((s,d)=>s+parseInt(d.count),0)}名
+          </div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {postalData.length}エリア
+          </div>
+        </div>
+        <div style={{ background:'#f5f3ff', borderRadius:12, padding:'18px 20px', border:'1px solid #ddd6fe' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>来院きっかけ登録済み</div>
+          <div style={{ fontSize:24, fontWeight:700, color:'#8b5cf6' }}>{totalReferral}名</div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {referralData.length}チャネル
+          </div>
+        </div>
+        <div style={{ background:'#f0fdf4', borderRadius:12, padding:'18px 20px', border:'1px solid #a7f3d0' }}>
+          <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>最多流入チャネル</div>
+          <div style={{ fontSize:18, fontWeight:700, color:'#10b981' }}>
+            {referralData[0]?.source || '-'}
+          </div>
+          <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>
+            {referralData[0] ? `${referralData[0].count}名 (${Math.round(parseInt(referralData[0].count)/Math.max(totalReferral,1)*100)}%)` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+
+        {/* 流入チャネル ツリーマップ */}
+        <div style={cardStyle}>
+          <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:'0 0 14px' }}>
+            流入チャネル（ツリーマップ）
+          </h2>
+          <ReferralTreeMap data={referralData} total={totalReferral} colors={TREE_COLORS} />
+          {/* 凡例 */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:12 }}>
+            {referralData.map((d,i) => (
+              <div key={d.source} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11 }}>
+                <span style={{ width:8, height:8, borderRadius:2, background:TREE_COLORS[i%TREE_COLORS.length], display:'inline-block' }} />
+                <span style={{ color:'#374151' }}>{d.source}</span>
+                <span style={{ color:'#9ca3af' }}>{d.count}名</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* チャネル別棒グラフ */}
+        <div style={cardStyle}>
+          <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:'0 0 14px' }}>
+            チャネル別患者数
+          </h2>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {referralData.map((d,i) => {
+              const pct = totalReferral > 0 ? Math.round(parseInt(d.count)/totalReferral*100) : 0
+              const bar = totalReferral > 0 ? (parseInt(d.count)/totalReferral*100) : 0
+              return (
+                <div key={d.source}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:3 }}>
+                    <span style={{ color:'#374151', fontWeight:500 }}>{d.source}</span>
+                    <span style={{ color:'#6b7280' }}>{d.count}名 ({pct}%)</span>
+                  </div>
+                  <div style={{ background:'#f3f4f6', borderRadius:4, height:8, overflow:'hidden' }}>
+                    <div style={{ width:`${bar}%`, height:8, borderRadius:4,
+                      background:TREE_COLORS[i%TREE_COLORS.length], transition:'width 0.5s' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 来院地域バブルマップ */}
+      <div style={cardStyle}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <div>
+            <h2 style={{ fontSize:15, fontWeight:700, color:'#111827', margin:0 }}>来院地域マップ</h2>
+            <p style={{ fontSize:11, color:'#9ca3af', margin:'3px 0 0' }}>
+              バブルの大きさ = 患者数　渋谷区・代々木周辺エリア
+            </p>
+          </div>
+          <div style={{ fontSize:11, color:'#6b7280' }}>
+            {postalData.length}エリア / {postalData.reduce((s,d)=>s+d.count,0)}名
+          </div>
+        </div>
+        <BubbleMap postalData={postalData} maxCount={maxCount} />
+
+        {/* エリア別ランキング */}
+        <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:8 }}>
+          {postalData.sort((a,b)=>b.count-a.count).slice(0,8).map((d,i) => (
+            <div key={d.postal_code} style={{
+              display:'flex', alignItems:'center', gap:8,
+              background:'#f9fafb', borderRadius:8, padding:'8px 10px',
+              border:'1px solid #e5e7eb',
+            }}>
+              <div style={{
+                width:24, height:24, borderRadius:'50%', flexShrink:0,
+                background: i===0?'#fbbf24':i===1?'#d1d5db':i===2?'#d97706':'#eff6ff',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:11, fontWeight:700, color: i<3?'#fff':'#3b82f6',
+              }}>{i+1}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'#374151', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                  {d.coords?.area || d.postal_code}
+                </div>
+                <div style={{ fontSize:10, color:'#9ca3af' }}>{d.postal_code} / {d.count}名</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// ツリーマップ（SVGで実装）
+// ============================================================
+function ReferralTreeMap({ data, total, colors }) {
+  if (!data?.length) return <div style={{ color:'#9ca3af', textAlign:'center', padding:40 }}>データなし</div>
+
+  const W = 400, H = 220
+  // シンプルな行分割ツリーマップ
+  function squarify(items, rect) {
+    if (!items.length) return []
+    const sorted = [...items].sort((a,b) => b.val - a.val)
+    const totalVal = sorted.reduce((s,d) => s+d.val, 0)
+    const result = []
+    let remaining = [...sorted]
+    let x = rect.x, y = rect.y, w = rect.w, h = rect.h
+
+    while (remaining.length > 0) {
+      const isWide = w >= h
+      const rowItems = []
+      let rowSum = 0
+      for (const item of remaining) {
+        rowItems.push(item)
+        rowSum += item.val
+        if (rowItems.length >= 2) {
+          const prev = rowItems.slice(0,-1).reduce((s,d)=>s+d.val,0)
+          const ratio = isWide
+            ? (h * rowSum / totalVal * W) / (h * prev / totalVal * W)
+            : (w * rowSum / totalVal * H) / (w * prev / totalVal * H)
+          if (ratio < 1) break
+        }
+      }
+      const rowRatio = rowSum / totalVal
+      rowItems.forEach((item, i) => {
+        const itemRatio = item.val / rowSum
+        if (isWide) {
+          const rw = w * rowRatio
+          result.push({ ...item, x, y: y + h * (1-rowRatio) + h * rowRatio * (1 - itemRatio - rowItems.slice(0,i).reduce((s,d)=>s+d.val,0)/rowSum),
+            w: rw, h: h * rowRatio * itemRatio })
+        } else {
+          const rh = h * rowRatio
+          result.push({ ...item, x: x + w * rowItems.slice(0,i).reduce((s,d)=>s+d.val,0)/rowSum,
+            y, w: w * itemRatio, h: rh })
+        }
+      })
+      remaining = remaining.slice(rowItems.length)
+      if (isWide) { x += w * rowRatio } else { y += h * rowRatio }
+      w = isWide ? w * (1-rowRatio) : w
+      h = isWide ? h : h * (1-rowRatio)
+      totalVal -= rowSum
+    }
+    return result
+  }
+
+  // シンプルな行ベース分割
+  function simpleLayout(items, W, H) {
+    const total = items.reduce((s,d)=>s+d.val,0)
+    const sorted = [...items].sort((a,b)=>b.val-a.val)
+    const result = []
+    let y = 0
+    for (let i=0; i<sorted.length; i++) {
+      const item = sorted[i]
+      const h = (item.val/total)*H
+      result.push({ ...item, x:0, y, w:W, h: Math.max(h,1) })
+      y += h
+    }
+    return result
+  }
+
+  const items = data.map((d,i) => ({ ...d, val: parseInt(d.count), color: colors[i%colors.length] }))
+  const boxes = simpleLayout(items, W, H)
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:220, borderRadius:8, overflow:'hidden' }}>
+      {boxes.map((box, i) => {
+        const pct = total > 0 ? Math.round(box.val/total*100) : 0
+        return (
+          <g key={box.source}>
+            <rect x={box.x+1} y={box.y+1} width={Math.max(box.w-2,0)} height={Math.max(box.h-2,0)}
+              rx={4} fill={box.color} opacity={0.9} />
+            {box.h > 22 && (
+              <text x={box.x+8} y={box.y+18} fill="#fff" fontSize={Math.min(13,box.h*0.45)} fontWeight={700}>
+                {box.source}
+              </text>
+            )}
+            {box.h > 38 && (
+              <text x={box.x+8} y={box.y+34} fill="rgba(255,255,255,0.85)" fontSize={11}>
+                {box.val}名 ({pct}%)
+              </text>
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ============================================================
+// バブルマップ（Leaflet.js使用）
+// ============================================================
+function BubbleMap({ postalData, maxCount }) {
+  const mapRef = React.useRef(null)
+  const leafletMap = React.useRef(null)
+  const markersRef = React.useRef([])
+
+  React.useEffect(() => {
+    if (!mapRef.current) return
+    if (leafletMap.current) {
+      // マーカー更新
+      markersRef.current.forEach(m => m.remove())
+      markersRef.current = []
+      addMarkers()
+      return
+    }
+
+    // Leafletを動的ロード
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    script.onload = () => {
+      const L = window.L
+      leafletMap.current = L.map(mapRef.current, {
+        center: [35.659, 139.700],
+        zoom: 13,
+        zoomControl: true,
+      })
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18,
+      }).addTo(leafletMap.current)
+      addMarkers()
+    }
+    document.head.appendChild(script)
+
+    function addMarkers() {
+      const L = window.L
+      if (!L || !leafletMap.current) return
+      postalData.forEach(d => {
+        const radius = Math.max(12, Math.sqrt(d.count / maxCount) * 40)
+        const circle = L.circleMarker([d.coords.lat, d.coords.lng], {
+          radius,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.55,
+          color: '#1d4ed8',
+          weight: 1.5,
+        }).bindPopup(`
+          <b>${d.coords.area}</b><br>
+          郵便番号: ${d.postal_code}<br>
+          患者数: <b>${d.count}名</b>
+        `)
+        circle.addTo(leafletMap.current)
+        markersRef.current.push(circle)
+      })
+    }
+
+    return () => { /* cleanup */ }
+  }, [postalData])
+
+  return (
+    <div ref={mapRef} style={{ height: 400, borderRadius: 8, border:'1px solid #e5e7eb', overflow:'hidden' }} />
+  )
+}
+
