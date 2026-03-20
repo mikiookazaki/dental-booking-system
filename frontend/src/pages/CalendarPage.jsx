@@ -63,6 +63,7 @@ export default function CalendarPage() {
   const [now, setNow]                     = useState(new Date());
   const timelineRef                       = useRef(null);  // D&D用
   const [tooltip, setTooltip]             = useState({ visible: false, appt: null, x: 0, y: 0 });
+  const [showManual, setShowManual]       = useState(false);
 
   // 週の開始日（月曜）を計算
   function getWeekStart(dateStr) {
@@ -376,9 +377,12 @@ export default function CalendarPage() {
           </button>
           <button
             onClick={() => {
-              const mode = localStorage.getItem('manual_display_mode') || 'tab'
-              if (mode === 'tab') { window.open('/manual-staff.html', '_blank') }
-              else { window.open('/manual-staff.html', 'manual', 'width=900,height=700,scrollbars=yes,resizable=yes') }
+              const mode = localStorage.getItem('manual_display_mode') || 'newtab'
+              if (mode === 'newtab') {
+                window.open('/manual.html', '_blank')
+              } else {
+                setShowManual(prev => !prev)
+              }
             }}
             className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 shadow-sm font-medium">
             📖 マニュアル
@@ -612,6 +616,34 @@ export default function CalendarPage() {
       )}
       <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
       </div>{/* /content */}
+
+      {/* マニュアルサイドパネル */}
+      {showManual && (
+        <div style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0,
+          width: 520, zIndex: 200,
+          background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px', background: '#1e3a5f', color: '#fff', flexShrink: 0,
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>📖 操作マニュアル</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => window.open('/manual.html', '_blank')}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }}
+              >↗ 別タブで開く</button>
+              <button
+                onClick={() => setShowManual(false)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}
+              >✕</button>
+            </div>
+          </div>
+          <iframe src="/manual.html" style={{ flex: 1, border: 'none' }} title="操作マニュアル" />
+        </div>
+      )}
     </div>
   );
 }

@@ -14,18 +14,12 @@ export default function AdminLayout({ onLogout }) {
   const location  = useLocation()
   const adminName = localStorage.getItem('admin_name') || '管理者'
 
-  function openManual(type) {
-    const urls = {
-      admin: '/manual-admin.html',
-      staff: '/manual-staff.html',
-      line:  '/manual-line.html',
-    }
-    const url = urls[type] || urls.admin
-    const mode = localStorage.getItem('manual_display_mode') || 'tab'
-    if (mode === 'tab') {
-      window.open(url, '_blank')
+  function openManual() {
+    const mode = localStorage.getItem('manual_display_mode') || 'newtab'
+    if (mode === 'newtab') {
+      window.open('/manual.html', '_blank')
     } else {
-      window.open(url, 'manual', 'width=900,height=700,scrollbars=yes,resizable=yes')
+      setShowManualPanel(prev => !prev)
     }
   }
 
@@ -84,7 +78,7 @@ export default function AdminLayout({ onLogout }) {
         </div>
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <button
-            onClick={() => openManual('admin')}
+            onClick={() => openManual()}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
               padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -95,7 +89,7 @@ export default function AdminLayout({ onLogout }) {
             <BookOpen size={14} />管理者マニュアル
           </button>
           <button
-            onClick={() => openManual('line')}
+            onClick={() => openManual()}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
               padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
