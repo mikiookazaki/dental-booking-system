@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/AdminLayout.jsx
 import { useState } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
-import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen } from 'lucide-react'
+import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen, X } from 'lucide-react'
 
 const NAV = [
   { path: '/admin/dashboard', label: 'ダッシュボード', icon: <BarChart2 size={18} /> },
@@ -13,6 +13,7 @@ export default function AdminLayout({ onLogout }) {
   const navigate  = useNavigate()
   const location  = useLocation()
   const adminName = localStorage.getItem('admin_name') || '管理者'
+  const [showManualPanel, setShowManualPanel] = useState(false)
 
   function openManual() {
     const mode = localStorage.getItem('manual_display_mode') || 'newtab'
@@ -63,6 +64,7 @@ export default function AdminLayout({ onLogout }) {
             )
           })}
         </nav>
+
         {/* 一般画面へ戻る */}
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <button
@@ -76,29 +78,24 @@ export default function AdminLayout({ onLogout }) {
             <ChevronRight size={14} />一般管理画面へ
           </button>
         </div>
+
+        {/* マニュアルボタン */}
         <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <button
-            onClick={() => openManual()}
+            onClick={openManual}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)', fontSize: 12,
-              marginBottom: 4,
+              padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: showManualPanel ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)',
+              color: showManualPanel ? '#93c5fd' : 'rgba(255,255,255,0.85)',
+              fontSize: 13, fontWeight: 600,
+              transition: 'all 0.15s',
             }}
           >
-            <BookOpen size={14} />管理者マニュアル
-          </button>
-          <button
-            onClick={() => openManual()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'transparent', color: 'rgba(255,255,255,0.55)', fontSize: 12,
-            }}
-          >
-            <BookOpen size={14} />LINE予約ガイド
+            <BookOpen size={15} />📖 操作マニュアル
           </button>
         </div>
+
         <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', padding: '0 12px', marginBottom: 6 }}>
             {adminName}
@@ -116,10 +113,51 @@ export default function AdminLayout({ onLogout }) {
         </div>
       </div>
 
-      {/* メインコンテンツ */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        <Outlet />
-      </main>
+      {/* メインコンテンツ + サイドパネル */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <main style={{ flex: 1, overflow: 'auto' }}>
+          <Outlet />
+        </main>
+
+        {/* マニュアルサイドパネル */}
+        {showManualPanel && (
+          <div style={{
+            width: 520, borderLeft: '2px solid #e5e7eb',
+            display: 'flex', flexDirection: 'column',
+            background: '#fff', flexShrink: 0,
+            boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', background: '#1e3a5f', color: '#fff', flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
+                <BookOpen size={16} /> 操作マニュアル
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={() => window.open('/manual.html', '_blank')}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
+                    fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                  }}
+                >↗ 別タブで開く</button>
+                <button
+                  onClick={() => setShowManualPanel(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <iframe
+              src="/manual.html"
+              style={{ flex: 1, border: 'none', width: '100%' }}
+              title="操作マニュアル"
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
