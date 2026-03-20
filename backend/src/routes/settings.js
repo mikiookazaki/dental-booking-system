@@ -9,9 +9,9 @@ const db      = require('../config/database');
 router.get('/', async (req, res) => {
   try {
     const result = await db.query('SELECT key, value FROM clinic_settings ORDER BY key');
-    // キーバリュー形式に変換
+    // AdminSettings.jsx が期待する { settings: { key: { value } } } 形式に変換
     const settings = {};
-    result.rows.forEach(row => { settings[row.key] = row.value; });
+    result.rows.forEach(row => { settings[row.key] = { value: row.value }; });
     res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -20,9 +20,10 @@ router.get('/', async (req, res) => {
 
 // 設定を一括更新
 router.put('/', async (req, res) => {
-  const { settings } = req.body; // { key: value, ... }
+  const { updates, settings } = req.body; // AdminSettingsはupdatesで送信
+  const data = updates || settings || {};
   try {
-    for (const [key, value] of Object.entries(settings)) {
+    for (const [key, value] of Object.entries(data)) {
       await db.query(`
         INSERT INTO clinic_settings (key, value) VALUES ($1, $2)
         ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()
