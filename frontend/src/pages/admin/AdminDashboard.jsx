@@ -311,145 +311,162 @@ function CrossTable({ data }) {
 function ReferralTreeMap({ data, total, colors }) {
   if (!data?.length) return <div style={{ color:'#9ca3af', textAlign:'center', padding:40 }}>データなし</div>
 
-  const W = 560, H = 260
-  const GAP = 2
+  const W = 560, H = 280, GAP = 3
 
-  // Squarifyアルゴリズム（縦横に最適分割）
-  function squarify(items, x0, y0, x1, y1) {
+  // 横分割ツリーマップ（上位2件を左右に、残りを右側で縦分割）
+  function buildLayout(items, x, y, w, h) {
     if (!items.length) return []
-    if (items.length === 1) {
-      return [{ ...items[0], x: x0, y: y0, w: x1-x0, h: y1-y0 }]
-    }
-    const totalVal = items.reduce((s,d) => s+d.val, 0)
-    const area = (x1-x0) * (y1-y0)
+    if (items.length === 1) return [{ ...items[0], x, y, w, h }]
 
-    // 最適な分割点を探す
-    let bestRatio = Infinity
-    let bestSplit = 1
-    for (let k = 1; k < items.length; k++) {
-      const aSum = items.slice(0,k).reduce((s,d)=>s+d.val,0)
-      const bSum = totalVal - aSum
-      const aFrac = aSum / totalVal
-      const bFrac = bSum / totalVal
-      const isWide = (x1-x0) >= (y1-y0)
-      let ratio
-      if (isWide) {
-        const aw = (x1-x0) * aFrac
-        const bw = (x1-x0) * bFrac
-        const aH = y1-y0, bH = y1-y0
-        const aWorst = items.slice(0,k).reduce((mx,d) => {
-          const h = (d.val/aSum)*aH; const w = aw; return Math.max(mx, Math.max(w/h,h/w))
-        }, 0)
-        const bWorst = items.slice(k).reduce((mx,d) => {
-          const h = (d.val/bSum)*bH; const w = bw; return Math.max(mx, Math.max(w/h,h/w))
-        }, 0)
-        ratio = Math.max(aWorst, bWorst)
+    const totalVal = items.reduce((s, d) => s + d.val, 0)
+    const result = []
+
+    // 横幅が高さより大きい場合は横分割、そうでなければ縦分割
+    const isWide = w >= h
+
+    if (isWide) {
+      // 横に分割
+      let cursor = x
+      items.forEach((item, i) => {
+        const iw = (item.val / totalVal) * w
+        result.push({ ...item, x: cursor, y, w: iw, h })
+        cursor += iw
+      })
+    } else {
+      // 縦に分割
+      let cursor = y
+      items.forEach((item, i) => {
+        const ih = (item.val / totalVal) * h
+        result.push({ ...item, x, y: cursor, w, h: ih })
+        cursor += ih
+      })
+    }
+    return result
+  }
+
+  // Squarify的な2段階レイアウト
+  function squarifyLayout(items, x, y, w, h) {
+    if (!items.length) return []
+    if (items.length === 1) return [{ ...items[0], x, y, w, h }]
+    if (items.length === 2) {
+      const total = items[0].val + items[1].val
+      if (w >= h) {
+        const w0 = w * items[0].val / total
+        return [
+          { ...items[0], x, y, w: w0, h },
+          { ...items[1], x: x + w0, y, w: w - w0, h },
+        ]
       } else {
-        const ah = (y1-y0) * aFrac
-        const bh = (y1-y0) * bFrac
-        const aW = x1-x0, bW = x1-x0
-        const aWorst = items.slice(0,k).reduce((mx,d) => {
-          const w = (d.val/aSum)*aW; const h = ah; return Math.max(mx, Math.max(w/h,h/w))
-        }, 0)
-        const bWorst = items.slice(k).reduce((mx,d) => {
-          const w = (d.val/bSum)*bW; const h = bh; return Math.max(mx, Math.max(w/h,h/w))
-        }, 0)
-        ratio = Math.max(aWorst, bWorst)
+        const h0 = h * items[0].val / total
+        return [
+          { ...items[0], x, y, w, h: h0 },
+          { ...items[1], x, y: y + h0, w, h: h - h0 },
+        ]
       }
-      if (ratio < bestRatio) { bestRatio = ratio; bestSplit = k }
+    }
+
+    const totalVal = items.reduce((s, d) => s + d.val, 0)
+
+    // 最良の分割点を探す（アスペクト比が最小になる分割）
+    let bestScore = Infinity
+    let bestSplit = 1
+
+    for (let k = 1; k < items.length; k++) {
+      const aVal = items.slice(0, k).reduce((s, d) => s + d.val, 0)
+      const bVal = totalVal - aVal
+      const aFrac = aVal / totalVal
+      const bFrac = bVal / totalVal
+
+      let score
+      if (w >= h) {
+        const aw = w * aFrac, bw = w * bFrac
+        const aWorst = items.slice(0, k).reduce((mx, d) => {
+          const iw = (d.val / aVal) * aw
+          return Math.max(mx, Math.max(iw / h, h / iw))
+        }, 0)
+        const bWorst = items.slice(k).reduce((mx, d) => {
+          const iw = (d.val / bVal) * bw
+          return Math.max(mx, Math.max(iw / h, h / iw))
+        }, 0)
+        score = Math.max(aWorst, bWorst)
+      } else {
+        const ah = h * aFrac, bh = h * bFrac
+        const aWorst = items.slice(0, k).reduce((mx, d) => {
+          const ih = (d.val / aVal) * ah
+          return Math.max(mx, Math.max(w / ih, ih / w))
+        }, 0)
+        const bWorst = items.slice(k).reduce((mx, d) => {
+          const ih = (d.val / bVal) * bh
+          return Math.max(mx, Math.max(w / ih, ih / w))
+        }, 0)
+        score = Math.max(aWorst, bWorst)
+      }
+      if (score < bestScore) { bestScore = score; bestSplit = k }
     }
 
     const aItems = items.slice(0, bestSplit)
     const bItems = items.slice(bestSplit)
-    const aSum = aItems.reduce((s,d)=>s+d.val,0)
-    const bSum = bItems.reduce((s,d)=>s+d.val,0)
-    const aFrac = aSum / totalVal
-    const isWide = (x1-x0) >= (y1-y0)
+    const aVal = aItems.reduce((s, d) => s + d.val, 0)
+    const aFrac = aVal / totalVal
 
-    let aBox, bBox
-    if (isWide) {
-      const mx = x0 + (x1-x0)*aFrac
-      aBox = [x0, y0, mx, y1]
-      bBox = [mx, y0, x1, y1]
+    if (w >= h) {
+      const aw = w * aFrac
+      return [
+        ...buildLayout(aItems, x, y, aw, h),
+        ...buildLayout(bItems, x + aw, y, w - aw, h),
+      ]
     } else {
-      const my = y0 + (y1-y0)*aFrac
-      aBox = [x0, y0, x1, my]
-      bBox = [x0, my, x1, y1]
+      const ah = h * aFrac
+      return [
+        ...buildLayout(aItems, x, y, w, ah),
+        ...buildLayout(bItems, x, y + ah, w, h - ah),
+      ]
     }
-
-    // 各グループ内で比例配分
-    function layoutGroup(groupItems, gx0, gy0, gx1, gy1) {
-      const gTotal = groupItems.reduce((s,d)=>s+d.val,0)
-      const gIsWide = (gx1-gx0) >= (gy1-gy0)
-      const result = []
-      let cursor = gIsWide ? gx0 : gy0
-      groupItems.forEach(item => {
-        const frac = item.val / gTotal
-        if (gIsWide) {
-          const w = (gx1-gx0) * frac
-          result.push({ ...item, x:cursor, y:gy0, w, h:gy1-gy0 })
-          cursor += w
-        } else {
-          const h = (gy1-gy0) * frac
-          result.push({ ...item, x:gx0, y:cursor, w:gx1-gx0, h })
-          cursor += h
-        }
-      })
-      return result
-    }
-
-    return [
-      ...layoutGroup(aItems, ...aBox),
-      ...layoutGroup(bItems, ...bBox),
-    ]
   }
 
-  const sorted = [...data].sort((a,b) => parseInt(b.count)-parseInt(a.count))
-  const items = sorted.map((d,i) => ({ ...d, val: parseInt(d.count), color: colors[i%colors.length] }))
-  const boxes = squarify(items, 0, 0, W, H)
+  const sorted = [...data].sort((a, b) => parseInt(b.count) - parseInt(a.count))
+  const items = sorted.map((d, i) => ({ ...d, val: parseInt(d.count), color: colors[i % colors.length] }))
+  const boxes = squarifyLayout(items, 0, 0, W, H)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:260, borderRadius:8, overflow:'hidden', display:'block' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 280, borderRadius: 8, overflow: 'hidden', display: 'block' }}>
       {boxes.map((box) => {
-        const pct = total > 0 ? Math.round(box.val/total*100) : 0
-        const cx = box.x + box.w/2
-        const cy = box.y + box.h/2
-        const isLarge = box.w > 80 && box.h > 50
-        const isMed   = box.w > 50 && box.h > 32
-        const labelSize = Math.min(15, Math.max(10, box.w * 0.1, box.h * 0.18))
+        const pct = total > 0 ? Math.round(box.val / total * 100) : 0
+        const cx = box.x + box.w / 2
+        const cy = box.y + box.h / 2
+        const isLarge = box.w > 100 && box.h > 60
+        const isMed = box.w > 60 && box.h > 36
+        const nameFontSize = Math.min(14, Math.max(9, Math.min(box.w * 0.13, box.h * 0.2)))
         return (
           <g key={box.source}>
             <rect
-              x={box.x + GAP/2} y={box.y + GAP/2}
-              width={Math.max(box.w - GAP, 0)} height={Math.max(box.h - GAP, 0)}
-              rx={0} fill={box.color}
+              x={box.x + GAP / 2} y={box.y + GAP / 2}
+              width={Math.max(box.w - GAP, 1)} height={Math.max(box.h - GAP, 1)}
+              rx={2} fill={box.color}
             />
             {isMed && (
               <text
-                x={cx} y={isLarge ? cy - 12 : cy + 4}
+                x={cx} y={isLarge ? cy - 14 : cy}
                 textAnchor="middle" dominantBaseline="middle"
-                fill="#fff" fontSize={labelSize} fontWeight={700}
-                style={{ pointerEvents:'none', textShadow:'0 1px 2px rgba(0,0,0,0.3)' }}
+                fill="#fff" fontSize={nameFontSize} fontWeight={700}
               >
                 {box.source}
               </text>
             )}
             {isLarge && (
               <text
-                x={cx} y={cy + 14}
+                x={cx} y={cy + 10}
                 textAnchor="middle" dominantBaseline="middle"
-                fill="rgba(255,255,255,0.92)" fontSize={Math.min(22, box.h*0.22)} fontWeight={800}
-                style={{ pointerEvents:'none' }}
+                fill="rgba(255,255,255,0.95)" fontSize={Math.min(26, box.h * 0.25)} fontWeight={800}
               >
                 {pct}%
               </text>
             )}
             {isLarge && (
               <text
-                x={cx} y={cy + 34}
+                x={cx} y={cy + 32}
                 textAnchor="middle" dominantBaseline="middle"
-                fill="rgba(255,255,255,0.75)" fontSize={11}
-                style={{ pointerEvents:'none' }}
+                fill="rgba(255,255,255,0.7)" fontSize={11}
               >
                 {box.val}名
               </text>
@@ -869,7 +886,7 @@ function MapAndReferralTab({ ageData }) {
 
   // ツリーマップのカラー
   const TREE_COLORS = [
-    '#2563EB','#F97316','#7C3AED','#059669','#DC2626','#0891B2','#D97706','#BE185D'
+    '#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'
   ]
 
   return (
