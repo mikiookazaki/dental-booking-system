@@ -421,9 +421,9 @@ export default function AdminSettings() {
           <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>📖 マニュアルを今すぐ確認</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
-              { label: '👑 管理者マニュアル', url: '/manual-admin.html' },
-              { label: '👩‍⚕️ スタッフマニュアル', url: '/manual-staff.html' },
-              { label: '📱 LINE予約ガイド',  url: '/manual-line.html'  },
+              { label: '👑 管理者マニュアル', url: '/manual.html' },
+              { label: '👩‍⚕️ スタッフマニュアル', url: '/manual.html' },
+              { label: '📱 LINE予約ガイド',  url: '/manual.html'  },
             ].map(m => (
               <button key={m.url}
                 onClick={() => window.open(m.url, '_blank')}
