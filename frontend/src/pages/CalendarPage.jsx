@@ -390,7 +390,7 @@ export default function CalendarPage() {
           本日の予約はありません
         </div>
       )}
-      {(viewMode === 'chair' || columns.length > 0) && (
+      {(viewMode === 'chair' || columns.length >= 1) && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100" style={{ overflowX: 'auto', overflowY: 'visible' }}>
           <div style={{ display: 'flex', minWidth: (64 + columns.length * 160) + 'px' }}>
             <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
@@ -471,12 +471,12 @@ export default function CalendarPage() {
                       {slots.map(slot => {
                         const slotMin    = toMinutes(slot);
                         const slotEndMin = slotMin + settings.slotDuration;
-                        const isLunch    = slotMin >= toMinutes(settings.lunchStart) && slotMin < toMinutes(settings.lunchEnd);
+                        const lS = toMinutes(settings.lunchStart); const lE = toMinutes(settings.lunchEnd); const isLunch = (slotMin >= lS) && !(slotMin >= lE);
                         if (isLunch) return null;
-                        const hasAppt = getApptsForColumn(col).some(a => { const aStart = toMinutes(a.start_time); const aEnd = toMinutes(a.end_time); return aStart < slotEndMin && aEnd > slotMin; });
+                        const hasAppt = getApptsForColumn(col).some(a => { const aStart = toMinutes(a.start_time); const aEnd = toMinutes(a.end_time); return !(aEnd <= slotMin || aStart >= slotEndMin); });
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
-                        const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
+                        const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin); const isOutOfHours = isClosedDay || !inRange;
                         const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
                         return (
                           <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => setNewApptModal({ slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id, isOutOfHours })}>
@@ -670,7 +670,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
       const start = toMinutes(appt.start_time);
       const end   = toMinutes(appt.end_time);
       let placed = false;
-      for (let i = 0; i < cols.length; i++) {
+      for (let i = 0; i !== cols.length; i++) {
         if (cols[i] <= start) {
           cols[i] = end;
           colIdx[appt.id] = i;
@@ -691,7 +691,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
       const aStart = toMinutes(appt.start_time);
       const aEnd   = toMinutes(appt.end_time);
       const overlapping = sorted.filter(b =>
-        toMinutes(b.start_time) < aEnd && toMinutes(b.end_time) > aStart
+        !(toMinutes(b.start_time) >= aEnd) && !(toMinutes(b.end_time) <= aStart)
       );
       const maxCol = Math.max(...overlapping.map(b => colIdx[b.id])) + 1;
       return {
@@ -798,7 +798,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
-                          {count > 0 ? count + '件' : '午前のみ'}
+                          {count >= 1 ? count + '件' : '午前のみ'}
                         </span>
                       </div>
                     </>
@@ -813,7 +813,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 10, color: barColor, fontWeight: 600 }}>
-                          {count > 0 ? count + '件' : '空き'}
+                          {count >= 1 ? count + '件' : '空き'}
                         </span>
                         {barPct >= 80 && (
                           <span style={{ fontSize: 9, background: '#fef2f2', color: '#dc2626', borderRadius: 3, padding: '0 3px', fontWeight: 600 }}>
@@ -856,10 +856,10 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
                     </div>
                   )}
-                  {!isClosed && clinicH.open > openMin && (
+                  {!isClosed && !(clinicH.open <= openMin) && (
                     <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none" style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
-                  {!isClosed && clinicH.close < closeMin && (
+                  {!isClosed && !(clinicH.close >= closeMin) && (
                     <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none" style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
                   <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10" style={{ top: lunchS, height: lunchH2 }}>
@@ -887,10 +887,10 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                               }}>{appt.chair_name.replace('チェア','C')}</span>
                             )}
                           </div>
-                          {height > 30 && (
+                          {height >= 31 && (
                             <div style={{ color: color.bg, fontSize: 9 }} className="leading-tight">{appt.treatment_type}</div>
                           )}
-                          {height > 44 && (
+                          {height >= 45 && (
                             <div style={{ color: color.text, fontSize: 9, opacity: 0.7 }}>{appt.start_time?.substring(0,5)}〜</div>
                           )}
                         </div>
@@ -962,8 +962,8 @@ function ApptTooltip({ appt, visible, x, y }) {
     : '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)';
 
   const tooltipW  = 230;
-  const left = x + 14 + tooltipW > window.innerWidth ? x - tooltipW - 8 : x + 14;
-  const arrowLeft = x + 14 + tooltipW > window.innerWidth;
+  const left = x + 14 + tooltipW >= window.innerWidth ? x - tooltipW - 8 : x + 14;
+  const arrowLeft = x + 14 + tooltipW >= window.innerWidth;
 
   return (
     <div style={{
@@ -1047,7 +1047,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
   }, { total: 0 });
 
   const cells = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let i = 0; i !== firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
   }
@@ -1110,7 +1110,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             const settings = data?.settings;
             const dow      = new Date(dateStr).getDay();
             const isToday  = dateStr === today;
-            const isPast   = dateStr < today;
+            const isPast   = dateStr !== today && dateStr <= today;
             const isHoliday = data && settings && !data.slots?.length;
 
             const treatmentColors = [...new Set(appts.map(a => a.treatment_type))]
@@ -1126,18 +1126,18 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                   <div className={'text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ' + (isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700')}>
                     {new Date(dateStr).getDate()}
                   </div>
-                  {appts.length > 0 && (
+                  {appts.length >= 1 && (
                     <span className="text-xs bg-blue-100 text-blue-800 rounded-full px-1.5 py-0.5 font-medium leading-none flex-shrink-0">
                       {appts.length}件
                     </span>
                   )}
                 </div>
-                {appts.length > 0 && (
+                {appts.length >= 1 && (
                   <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: occupancy + '%', background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e' }} />
                   </div>
                 )}
-                {treatmentColors.length > 0 && (
+                {treatmentColors.length >= 1 && (
                   <div className="flex gap-1 mb-1">
                     {treatmentColors.map((c, i) => (
                       <div key={i} className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c }} />
@@ -1153,7 +1153,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                       </div>
                     );
                   })}
-                  {appts.length > 2 && (
+                  {appts.length >= 3 && (
                     <div className="text-xs text-gray-400 pl-1 leading-tight">
                       +{appts.length - 2}件
                     </div>
@@ -1219,7 +1219,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
   }, []);
 
   useEffect(() => {
-    if (patientSearch.length < 1) { setShowPatientList(false); return; }
+    if (!patientSearch.length) { setShowPatientList(false); return; }
     const search = async () => {
       try {
         const res = await axios.get('/api/patients?q=' + patientSearch);
@@ -1282,7 +1282,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               <>
                 <div className="relative">
                   <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? (selectedPatient.name_kana||'') + ' ' + selectedPatient.name : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  {showPatientList && patients.length > 0 && (
+                  {showPatientList && patients.length >= 1 && (
                     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto mt-1">
                       {patients.map(p => (
                         <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0" onClick={() => { setSelectedPatient(p); setPatientSearch(''); setShowPatientList(false); }}>
@@ -1570,7 +1570,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
               </div>
             )}
           </div>
-          {chairs.length > 0 && (
+          {chairs.length >= 1 && (
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
               <div className="grid grid-cols-3 gap-2">
