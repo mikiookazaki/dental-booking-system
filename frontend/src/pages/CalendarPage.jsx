@@ -525,7 +525,7 @@ export default function CalendarPage() {
                                 <span className="text-xs text-blue-500 font-medium">ここに移動</span>
                               </div>
                             )}
-                            <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>
+                            <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: isDragTarget ? 1 : 0 }}>
                               <span className={'text-xs ' + ((isOutOfHours ? 'text-orange-400' : 'text-blue-400'))}>
                                 {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
                               </span>
