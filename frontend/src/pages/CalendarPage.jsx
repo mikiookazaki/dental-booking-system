@@ -334,8 +334,7 @@ export default function CalendarPage() {
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors
-                  ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                className={`px-3 py-2 text-sm font-medium transition-colors ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 {label}表示
               </button>
             ))}
@@ -349,10 +348,7 @@ export default function CalendarPage() {
               <input type="date" value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
                 className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
-              <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md
-                ${new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' :
-                  new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' :
-                  'text-gray-600 bg-gray-50'}`}>
+              <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md ${new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' : new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' : 'text-gray-600 bg-gray-50'}`}>
                 （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
               </span>
             </div>
@@ -364,8 +360,7 @@ export default function CalendarPage() {
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
               <button key={v} onClick={() => setViewMode(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors
-                  ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                className={`px-3 py-2 text-sm font-medium transition-colors ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 {label}
               </button>
             ))}
@@ -527,9 +522,7 @@ export default function CalendarPage() {
                             onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                            className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing
-                              shadow-sm transition-all select-none z-20
-                              ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
+                            className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
                             style={{ top: top+2, height: height-4,
                               background: color.light, borderLeft: `4px solid ${color.bg}`,
                               border: `1px solid ${color.border}`, borderLeftWidth: 4 }}>
@@ -587,12 +580,7 @@ export default function CalendarPage() {
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         return (
                           <div key={slot}
-                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group
-                              ${isOutOfHours
-                                ? 'bg-gray-50/80 border-gray-100 hover:bg-orange-50/50'
-                                : isDragTarget
-                                  ? 'bg-blue-50 border-blue-200'
-                                  : 'border-gray-50 hover:bg-blue-50/50'}`}
+                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group ${isOutOfHours ? 'bg-gray-50/80 border-gray-100 hover:bg-orange-50/50' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50 hover:bg-blue-50/50'}`}
                             style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
                             onDragOver={e => e.preventDefault()}
                             onClick={() => setNewApptModal({
@@ -869,9 +857,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                 {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
                   <button key={v} onClick={() => onSwitchView(v)}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors
-                      ${(v === 'week' && !weekOnly) || (v === 'week5' && weekOnly)
-                        ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${(v === 'week' && !weekOnly) || (v === 'week5' && weekOnly) ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                     {label}表示
                   </button>
                 ))}
@@ -1122,8 +1108,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                         onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                         onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                         onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                        className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all
-                          ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
+                        className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
                         style={{
                           top: top + 1, height: Math.max(height - 2, 18),
                           left: `${left + 0.5}%`, width: `${width - 1}%`,
@@ -1392,8 +1377,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         {/* 曜日ヘッダー */}
         <div className="grid grid-cols-7 border-b border-gray-100">
           {['日','月','火','水','木','金','土'].map((d, i) => (
-            <div key={d} className={`py-2 text-center text-xs font-bold
-              ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
+            <div key={d} className={`py-2 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
               {d}
             </div>
           ))}
@@ -1425,17 +1409,11 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             return (
               <div key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
-                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group
-                  ${isToday ? 'bg-blue-50 border-blue-100' : ''}
-                  ${isPast && !isToday ? 'bg-gray-50/40' : ''}
-                  ${!isPast && !isToday ? 'hover:bg-blue-50/20' : ''}`}>
+                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ${isToday ? 'bg-blue-50 border-blue-100' : ''} ${isPast && !isToday ? 'bg-gray-50/40' : ''} ${!isPast && !isToday ? 'hover:bg-blue-50/20' : ''}`}>
 
                 {/* 日付 + 件数バッジ */}
                 <div className="flex items-center justify-between mb-1">
-                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0
-                    ${isToday ? 'bg-blue-600 text-white' :
-                      dow === 0 ? 'text-red-500' :
-                      dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
+                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
                     {new Date(dateStr).getDate()}
                   </div>
                   {appts.length > 0 && (
@@ -1958,10 +1936,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
                     <button key={slot.time} type="button"
                       onClick={() => isAvailable && setNewTime(slot.time)}
                       disabled={!isAvailable}
-                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all
-                        ${isSelected ? 'bg-blue-600 text-white border-blue-600' :
-                          isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' :
-                          'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'}`}>
+                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600' : isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'}`}>
                       {slot.time}
                     </button>
                   );
@@ -1978,8 +1953,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
                 {chairs.map(c => (
                   <button key={c.id} type="button"
                     onClick={() => setNewChairId(c.id)}
-                    className={`py-2 rounded-lg text-xs font-medium border transition-all
-                      ${newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'}`}>
+                    className={`py-2 rounded-lg text-xs font-medium border transition-all ${newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'}`}>
                     {c.name}
                   </button>
                 ))}
@@ -2119,8 +2093,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
                 {AGE_GROUPS.map(ag => (
                   <button key={ag} type="button"
                     onClick={() => setForm(f => ({...f, age_group: ag}))}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition-all border
-                      ${form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50'}`}>
+                    className={`py-1.5 rounded-lg text-xs font-medium transition-all border ${form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50'}`}>
                     {ag}
                   </button>
                 ))}
