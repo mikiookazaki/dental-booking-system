@@ -420,7 +420,7 @@ export default function CalendarPage() {
           <div className="flex" style={{ minWidth: '700px' }}>
             {/* 時刻軸 */}
             <div className="w-16 flex-shrink-0 bg-gray-50 border-r border-gray-100">
-              <div style={{ height: HEADER_HEIGHT }} className="border-b border-gray-100" />
+              <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 10 }} className="border-b border-gray-100 bg-white" />
               <div className="relative" style={{ height: timelineHeight }}>
                 {slots.map(slot => (
                   <div key={slot} className="absolute left-0 right-0 flex items-start justify-end pr-2"
@@ -436,8 +436,8 @@ export default function CalendarPage() {
               <div className="flex">
                 {columns.map((col, colIdx) => (
                   <div key={col.id} className="flex-1 min-w-[160px] border-r border-gray-100 last:border-r-0">
-                    <div style={{ height: HEADER_HEIGHT }}
-                      className="flex items-center justify-center border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white">
+                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 10 }}
+                      className="flex items-center justify-center border-b border-gray-100 bg-white shadow-sm">
                       <span className="text-sm font-bold text-gray-700">
                         {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
                       </span>
@@ -466,6 +466,22 @@ export default function CalendarPage() {
                       <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                         style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
+                      </div>
+
+                      {/* 昼休み後の列名ラベル（スクロール位置確認用） */}
+                      <div className="absolute left-0 right-0 pointer-events-none"
+                        style={{ top: lunchTop + lunchHeight, zIndex: 8 }}>
+                        <div style={{
+                          background: 'rgba(239,246,255,0.9)',
+                          borderBottom: '2px solid #bfdbfe',
+                          padding: '2px 0',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: '#1d4ed8',
+                          textAlign: 'center',
+                        }}>
+                          {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
+                        </div>
                       </div>
 
                       {/* 現在時刻ライン */}
