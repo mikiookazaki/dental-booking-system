@@ -444,21 +444,35 @@ export default function CalendarPage() {
                           </span>
                         </div>
                       )}
-                      {slots.map(slot => {
-                        const slotMin    = toMinutes(slot);
+{slots.map(slot => {
+                        const slotMin = toMinutes(slot);
                         const slotEndMin = slotMin + settings.slotDuration;
-                        const lS = toMinutes(settings.lunchStart); const lE = toMinutes(settings.lunchEnd); const isLunch = (slotMin >= lS) && !(slotMin >= lE);
+                        const lS = toMinutes(settings.lunchStart);
+                        const lE = toMinutes(settings.lunchEnd);
+                        const isLunch = (slotMin >= lS) && !(slotMin >= lE);
                         if (isLunch) return null;
-                        const hasAppt = getApptsForColumn(col).some(a => { const aStart = toMinutes(a.start_time); const aEnd = toMinutes(a.end_time); return !(aEnd <= slotMin || aStart >= slotEndMin); });
+                        const hasAppt = getApptsForColumn(col).some(a => {
+                          const aStart = toMinutes(a.start_time);
+                          const aEnd = toMinutes(a.end_time);
+                          return !(aEnd <= slotMin || aStart >= slotEndMin);
+                        });
                         if (hasAppt) return null;
-                        const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
-                        const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin); const isOutOfHours = isClosedDay || !inRange;
+                        const isDragTarget = dragOver?.slot === slot && dragOver?.colId === col.id;
+                        const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin);
+                        const isOutOfHours = isClosedDay || !inRange;
                         let slotCls = "absolute left-0 right-0 border-b cursor-pointer transition-colors group ";
                         if (isOutOfHours) { slotCls += "bg-gray-100 border-gray-100"; }
                         else if (isDragTarget) { slotCls += "bg-blue-50 border-blue-200"; }
                         else { slotCls += "border-gray-50"; }
+                        const handleSlotClick = () => {
+                          const fallbackChair = chairs[0] ? chairs[0].id : null;
+                          const isChairMode = col.type === "chair";
+                          setNewApptModal({ slot, chairId: isChairMode ? col.id : fallbackChair, isOutOfHours });
+                        };
+                        const spanCls = isOutOfHours ? "text-xs text-orange-400" : "text-xs text-blue-400";
+                        const spanTxt = isOutOfHours ? "+ 時間外予約" : "+ 予約追加";
                         return (
-                          <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => { const fallbackChair = chairs[0] ? chairs[0].id : null; const isChairMode = col.type === "chair"; setNewApptModal({ slot, chairId: isChairMode ? col.id : fallbackChair, isOutOfHours }); }}>
+                          <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={handleSlotClick}>
                             {isOutOfHours && colIdx === 0 && (
                               <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none" style={{ fontSize: 9 }}>時間外</div>
                             )}
@@ -468,12 +482,11 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: isDragTarget ? 1 : 0 }}>
-                              <span className={isOutOfHours ? "text-xs text-orange-400" : "text-xs text-blue-400"}>
-                                {isOutOfHours ? "+ 時間外予約" : "+ 予約追加"}
-                              </span>
+                              <span className={spanCls}>{spanTxt}</span>
                             </div>
                           </div>
                         );
+                      })}
                       })}
                     </div>
                   </div>
