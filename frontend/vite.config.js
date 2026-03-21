@@ -4,7 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      // Babelを強制的に使用してesbuildのJSX処理を回避
+      babel: {
+        plugins: [],
+      },
+      // 全JSXファイルをBabelで処理
+      include: ['**/*.jsx', '**/*.tsx'],
+    }),
     tailwindcss(),
   ],
   server: {
@@ -15,15 +22,14 @@ export default defineConfig({
       },
     },
   },
-  esbuild: {
-    // JSXファイルはreact()プラグイン（Babel）で処理するためesbuildのJSX処理を無効化
-    jsx: 'automatic',
-    jsxImportSource: 'react',
+  build: {
+    // esbuildのJSXトランスフォームを無効化
+    rollupOptions: {},
   },
-  optimizeDeps: {
-    esbuildOptions: {
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-    },
+  esbuild: {
+    // JSXファイルはreact()プラグイン（Babel）が処理するため
+    // esbuildにJSX処理をさせない
+    include: /\.(ts|js)$/,
+    exclude: /\.(tsx|jsx)$/,
   },
 })
