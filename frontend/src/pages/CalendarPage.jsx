@@ -388,7 +388,7 @@ export default function CalendarPage() {
         <div className="flex flex-wrap gap-1.5 mt-2 items-center">
           {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
             <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
+              style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
             </span>
           ))}
@@ -413,7 +413,7 @@ export default function CalendarPage() {
       {(viewMode === 'chair' || columns.length > 0) && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100"
           style={{ overflowX: 'auto', overflowY: 'visible' }}>
-          <div style={{ display: 'flex', minWidth: `${64 + columns.length * 160}px` }}>
+          <div style={{ display: 'flex', minWidth: (64 + columns.length * 160) + 'px' }}>
             {/* 時刻軸 */}
             <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
               <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
@@ -465,7 +465,7 @@ export default function CalendarPage() {
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
                         <div className="pointer-events-none z-30"
-                          style={{ position: 'absolute', top: nowTop, left: -64, width: `calc(${columns.length * 161}px + 64px)` }}>
+                          style={{ position: 'absolute', top: nowTop, left: -64, width: (columns.length * 161 + 64) + 'px' }}>
                           <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', left: 56, right: 0, height: 2, background: '#ef4444', boxShadow: '0 1px 3px rgba(239,68,68,0.4)' }} />
                             <div style={{ position: 'absolute', left: 48, top: -6, width: 12, height: 12, borderRadius: '50%', background: '#ef4444', boxShadow: '0 1px 4px rgba(239,68,68,0.5)' }} />
@@ -491,7 +491,7 @@ export default function CalendarPage() {
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                             className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
-                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: `4px solid ${color.bg}`, border: `1px solid ${color.border}`, borderLeftWidth: 4 }}>
+                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: '4px solid ' + color.bg, border: '1px solid ' + color.border, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
                                 {appt.name_kana || appt.patient_name}
@@ -843,7 +843,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
               <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: color.light, color: color.text, border: `1px solid ${color.border}` }}>
+                style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
                 <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
               </span>
             ))}
@@ -928,7 +928,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   ) : isPartialDay ? (
                     <>
                       <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
-                        <div style={{ width: `${barPct}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                        <div style={{ width: barPct + '%', height: '100%', background: barColor, borderRadius: 3 }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
@@ -1213,7 +1213,7 @@ function ApptTooltip({ appt, visible, x, y }) {
       )}
 
       {/* 区切り線 */}
-      <div style={{ borderTop: `1px solid ${isDark ? '#e2e8f0' : '#334155'}`, margin: '5px 0' }} />
+      <div style={{ borderTop: '1px solid ' + (isDark ? '#e2e8f0' : '#334155'), margin: '5px 0' }} />
 
       {/* 治療内容 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
@@ -1412,7 +1412,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                     const color = getTreatmentColor(a.treatment_type);
                     return (
                       <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight"
-                        style={{ background: color.light, color: color.text, borderLeft: `2px solid ${color.bg}` }}>
+                        style={{ background: color.light, color: color.text, borderLeft: '2px solid ' + color.bg }}>
                         {a.start_time?.substring(0,5)} {a.name_kana || a.patient_name}
                       </div>
                     );
