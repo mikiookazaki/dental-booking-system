@@ -436,8 +436,8 @@ export default function CalendarPage() {
             {/* 列 */}
             <div style={{ flex: 1, display: 'flex' }}>
               {columns.map((col, colIdx) => (
-                <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160, borderRight: '1px solid #f3f4f6' }}
-                  className="last:border-r-0">
+                <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160,
+                  borderRight: colIdx < columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
                     <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20,
                       background: '#fff', borderBottom: '2px solid #e5e7eb',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
