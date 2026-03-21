@@ -319,7 +319,7 @@ export default function CalendarPage() {
           <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[["month","月"], ["week","週"], ["week5","5日"], ["day","日"]].map(([v, label]) => (
-              <button key={v} onClick={() => setViewType(v)} className={viewType === v ? "px-3 py-2 text-sm font-medium transition-colors bg-blue-600 text-white" : "px-3 py-2 text-sm font-medium transition-colors bg-white text-gray-600 hover:bg-gray-50"}>
+              <button key={v} onClick={() => setViewType(v)} className={"px-3 py-2 text-sm font-medium transition-colors " + (viewType === v ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50")}>
                 {label}表示
               </button>
             ))}
@@ -336,7 +336,7 @@ export default function CalendarPage() {
           </div>
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[["chair","🦷 チェア"], ["doctor","👨‍⚕️ ドクター"]].map(([v, label]) => (
-              <button key={v} onClick={() => setViewMode(v)} className={viewMode === v ? "px-3 py-2 text-sm font-medium transition-colors bg-blue-600 text-white" : "px-3 py-2 text-sm font-medium transition-colors bg-white text-gray-600 hover:bg-gray-50"}>
+              <button key={v} onClick={() => setViewMode(v)} className={"px-3 py-2 text-sm font-medium transition-colors " + (viewMode === v ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50")}>
                 {label}
               </button>
             ))}
@@ -417,6 +417,8 @@ export default function CalendarPage() {
                             onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
+                            className={dragging && dragging.appointment && dragging.appointment.id === appt.id ? "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 opacity-40 scale-95" : "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 hover:shadow-md hover:-translate-y-0.5"}
+                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: "4px solid " + color.bg, border: "1px solid " + color.border, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
                                 {appt.name_kana || appt.patient_name}
@@ -454,7 +456,6 @@ export default function CalendarPage() {
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                             className={dragging && dragging.appointment && dragging.appointment.id === appt.id ? "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 opacity-40 scale-95" : "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 hover:shadow-md hover:-translate-y-0.5"}
-                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: "4px solid " + color.bg, border: "1px solid " + color.border, borderLeftWidth: 4 }}>
                             style={{ top: top+2, height: height-4, background: color.light, borderLeft: "4px solid " + color.bg, border: "1px solid " + color.border, borderLeftWidth: 4 }}>
                           <span style={{ position: "absolute", left: 12, top: -10, fontSize: 10, color: "#3b82f6", fontWeight: 700, background: "#fff", padding: "0 2px", borderRadius: 3 }}>
                             {dragOver.slot}
@@ -888,7 +889,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const firstChairId = firstChair ? firstChair.id : null;
                     setNewApptModal({ slot: time, chairId: firstChairId, date: dateStr });
                   }}
-                > {isClosed && (
+                >
                     <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: "vertical-rl" }}>休診日</span>
                     </div>
@@ -1142,7 +1143,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         </div>
         <div className="grid grid-cols-7 border-b border-gray-100">
           {["日","月","火","水","木","金","土"].map((d, i) => (
-            <div key={d} className={i === 0 ? "text-red-500" : i === 6 ? "py-2 text-center text-xs font-bold text-blue-500" : "py-2 text-center text-xs font-bold text-gray-500"}>
+            <div key={d} className={"py-2 text-center text-xs font-bold " + (i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500")}>
               {d}
             </div>
           ))}
@@ -1168,9 +1169,9 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             const occupancy = getOccupancyRate(appts, maxChairs);
 
             return (
-              <div key={dateStr} onClick={() => onSelectDate(dateStr)} className={isToday ? "bg-blue-50 border-blue-100" : "" + " " + isPast && !isToday ? "bg-gray-50" : "" + " " + !isPast && !isToday ? "h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group " : "h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group "}>
+              <div key={dateStr} onClick={() => onSelectDate(dateStr)} className={"h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group " + (isToday ? "bg-blue-50 border-blue-100" : "" + " " + isPast && !isToday ? "bg-gray-50" : "" + " " + !isPast && !isToday ? "" : "")}>
                 <div className="flex items-center justify-between mb-1">
-                  <div className={isToday ? "bg-blue-600 text-white" : dow === 0 ? "text-red-500" : dow === 6 ? "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 text-blue-500" : "text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 text-gray-700"}>
+                  <div className={"text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 " + (isToday ? "bg-blue-600 text-white" : dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-700")}>
                     {new Date(dateStr).getDate()}
                   </div>
                   {appts.length >= 1 && (
@@ -1354,7 +1355,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
                 <p className="text-xs font-bold text-blue-700">新患登録</p>
                 <input placeholder="氏名 *" value={newPatient.name} onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
                 <div>
-                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana} onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }} className={kanaError ? "w-full border rounded px-2 py-1.5 text-sm border-red-400" : "w-full border rounded px-2 py-1.5 text-sm border-gray-200"} />
+                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana} onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }} className={"w-full border rounded px-2 py-1.5 text-sm " + (kanaError ? "border-red-400" : "border-gray-200")} />
                   {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
                 </div>
                 <input placeholder="電話番号" value={newPatient.phone} onChange={e => setNewPatient(p => ({ ...p, phone: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
@@ -1609,12 +1610,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
                   const isAvailable = slot.available || slot.time === appt.start_time?.substring(0,5);
                   const isSelected  = slot.time === newTime;
                   return (
-                     <button
-                       key={slot.time}
-                       type="button"
-                       onClick={() => isAvailable && setNewTime(slot.time)}
-                       disabled={!isAvailable}
-                       className={isSelected ? "py-1.5 rounded-lg text-xs font-medium border transition-all bg-blue-600 text-white border-blue-600" : isAvailable ? "py-1.5 rounded-lg text-xs font-medium border transition-all bg-white text-gray-700 border-gray-200 hover:bg-blue-50" : "py-1.5 rounded-lg text-xs font-medium border transition-all bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"}>
+                    <button key={slot.time} type="button" onClick={() => isAvailable && setNewTime(slot.time)} disabled={!isAvailable} className={"py-1.5 rounded-lg text-xs font-medium border transition-all " + (isSelected ? "bg-blue-600 text-white border-blue-600" : isAvailable ? "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300" : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed")}>
                       {slot.time}
                     </button>
                   );
@@ -1627,7 +1623,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
               <div className="grid grid-cols-3 gap-2">
                 {chairs.map(c => (
-                  <button key={c.id} type="button" onClick={() => setNewChairId(c.id)} className={newChairId === c.id ? "py-2 rounded-lg text-xs font-medium border transition-all bg-blue-600 text-white border-blue-600" : "py-2 rounded-lg text-xs font-medium border transition-all bg-white text-gray-700 border-gray-200 hover:bg-blue-50"}>
+                  <button key={c.id} type="button" onClick={() => setNewChairId(c.id)} className={"py-2 rounded-lg text-xs font-medium border transition-all " + (newChairId === c.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50")}>
                     {c.name}
                   </button>
                 ))}
@@ -1717,7 +1713,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">フリガナ *</label>
-              <input value={form.name_kana || ""} onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }} className={kanaError ? "w-full border rounded-lg px-3 py-2 text-sm border-red-400" : "w-full border rounded-lg px-3 py-2 text-sm border-gray-200"} />
+              <input value={form.name_kana || ""} onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }} className={"w-full border rounded-lg px-3 py-2 text-sm " + (kanaError ? "border-red-400" : "border-gray-200")} />
               {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
             </div>
           </div>
@@ -1747,7 +1743,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
             ) : (
               <div className="grid grid-cols-5 gap-1">
                 {AGE_GROUPS.map(ag => (
-                  <button key={ag} type="button" onClick={() => setForm(f => ({...f, age_group: ag}))} className={form.age_group === ag ? "py-1.5 rounded-lg text-xs font-medium transition-all border bg-blue-600 text-white border-blue-600" : "py-1.5 rounded-lg text-xs font-medium transition-all border bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50"}>
+                  <button key={ag} type="button" onClick={() => setForm(f => ({...f, age_group: ag}))} className={"py-1.5 rounded-lg text-xs font-medium transition-all border " + (form.age_group === ag ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50")}>
                     {ag}
                   </button>
                 ))}
