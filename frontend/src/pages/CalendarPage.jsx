@@ -468,7 +468,7 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: isDragTarget ? 1 : 0 }}>
-                              <span className={"text-xs " + ((isOutOfHours ? "text-orange-400" : "text-blue-400"))}>
+                              <span className={isOutOfHours ? "text-xs text-orange-400" : "text-xs text-blue-400"}>
                                 {isOutOfHours ? "+ 時間外予約" : "+ 予約追加"}
                               </span>
                             </div>
