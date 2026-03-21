@@ -31,6 +31,25 @@ async function pushMessage(lineUserId, messages) {
   if (!res.ok) console.error('LINE push error:', await res.text());
 }
 
+// リッチメニューを非表示（テキスト入力モード）
+async function hideRichMenu(lineUserId) {
+  await fetch(`https://api.line.me/v2/bot/user/${lineUserId}/richmenu`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+  }).catch(() => {});
+}
+
+// リッチメニューを再表示（デフォルトに戻す）
+async function showRichMenu(lineUserId) {
+  // デフォルトのリッチメニューIDが設定されている場合は復元
+  const menuId = process.env.LINE_RICH_MENU_ID;
+  if (!menuId) return;
+  await fetch(`https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${menuId}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+  }).catch(() => {});
+}
+
 // GET /api/line/link?code=P-00001
 router.get('/link', async (req, res) => {
   const { code } = req.query;
@@ -200,9 +219,10 @@ async function clearSession(lineUserId) {
 // ============================================================
 async function startInquiryFlow(replyToken, lineUserId) {
   await saveSession(lineUserId, 'name', {});
+  await hideRichMenu(lineUserId);
   await replyMessage(replyToken, [{
     type: 'text',
-    text: '問診を開始します。\n\n【1/6】お名前を入力してください。\n例：山田 花子',
+    text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子',
   }]);
 }
 
@@ -221,7 +241,7 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
       await saveSession(lineUserId, 'kana', data);
       await replyMessage(replyToken, [{
         type: 'text',
-        text: `【2/6】フリガナを入力してください。\n\n「${text}」さんのフリガナをカタカナで入力してください。\n例：ヤマダ ハナコ`,
+        text: `【2/5】フリガナを入力してください。\n\n「${text}」さんのフリガナをカタカナで入力してください。\n例：ヤマダ ハナコ`,
       }]);
       break;
     }
@@ -242,7 +262,7 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
         altText: '年代を選択してください',
         template: {
           type: 'buttons',
-          text: '【3/6】あなたの年代を教えてください',
+          text: '【3/5】あなたの年代を教えてください',
           actions: [
             { type: 'postback', label: '10〜30代', data: 'action=inq_age&range=young' },
             { type: 'postback', label: '40〜50代', data: 'action=inq_age&range=middle' },
@@ -267,7 +287,7 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
         altText: '郵便番号を入力しますか？',
         template: {
           type: 'confirm',
-          text: '【5/6】郵便番号を教えていただけますか？（任意）',
+          text: '【4/5 続き】郵便番号を教えていただけますか？（任意）',
           actions: [
             { type: 'postback', label: '入力する', data: 'action=inq_postal_yes' },
             { type: 'postback', label: 'スキップ', data: 'action=inq_postal_skip' },
@@ -290,8 +310,9 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
     }
 
     case 'memo': {
-      data.memo = text === 'スキップ' ? '' : text;
+      data.memo = text;
       await saveSession(lineUserId, 'confirm', data);
+      await showRichMenu(lineUserId);
       await showConfirm(replyToken, lineUserId, data);
       break;
     }
@@ -329,15 +350,17 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
       inq_age_70:'70代', inq_age_80:'80代', inq_age_90:'90代以上' };
     sData.age_group = ageMap[action] || '';
     await saveSession(lineUserId, 'phone', sData);
+    await hideRichMenu(lineUserId);
     await replyMessage(replyToken, [{
       type: 'text',
-      text: `【4/6】電話番号を入力してください。\n例：090-1234-5678`,
+      text: `【4/5】電話番号を入力してください。\n例：090-1234-5678`,
     }]);
     return;
   }
 
   if (action === 'inq_postal_yes') {
     await saveSession(lineUserId, 'postal_input', sData);
+    await hideRichMenu(lineUserId);
     await replyMessage(replyToken, [{ type: 'text', text: '郵便番号を入力してください。\n例：150-0001' }]);
     return;
   }
@@ -359,10 +382,37 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
   if (action === 'inq_referral') {
     sData.referral_source = data.get('source');
     await saveSession(lineUserId, 'memo', sData);
+    await showRichMenu(lineUserId); // 選択肢ボタンなのでリッチメニュー戻す
+    await replyMessage(replyToken, [{
+      type: 'template',
+      altText: 'その他ご連絡事項はありますか？',
+      template: {
+        type: 'confirm',
+        text: '最後に、アレルギーや服用中のお薬など\nスタッフへの伝言はありますか？',
+        actions: [
+          { type: 'postback', label: 'あり（入力する）', data: 'action=inq_memo_yes' },
+          { type: 'postback', label: 'なし（スキップ）', data: 'action=inq_memo_skip' },
+        ],
+      },
+    }]);
+    return;
+  }
+
+  if (action === 'inq_memo_yes') {
+    await saveSession(lineUserId, 'memo', sData);
+    await hideRichMenu(lineUserId);
     await replyMessage(replyToken, [{
       type: 'text',
-      text: `【6/6】最後に、その他伝えておきたいことがあれば入力してください。\n（アレルギー、服用中のお薬など）\n\nなければ「スキップ」と入力してください。`,
+      text: 'アレルギーや服用中のお薬など、スタッフへ伝えたいことを入力してください。',
     }]);
+    return;
+  }
+
+  if (action === 'inq_memo_skip') {
+    sData.memo = '';
+    await saveSession(lineUserId, 'confirm', sData);
+    await showRichMenu(lineUserId);
+    await showConfirm(replyToken, lineUserId, sData);
     return;
   }
 
@@ -384,7 +434,7 @@ async function askReferral(replyToken, lineUserId) {
     altText: 'クリニックをどこで知りましたか？',
     template: {
       type: 'buttons',
-      text: '【5/6】当クリニックをどこでお知りになりましたか？\nカテゴリを選んでください。',
+      text: '【5/5】当クリニックをどこでお知りになりましたか？\nカテゴリを選んでください。',
       actions: [
         { type: 'postback', label: 'Web・デジタル系', data: 'action=inq_referral_cat&cat=web' },
         { type: 'postback', label: '口コミ・広告系',  data: 'action=inq_referral_cat&cat=ads' },
@@ -458,6 +508,7 @@ async function registerNewPatient(replyToken, lineUserId, d) {
     ]);
     const patient = result.rows[0];
     await clearSession(lineUserId);
+    await showRichMenu(lineUserId); // 問診完了でリッチメニューを戻す
 
     await replyMessage(replyToken, [{
       type: 'text',
