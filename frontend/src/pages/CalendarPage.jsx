@@ -61,6 +61,15 @@ export default function CalendarPage() {
   const [tooltip, setTooltip]             = useState({ visible: false, appt: null, x: 0, y: 0 });
   const [showManual, setShowManual]       = useState(false);
 
+  function handleManualClick() {
+    const mode = localStorage.getItem('manual_display_mode') || 'newtab';
+    if (mode === 'newtab') {
+      window.open('/manual.html', '_blank');
+    } else {
+      setShowManual(prev => !prev);
+    }
+  }
+
   function getWeekStart(dateStr) {
     const d = new Date(dateStr);
     const dow = d.getDay();
@@ -334,59 +343,41 @@ export default function CalendarPage() {
           <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
-              <button key={v} onClick={() => setViewType(v)}
-                className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+              <button key={v} onClick={() => setViewType(v)} className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
                 {label}表示
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
-            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }}
-              className="text-gray-500 hover:text-blue-600">◀</button>
+            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }} className="text-gray-500 hover:text-blue-600">◀</button>
             <div className="flex items-center gap-1.5">
-              <input type="date" value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
+              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
               <span className={'text-sm font-bold px-1.5 py-0.5 rounded-md ' + (new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' : new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' : 'text-gray-600 bg-gray-50')}>
                 （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
               </span>
             </div>
-            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }}
-              className="text-gray-500 hover:text-blue-600">▶</button>
+            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }} className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
-              <button key={v} onClick={() => setViewMode(v)}
-                className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+              <button key={v} onClick={() => setViewMode(v)} className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
                 {label}
               </button>
             ))}
           </div>
 
-          <button onClick={fetchCalendar}
-            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
+          <button onClick={fetchCalendar} className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
             🔄 更新
           </button>
-          <button
-            onClick={() => {
-              const mode = localStorage.getItem('manual_display_mode') || 'newtab'
-              if (mode === 'newtab') {
-                window.open('/manual.html', '_blank')
-              } else {
-                setShowManual(prev => !prev)
-              }
-            }}
-            className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 shadow-sm font-medium">
+          <button onClick={handleManualClick} className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 shadow-sm font-medium">
             📖 マニュアル
           </button>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2 items-center">
           {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-            <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
-              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
-            </span>
+            <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name} </span>
           ))}
           <span style={{ fontSize:11, color:'var(--color-text-secondary)', marginLeft:8 }}>
             ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
@@ -395,22 +386,18 @@ export default function CalendarPage() {
       </div>
 
       <div className="px-4 py-3" style={{ paddingTop: 120 }}>
-      {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
-      {viewMode === "doctor" && allStaff.length === 0 && (
-        <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
+      {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>} {viewMode === "doctor" && allStaff.length === 0 && ( <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
           本日の予約はありません
         </div>
       )}
       {(viewMode === 'chair' || columns.length > 0) && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100"
-          style={{ overflowX: 'auto', overflowY: 'visible' }}>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100" style={{ overflowX: 'auto', overflowY: 'visible' }}>
           <div style={{ display: 'flex', minWidth: (64 + columns.length * 160) + 'px' }}>
             <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
               <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
               <div className="relative" style={{ height: timelineHeight }}>
                 {slots.map(slot => (
-                  <div key={slot} className="absolute left-0 right-0 flex items-start justify-end pr-2"
-                    style={{ top: slotTop(slot), height: SLOT_HEIGHT }}>
+                  <div key={slot} className="absolute left-0 right-0 flex items-start justify-end pr-2" style={{ top: slotTop(slot), height: SLOT_HEIGHT }}>
                     <span className="text-xs text-gray-400 font-mono leading-none pt-1">{slot}</span>
                   </div>
                 ))}
@@ -425,16 +412,12 @@ export default function CalendarPage() {
                       </span>
                     </div>
 
-                    <div className="relative" style={{ height: timelineHeight }}
-                      onDragOver={handleColDragOver(col.id)}
-                      onDrop={handleColDrop(col.id)}>
-                      <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
-                        style={{ top: lunchTop, height: lunchHeight }}>
+                    <div className="relative" style={{ height: timelineHeight }} onDragOver={handleColDragOver(col.id)} onDrop={handleColDrop(col.id)}>
+                      <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10" style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
                       {showNowLine && colIdx === 0 && (
-                        <div className="pointer-events-none z-30"
-                          style={{ position: 'absolute', top: nowTop, left: -64, width: (columns.length * 161 + 64) + 'px' }}>
+                        <div className="pointer-events-none z-30" style={{ position: 'absolute', top: nowTop, left: -64, width: (columns.length * 161 + 64) + 'px' }}>
                           <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', left: 56, right: 0, height: 2, background: '#ef4444', boxShadow: '0 1px 3px rgba(239,68,68,0.4)' }} />
                             <div style={{ position: 'absolute', left: 48, top: -6, width: 12, height: 12, borderRadius: '50%', background: '#ef4444', boxShadow: '0 1px 4px rgba(239,68,68,0.5)' }} />
@@ -449,16 +432,7 @@ export default function CalendarPage() {
                         const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
                         const color  = getTreatmentColor(appt.treatment_type);
                         return (
-                          <div key={appt.id}
-                            draggable
-                            onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }}
-                            onDragEnd={handleDragEnd}
-                            onClick={e => { if (!dragging) setDetailModal(appt); }}
-                            onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
-                            onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
-                            onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                            className={'absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ' + ((dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'))}
-                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: '4px solid ' + color.bg, border: '1px solid ' + color.border, borderLeftWidth: 4 }}>
+                          <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={e => { if (!dragging) setDetailModal(appt); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={'absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ' + ((dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'))} style={{ top: top+2, height: height-4, background: color.light, borderLeft: '4px solid ' + color.bg, border: '1px solid ' + color.border, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
                                 {appt.name_kana || appt.patient_name}
@@ -487,8 +461,7 @@ export default function CalendarPage() {
                         );
                       })}
                       {dragOver?.colId === col.id && (
-                        <div className="absolute left-0 right-0 pointer-events-none z-30"
-                          style={{ top: slotTop(dragOver.slot), height: 2, background: '#3b82f6' }}>
+                        <div className="absolute left-0 right-0 pointer-events-none z-30" style={{ top: slotTop(dragOver.slot), height: 2, background: '#3b82f6' }}>
                           <div style={{ position: 'absolute', left: 0, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
                           <span style={{ position: 'absolute', left: 12, top: -10, fontSize: 10, color: '#3b82f6', fontWeight: 700, background: '#fff', padding: '0 2px', borderRadius: 3 }}>
                             {dragOver.slot}
@@ -508,17 +481,9 @@ export default function CalendarPage() {
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
                         return (
-                          <div key={slot}
-                            className={slotCls}
-                            style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
-                            onDragOver={e => e.preventDefault()}
-                            onClick={() => setNewApptModal({
-                              slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id,
-                              isOutOfHours
-                            })}>
+                          <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => setNewApptModal({ slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id, isOutOfHours })}>
                             {isOutOfHours && colIdx === 0 && (
-                              <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none"
-                                style={{ fontSize: 9 }}>時間外</div>
+                              <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none" style={{ fontSize: 9 }}>時間外</div>
                             )}
                             {isDragTarget && (
                               <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center">
@@ -576,14 +541,8 @@ export default function CalendarPage() {
           }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>📖 操作マニュアル</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => window.open('/manual.html', '_blank')}
-                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }}
-              >↗ 別タブで開く</button>
-              <button
-                onClick={() => setShowManual(false)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}
-              >✕</button>
+              <button onClick={() => window.open('/manual.html', '_blank')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }} >↗ 別タブで開く</button>
+              <button onClick={() => setShowManual(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }} >✕</button>
             </div>
           </div>
           <iframe src="/manual.html" style={{ flex: 1, border: 'none' }} title="操作マニュアル" />
@@ -761,8 +720,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                 {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
-                  <button key={v} onClick={() => onSwitchView(v)}
-                    className={'px-3 py-1.5 text-sm font-medium transition-colors ' + ((v === 'week' && !weekOnly) || (v === 'week5' && weekOnly) ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+                  <button key={v} onClick={() => onSwitchView(v)} className={'px-3 py-1.5 text-sm font-medium transition-colors ' + ((v === 'week' && !weekOnly) || (v === 'week5' && weekOnly) ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
                     {label}表示
                   </button>
                 ))}
@@ -772,29 +730,24 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
                 <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
               </div>
-              <button onClick={onRefresh}
-                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
+              <button onClick={onRefresh} className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
                 🔄 更新
               </button>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-              <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name}
-              </span>
+              <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name} </span>
             ))}
           </div>
         </div>
       </div>
       <div className="px-4" style={{ paddingTop: 110 }}>
-      {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+      {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>} <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
         <div style={{ minWidth: TIME_W + COL_W * 7 }}>
           <div className="flex border-b border-gray-200" style={{ height: HEADER_H }}>
-            <div style={{ width: TIME_W, flexShrink: 0 }}
-              className="bg-gray-50 border-r border-gray-100 flex flex-col items-center justify-end pb-1.5">
+            <div style={{ width: TIME_W, flexShrink: 0 }} className="bg-gray-50 border-r border-gray-100 flex flex-col items-center justify-end pb-1.5">
               <span className="text-gray-400" style={{ fontSize: 9 }}>時刻</span>
             </div>
 
@@ -817,15 +770,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 : CHAIR_COLORS[colIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr}
-                  onClick={() => onSelectDate(dateStr)}
-                  style={{
-                    width: COL_W, flexShrink: 0,
-                    borderLeft: `3px solid ${isClosed ? '#e5e7eb' : chColor.bg}`,
-                    background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff',
-                    cursor: 'pointer',
-                  }}
-                  className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
+                <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ width: COL_W, flexShrink: 0, borderLeft: `3px solid ${isClosed ? '#e5e7eb' : chColor.bg}`, background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff', cursor: 'pointer', }} className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
                   <div className="flex items-center justify-between mb-1">
                     <span style={{
                       fontSize: 11, fontWeight: 700,
@@ -885,11 +830,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
             })}
           </div>
           <div className="flex">
-            <div className="bg-gray-50 border-r border-gray-100 relative flex-shrink-0"
-              style={{ width: TIME_W, height: timelineH }}>
+            <div className="bg-gray-50 border-r border-gray-100 relative flex-shrink-0" style={{ width: TIME_W, height: timelineH }}>
               {allSlots.map(slot => (
-                <div key={slot} className="absolute right-1 text-right"
-                  style={{ top: slotTop(slot), height: SLOT_H }}>
+                <div key={slot} className="absolute right-1 text-right" style={{ top: slotTop(slot), height: SLOT_H }}>
                   <span className="text-gray-400 font-mono" style={{ fontSize: 10 }}>{slot}</span>
                 </div>
               ))}
@@ -910,13 +853,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 : CHAIR_COLORS[dayIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr}
-                  style={{
-                    width: COL_W, flexShrink: 0, height: timelineH,
-                    borderLeft: `2px solid ${chColor.border}`,
-                    background: isToday ? chColor.light + '60' : 'transparent',
-                  }}
-                  className="relative border-r border-gray-100 last:border-r-0"
+                <div key={dateStr} className="relative border-r border-gray-100" style={{ width: COL_W, flexShrink: 0, height: timelineH, borderLeft: '2px solid ' + chColor.border, background: isToday ? chColor.light + '60' : 'transparent' }}"
                   onDragOver={e => {
                     e.preventDefault();
                     const time = weekPixelToTime(e, e.currentTarget);
@@ -950,20 +887,15 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     </div>
                   )}
                   {!isClosed && clinicH.open > openMin && (
-                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
-                      style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
+                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none" style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
                   {!isClosed && clinicH.close < closeMin && (
-                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
-                      style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
+                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none" style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
-                  <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
-                    style={{ top: lunchS, height: lunchH2 }}>
-                    {dayIdx === 0 && <span className="text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>}
-                  </div>
+                  <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10" style={{ top: lunchS, height: lunchH2 }}>
+                    {dayIdx === 0 && <span className="text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>} </div>
                   {showNow && dayIdx === 0 && (
-                    <div className="pointer-events-none z-30"
-                      style={{ position: 'absolute', top: nowTop, left: 0, width: COL_W * 7, height: 2, background: '#ef4444' }}>
+                    <div className="pointer-events-none z-30" style={{ position: 'absolute', top: nowTop, left: 0, width: COL_W * 7, height: 2, background: '#ef4444' }}>
                       <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
                     </div>
                   )}
@@ -973,14 +905,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const color  = getTreatmentColor(appt.treatment_type);
                     const isDrag = dragging?.appt?.id === appt.id;
                     return (
-                      <div key={appt.id}
-                        draggable
-                        onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }}
-                        onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
-                        onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
-                        onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
+                      <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                         className={'absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ' + (isDrag ? 'opacity-40' : 'hover:shadow-lg')}
                         style={{
                           top: top + 1, height: Math.max(height - 2, 18),
@@ -1027,8 +952,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   {allSlots.map(slot => {
                     const isHour = toMinutes(slot) % 60 === 0;
                     return (
-                      <div key={slot} className="absolute left-0 right-0 pointer-events-none"
-                        style={{ top: slotTop(slot), height: SLOT_H, borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6', zIndex: 0 }} />
+                      <div key={slot} className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(slot), height: SLOT_H, borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6', zIndex: 0 }} />
                     );
                   })}
                 </div>
@@ -1234,9 +1158,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             const occupancy = getOccupancyRate(appts, maxChairs);
 
             return (
-              <div key={dateStr}
-                onClick={() => onSelectDate(dateStr)}
-                className={'h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ' + (isToday ? 'bg-blue-50 border-blue-100' : '' + ' ' + isPast && !isToday ? 'bg-gray-50' : '' + ' ' + !isPast && !isToday ? '' : '')}>
+              <div key={dateStr} onClick={() => onSelectDate(dateStr)} className={'h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ' + (isToday ? 'bg-blue-50 border-blue-100' : '' + ' ' + isPast && !isToday ? 'bg-gray-50' : '' + ' ' + !isPast && !isToday ? '' : '')}>
                 <div className="flex items-center justify-between mb-1">
                   <div className={'text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ' + (isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700')}>
                     {new Date(dateStr).getDate()}
@@ -1249,11 +1171,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                 </div>
                 {appts.length > 0 && (
                   <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${occupancy}%`,
-                        background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e'
-                      }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${occupancy}%`, background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e' }} />
                   </div>
                 )}
                 {treatmentColors.length > 0 && (
@@ -1267,8 +1185,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                   {appts.slice(0, 2).map(a => {
                     const color = getTreatmentColor(a.treatment_type);
                     return (
-                      <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight"
-                        style={{ background: color.light, color: color.text, borderLeft: '2px solid ' + color.bg }}>
+                      <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight" style={{ background: color.light, color: color.text, borderLeft: '2px solid ' + color.bg }}>
                         {a.start_time?.substring(0,5)} {a.name_kana || a.patient_name}
                       </div>
                     );
@@ -1290,14 +1207,11 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         </div>
         <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
-            <div className="w-8 h-1 rounded-full bg-green-400" />少ない
-          </span>
+            <div className="w-8 h-1 rounded-full bg-green-400" />少ない </span>
           <span className="flex items-center gap-1">
-            <div className="w-8 h-1 rounded-full bg-blue-400" />普通
-          </span>
+            <div className="w-8 h-1 rounded-full bg-blue-400" />普通 </span>
           <span className="flex items-center gap-1">
-            <div className="w-8 h-1 rounded-full bg-red-400" />混んでいる
-          </span>
+            <div className="w-8 h-1 rounded-full bg-red-400" />混んでいる </span>
           <span className="ml-auto text-gray-400">バーは稼働率を表示</span>
         </div>
       </div>
@@ -1404,15 +1318,11 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
             {!newPatientMode ? (
               <>
                 <div className="relative">
-                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..."
-                    value={selectedPatient ? `${selectedPatient.name_kana||''} ${selectedPatient.name}` : patientSearch}
-                    onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? `${selectedPatient.name_kana||''} ${selectedPatient.name}` : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   {showPatientList && patients.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto mt-1">
                       {patients.map(p => (
-                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0"
-                          onClick={() => { setSelectedPatient(p); setPatientSearch(''); setShowPatientList(false); }}>
+                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0" onClick={() => { setSelectedPatient(p); setPatientSearch(''); setShowPatientList(false); }}>
                           <span className="font-medium">{p.name_kana}</span>
                           <span className="text-gray-500 ml-1">{p.name}</span>
                           <span className="text-gray-400 ml-2 text-xs">{p.phone}</span>
@@ -1432,18 +1342,12 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
             ) : (
               <div className="border border-blue-200 rounded-lg p-3 bg-blue-50 space-y-2">
                 <p className="text-xs font-bold text-blue-700">新患登録</p>
-                <input placeholder="氏名 *" value={newPatient.name}
-                  onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                <input placeholder="氏名 *" value={newPatient.name} onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
                 <div>
-                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana}
-                    onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }}
-                    className={'w-full border rounded px-2 py-1.5 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
+                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana} onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }} className={'w-full border rounded px-2 py-1.5 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
                   {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
                 </div>
-                <input placeholder="電話番号" value={newPatient.phone}
-                  onChange={e => setNewPatient(p => ({ ...p, phone: e.target.value }))}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                <input placeholder="電話番号" value={newPatient.phone} onChange={e => setNewPatient(p => ({ ...p, phone: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
                 <button onClick={() => setNewPatientMode(false)} className="text-xs text-gray-500 hover:underline">← 既存患者を選択</button>
               </div>
             )}
@@ -1455,10 +1359,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
                 const c = getTreatmentColor(t.name);
                 const selected = selectedTreatment?.id === t.id;
                 return (
-                  <button key={t.id}
-                    onClick={() => { setSelectedTreatment(t); setDuration(t.duration || settings.slotDuration); }}
-                    className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-left"
-                    style={{ background: selected ? c.bg : c.light, color: selected ? '#fff' : c.text, borderColor: selected ? c.bg : c.border }}>
+                  <button key={t.id} onClick={() => { setSelectedTreatment(t); setDuration(t.duration || settings.slotDuration); }} className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-left" style={{ background: selected ? c.bg : c.light, color: selected ? '#fff' : c.text, borderColor: selected ? c.bg : c.border }}>
                     {t.name} <span className="opacity-70">{t.duration}分</span>
                   </button>
                 );
@@ -1468,8 +1369,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">所要時間</label>
             <div className="flex items-center gap-3">
-              <select value={duration} onChange={e => setDuration(Number(e.target.value))}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1">
+              <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1">
                 {[15,30,45,60,90,120].map(m => <option key={m} value={m}>{m}分</option>)}
               </select>
               <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
@@ -1479,32 +1379,26 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
           </div>
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">チェア</label>
-            <select value={selectedChairId} onChange={e => setSelectedChairId(Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <select value={selectedChairId} onChange={e => setSelectedChairId(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
               {chairs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">担当スタッフ</label>
-            <select value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            <select value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
               <option value="">未設定</option>
               {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">📋 申し送り <span className="text-gray-400 font-normal text-xs">（任意）</span></label>
-            <textarea placeholder="次回スタッフへの申し送り事項..." value={notes}
-              onChange={e => setNotes(e.target.value)} rows={3}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <textarea placeholder="次回スタッフへの申し送り事項..." value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">キャンセル</button>
-          <button onClick={handleSave} disabled={saving}
-            className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50"
-            style={{ background: color.bg }}>
+          <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
             {saving ? '保存中...' : '予約を追加'}
           </button>
         </div>
@@ -1559,8 +1453,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
             <div>
               <div className="flex items-center gap-2">
                 <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
-                <button onClick={() => setEditPatient(true)}
-                  className="p-1 rounded-lg hover: transition-colors" title="患者情報を編集">
+                <button onClick={() => setEditPatient(true)} className="p-1 rounded-lg hover: transition-colors" title="患者情報を編集">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -1569,9 +1462,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               </div>
               <div className="text-sm opacity-75" style={{ color: color.text }}>{appt.patient_name}</div>
             </div>
-            <button onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white bg-opacity-80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
-              title="閉じる">✕</button>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white bg-opacity-80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg" title="閉じる">✕</button>
           </div>
         </div>
         <div className="p-5 space-y-3">
@@ -1593,8 +1484,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               <div className="font-bold text-gray-800">{appt.chair_name}</div>
             </div>
           </div>
-          <button onClick={() => setReschedule(true)}
-            className="w-full border border-blue-200 text-blue-600 rounded-xl py-2 text-sm font-medium hover:bg-blue-50 flex items-center justify-center gap-2 transition-colors">
+          <button onClick={() => setReschedule(true)} className="w-full border border-blue-200 text-blue-600 rounded-xl py-2 text-sm font-medium hover:bg-blue-50 flex items-center justify-center gap-2 transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
               <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
@@ -1605,20 +1495,17 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
 
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1 block">📋 申し送り</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" placeholder="申し送り事項を入力..." />
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" placeholder="申し送り事項を入力..." />
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2">
-          <button onClick={handleCancel}
-            className="flex-1 border-2 border-red-300 text-red-600 rounded-xl py-2 text-sm font-semibold hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors">
+          <button onClick={handleCancel} className="flex-1 border-2 border-red-300 text-red-600 rounded-xl py-2 text-sm font-semibold hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
             </svg>
             予約キャンセル
           </button>
-          <button onClick={handleSave} disabled={saving}
-            className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
+          <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
             {saving ? '保存中...' : '保存'}
           </button>
         </div>
@@ -1697,9 +1584,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">新しい日付</label>
-            <input type="date" value={newDate}
-              onChange={e => setNewDate(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
@@ -1714,10 +1599,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
                   const isAvailable = slot.available || slot.time === appt.start_time?.substring(0,5);
                   const isSelected  = slot.time === newTime;
                   return (
-                    <button key={slot.time} type="button"
-                      onClick={() => isAvailable && setNewTime(slot.time)}
-                      disabled={!isAvailable}
-                      className={'py-1.5 rounded-lg text-xs font-medium border transition-all ' + (isSelected ? 'bg-blue-600 text-white border-blue-600' : isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed')}>
+                    <button key={slot.time} type="button" onClick={() => isAvailable && setNewTime(slot.time)} disabled={!isAvailable} className={'py-1.5 rounded-lg text-xs font-medium border transition-all ' + (isSelected ? 'bg-blue-600 text-white border-blue-600' : isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed')}>
                       {slot.time}
                     </button>
                   );
@@ -1730,9 +1612,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
               <div className="grid grid-cols-3 gap-2">
                 {chairs.map(c => (
-                  <button key={c.id} type="button"
-                    onClick={() => setNewChairId(c.id)}
-                    className={'py-2 rounded-lg text-xs font-medium border transition-all ' + (newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50')}>
+                  <button key={c.id} type="button" onClick={() => setNewChairId(c.id)} className={'py-2 rounded-lg text-xs font-medium border transition-all ' + (newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50')}>
                     {c.name}
                   </button>
                 ))}
@@ -1750,13 +1630,10 @@ function RescheduleModal({ appt, onClose, onSave }) {
         </div>
 
         <div className="px-5 pb-5 flex gap-2">
-          <button onClick={onClose}
-            className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
+          <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
             戻る
           </button>
-          <button onClick={handleSave} disabled={saving || !isChanged}
-            className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-colors"
-            style={{ background: isChanged ? color.bg : '#9ca3af' }}>
+          <button onClick={handleSave} disabled={saving || !isChanged} className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-colors" style={{ background: isChanged ? color.bg : '#9ca3af' }}>
             {saving ? '変更中...' : '変更を保存'}
           </button>
         </div>
@@ -1821,27 +1698,22 @@ function PatientEditModal({ patientId, onClose, onSave }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">氏名 *</label>
-              <input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">フリガナ *</label>
-              <input value={form.name_kana || ''}
-                onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }}
-                className={'w-full border rounded-lg px-3 py-2 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
+              <input value={form.name_kana || ''} onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }} className={'w-full border rounded-lg px-3 py-2 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
               {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">電話番号</label>
-              <input value={form.phone || ''} onChange={e => setForm(f => ({...f, phone: e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.phone || ''} onChange={e => setForm(f => ({...f, phone: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">性別</label>
-              <select value={form.gender || ''} onChange={e => setForm(f => ({...f, gender: e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+              <select value={form.gender || ''} onChange={e => setForm(f => ({...f, gender: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 <option value="">未設定</option>
                 <option value="male">男性</option>
                 <option value="female">女性</option>
@@ -1852,8 +1724,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">
               年代
-              {autoAgeGroup && <span className="ml-2 text-blue-500 font-normal">（生年月日から自動: {autoAgeGroup}）</span>}
-            </label>
+              {autoAgeGroup && <span className="ml-2 text-blue-500 font-normal">（生年月日から自動: {autoAgeGroup}）</span>} </label>
             {autoAgeGroup ? (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700 font-medium">
                 {autoAgeGroup}（生年月日から自動計算）
@@ -1861,9 +1732,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
             ) : (
               <div className="grid grid-cols-5 gap-1">
                 {AGE_GROUPS.map(ag => (
-                  <button key={ag} type="button"
-                    onClick={() => setForm(f => ({...f, age_group: ag}))}
-                    className={'py-1.5 rounded-lg text-xs font-medium transition-all border ' + (form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50')}>
+                  <button key={ag} type="button" onClick={() => setForm(f => ({...f, age_group: ag}))} className={'py-1.5 rounded-lg text-xs font-medium transition-all border ' + (form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50')}>
                     {ag}
                   </button>
                 ))}
@@ -1873,28 +1742,22 @@ function PatientEditModal({ patientId, onClose, onSave }) {
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">生年月日</label>
-            <input type="date" value={form.birth_date?.substring(0,10) || ''}
-              onChange={e => setForm(f => ({...f, birth_date: e.target.value}))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input type="date" value={form.birth_date?.substring(0,10) || ''} onChange={e => setForm(f => ({...f, birth_date: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <p className="text-xs text-gray-400 mt-0.5">入力すると年代が自動計算されます</p>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">備考・アレルギー</label>
-            <textarea value={form.notes || ''} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-              rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
+            <textarea value={form.notes || ''} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">郵便番号</label>
-              <input value={form.postal_code || ''} onChange={e => setForm(f => ({...f, postal_code: e.target.value}))}
-                placeholder="150-0001"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.postal_code || ''} onChange={e => setForm(f => ({...f, postal_code: e.target.value}))} placeholder="150-0001" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">来院きっかけ</label>
-              <select value={form.referral_source || ''} onChange={e => setForm(f => ({...f, referral_source: e.target.value}))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+              <select value={form.referral_source || ''} onChange={e => setForm(f => ({...f, referral_source: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 <option value="">-</option>
                 <option value="インターネット検索">インターネット検索</option>
                 <option value="SNS・Instagram">SNS・Instagram</option>
@@ -1907,8 +1770,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">キャンセル</button>
-          <button onClick={handleSave} disabled={saving}
-            className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50">
             {saving ? '保存中...' : '保存する'}
           </button>
         </div>
