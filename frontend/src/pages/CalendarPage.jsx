@@ -330,7 +330,7 @@ export default function CalendarPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* 月/週/5日/日切替 */}
+            {/* 月・週・5日・日切替 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
@@ -563,7 +563,7 @@ export default function CalendarPage() {
                                 <span className="text-xs text-blue-500 font-medium">ここに移動</span>
                               </div>
                             )}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>
                               <span className={`text-xs ${isOutOfHours ? 'text-orange-400' : 'text-blue-400'}`}>
                                 {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
                               </span>
