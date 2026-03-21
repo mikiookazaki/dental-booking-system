@@ -609,23 +609,6 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
   const time        = data.get('time');
 
   try {
-    // チェアを取得（line_bookable優先、なければis_activeのみ）
-    let chairRow = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE AND line_bookable=TRUE ORDER BY display_order LIMIT 1')).rows[0];
-    if (!chairRow) {
-      chairRow = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE ORDER BY display_order LIMIT 1')).rows[0];
-    }
-
-    // スタッフを取得（doctor優先、なければis_activeのみ）
-    let staffRow = (await db.query("SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1")).rows[0];
-    if (!staffRow) {
-      staffRow = (await db.query('SELECT id FROM staff WHERE is_active=TRUE LIMIT 1')).rows[0];
-    }
-
-    if (!chairRow || !staffRow) {
-      await pushMessage(lineUserId, [{ type: 'text', text: '空き枠の確保に失敗しました。お電話でご予約ください。' }]);
-      return;
-    }
-
     const t = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
     if (!t) {
       await pushMessage(lineUserId, [{ type: 'text', text: '治療メニューの取得に失敗しました。お電話でご予約ください。' }]);
@@ -633,7 +616,78 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
     }
     const endTime = addMinutes(time, t.duration);
 
-    // APIを使わず直接DBにINSERT（認証不要）
+    // ── 空きチェアを選択（重複チェックあり） ──
+    // 指定日時に既存予約と時間が重複していないチェアを取得
+    const chairResult = await db.query(`
+      SELECT c.id, c.name FROM chairs c
+      WHERE c.is_active = TRUE
+        AND (c.line_bookable = TRUE OR TRUE)
+      AND c.id NOT IN (
+        SELECT a.chair_id FROM appointments a
+        WHERE a.appointment_date = $1
+          AND a.status = 'confirmed'
+          AND a.start_time < $3::time
+          AND a.end_time   > $2::time
+      )
+      ORDER BY c.display_order
+      LIMIT 1
+    `, [date, time, endTime]);
+
+    if (!chairResult.rows.length) {
+      await pushMessage(lineUserId, [{
+        type: 'text',
+        text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は満員です。
+他の日時をお選びいただくか、お電話でご相談ください。`
+      }]);
+      return;
+    }
+    const chairRow = chairResult.rows[0];
+
+    // ── 空きドクターを選択（重複チェックあり） ──
+    // 指定日時に既存予約と時間が重複していないドクターを取得
+    const staffResult = await db.query(`
+      SELECT s.id, s.name FROM staff s
+      WHERE s.is_active = TRUE
+        AND s.role = 'doctor'
+        AND s.id NOT IN (
+          SELECT a.staff_id FROM appointments a
+          WHERE a.appointment_date = $1
+            AND a.status = 'confirmed'
+            AND a.start_time < $3::time
+            AND a.end_time   > $2::time
+        )
+      ORDER BY s.id
+      LIMIT 1
+    `, [date, time, endTime]);
+
+    // ドクターが全員埋まっている場合は他のスタッフで代替
+    let staffRow = staffResult.rows[0];
+    if (!staffRow) {
+      const anyStaff = await db.query(`
+        SELECT s.id, s.name FROM staff s
+        WHERE s.is_active = TRUE
+          AND s.id NOT IN (
+            SELECT a.staff_id FROM appointments a
+            WHERE a.appointment_date = $1
+              AND a.status = 'confirmed'
+              AND a.start_time < $3::time
+              AND a.end_time   > $2::time
+          )
+        ORDER BY s.id LIMIT 1
+      `, [date, time, endTime]);
+      staffRow = anyStaff.rows[0];
+    }
+
+    if (!staffRow) {
+      await pushMessage(lineUserId, [{
+        type: 'text',
+        text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。
+他の日時をお選びいただくか、お電話でご相談ください。`
+      }]);
+      return;
+    }
+
+    // ── 予約を登録 ──
     await db.query(`
       INSERT INTO appointments
         (patient_id, staff_id, chair_id, treatment_id, appointment_date, start_time, end_time, status, source, patient_name, patient_phone)
@@ -642,7 +696,7 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
 
     await pushMessage(lineUserId, [{
       type: 'text',
-      text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております`
+      text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n担当: ${staffRow.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております`
     }]);
 
   } catch (err) {
