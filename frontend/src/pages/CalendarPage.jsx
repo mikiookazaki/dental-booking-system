@@ -1,4 +1,3 @@
-// src/pages/CalendarPage.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from '../api';
@@ -34,16 +33,13 @@ function formatDate(dateStr) {
   return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
 }
 
-// =============================================
-// メインコンポーネント
-// =============================================
 export default function CalendarPage() {
-  const [searchParams] = useSearchParams();  // 先に定義
+  const [searchParams] = useSearchParams(); 
   const [viewType, setViewType]           = useState(() => {
     const v = searchParams.get('view')
     return (v === 'month' || v === 'week' || v === 'week5') ? v : 'day'
-  });  // 'month' | 'week' | 'week5' | 'day'
-  const [viewMode, setViewMode]           = useState('chair'); // 'chair' | 'doctor'
+  }); 
+  const [viewMode, setViewMode]           = useState('chair');
   const [selectedDate, setSelectedDate]   = useState(
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
@@ -53,7 +49,7 @@ export default function CalendarPage() {
   });
   const [calendarData, setCalendarData]   = useState(null);
   const [monthData, setMonthData]         = useState({});
-  const [weekData, setWeekData]           = useState({});  // { 'YYYY-MM-DD': calendarData }
+  const [weekData, setWeekData]           = useState({}); 
   const [loading, setLoading]             = useState(false);
   const [dragging, setDragging]           = useState(null);
   const [dragOver, setDragOver]           = useState(null);
@@ -61,15 +57,14 @@ export default function CalendarPage() {
   const [detailModal, setDetailModal]     = useState(null);
   const [allStaff, setAllStaff]           = useState([]);
   const [now, setNow]                     = useState(new Date());
-  const timelineRef                       = useRef(null);  // D&D用
+  const timelineRef                       = useRef(null); 
   const [tooltip, setTooltip]             = useState({ visible: false, appt: null, x: 0, y: 0 });
   const [showManual, setShowManual]       = useState(false);
 
-  // 週の開始日（月曜）を計算
   function getWeekStart(dateStr) {
     const d = new Date(dateStr);
     const dow = d.getDay();
-    const diff = dow === 0 ? -6 : 1 - dow; // 月曜始まり
+    const diff = dow === 0 ? -6 : 1 - dow;
     d.setDate(d.getDate() + diff);
     return d.toISOString().split('T')[0];
   }
@@ -87,7 +82,6 @@ export default function CalendarPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // 日別データ取得
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
@@ -106,7 +100,6 @@ export default function CalendarPage() {
     }).catch(() => {});
   }, []);
 
-  // 月別データ取得
   const fetchMonth = useCallback(async () => {
     try {
       const [year, month] = currentMonth.split('-').map(Number);
@@ -129,7 +122,6 @@ export default function CalendarPage() {
 
   useEffect(() => { if (viewType === 'month') fetchMonth(); }, [viewType, fetchMonth]);
 
-  // 週別データ取得
   const fetchWeek = useCallback(async () => {
     setLoading(true);
     try {
@@ -150,7 +142,6 @@ export default function CalendarPage() {
 
   useEffect(() => { if (viewType === 'week' || viewType === 'week5') fetchWeek(); }, [viewType, fetchWeek, selectedDate]);
 
-  // ── 月カレンダービュー ──────────────────────────
   if (viewType === 'month') {
     return (
       <MonthView
@@ -172,7 +163,6 @@ export default function CalendarPage() {
     );
   }
 
-  // ── 週表示ビュー ──────────────────────────────────
   if (viewType === 'week' || viewType === 'week5') {
     return (
       <WeekView
@@ -199,7 +189,6 @@ export default function CalendarPage() {
     );
   }
 
-  // ── 日別ビュー ──────────────────────────────────
   if (!calendarData) return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
@@ -208,13 +197,11 @@ export default function CalendarPage() {
 
   const { settings, chairs, slots: clinicSlots, appointments, blocks } = calendarData;
 
-  // 表示時間（診療時間外含む）※ 先に定義
   const displayStart   = settings.displayStart || settings.openTime;
   const displayEnd     = settings.displayEnd   || settings.closeTime;
   const openMin        = toMinutes(displayStart);
   const closeMin       = toMinutes(displayEnd);
 
-  // 曜日別カスタム時間を考慮した診療時間（グレーアウト判定用）
   const dow = new Date(selectedDate).getDay();
   const customHour = settings.customHours?.[dow];
   let clinicOpenMin, clinicCloseMin;
@@ -232,11 +219,9 @@ export default function CalendarPage() {
     clinicCloseMin = toMinutes(settings.closeTime);
   }
 
-  // 休診日判定（open_daysに含まれない曜日 = 終日グレーアウト）
   const openDays   = settings.openDays || [1,2,3,4,5,6];
   const isClosedDay = !openDays.includes(dow);
 
-  // 診療時間外のスロットも生成してslotsを拡張
   function genExtraSlots(fromMin, toMin, dur) {
     const s = [];
     let c = fromMin;
@@ -263,7 +248,6 @@ export default function CalendarPage() {
   const lunchTop    = slotTop(settings.lunchStart);
   const lunchHeight = durationPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
 
-  // 表示列（ドクターモードは全スタッフ表示）
   const columns = viewMode === 'chair'
     ? chairs.map(c => ({ id: c.id, label: c.name, type: 'chair' }))
     : allStaff.map(s => ({ id: s.id, label: s.name, type: 'doctor' }));
@@ -273,14 +257,10 @@ export default function CalendarPage() {
     return appointments.filter(a => a.staff_id === col.id);
   }
 
-  // =============================================
-  // 【1】D&D: ピクセル位置から5分単位で時刻計算
-  // =============================================
   function pixelToTime(e, containerEl) {
     const rect = containerEl.getBoundingClientRect();
     const y    = e.clientY - rect.top;
     const rawMin = openMin + (y / MIN_PX);
-    // 5分単位にスナップ
     const snapped = Math.round(rawMin / 5) * 5;
     return toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - 5)));
   }
@@ -312,7 +292,6 @@ export default function CalendarPage() {
   function handleDragStart(e, appt) {
     setDragging({ appointment: appt });
     e.dataTransfer.effectAllowed = 'move';
-    // ドラッグ開始位置のオフセットを記録（予約ブロック内のどこを掴んだか）
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetMin = (e.clientY - rect.top) / MIN_PX;
     e.dataTransfer.setData('offsetMin', String(Math.round(offsetMin)));
@@ -526,7 +505,6 @@ export default function CalendarPage() {
                         );
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
-                        // 診療時間外判定（休診日 or 時間外）
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
                         return (
@@ -615,11 +593,8 @@ export default function CalendarPage() {
   );
 }
 
-// =============================================
-// 週表示カレンダー（案B）
-// =============================================
 function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
-  weekOnly,  // trueなら平日(月〜金)のみ表示
+  weekOnly, 
   onSelectDate, onPrevWeek, onNextWeek, onSwitchView, onViewModeChange, onRefresh }) {
 
   const [dragging, setDragging]       = useState(null);
@@ -628,7 +603,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const [detailModal, setDetailModal]   = useState(null);
   const [tooltip, setTooltip]           = useState({ visible: false, appt: null, x: 0, y: 0 });
 
-  // 週の日付リスト（月〜日）
   function getWeekStart(ds) {
     const d = new Date(ds); const dow = d.getDay();
     d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
@@ -639,12 +613,10 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
     const d = new Date(weekStart); d.setDate(d.getDate() + i);
     return d.toISOString().split('T')[0];
   });
-  // 5日表示なら土日を除外
   const weekDates = weekOnly
     ? allWeekDates.filter(ds => { const dow = new Date(ds).getDay(); return dow >= 1 && dow <= 5; })
     : allWeekDates;
 
-  // 設定は最初の有効な日から取得
   const firstData  = Object.values(weekData).find(d => d?.settings);
   const settings   = firstData?.settings;
   const chairs     = firstData?.chairs || [];
@@ -668,23 +640,21 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const SLOT_H     = 48;
   const MIN_PX     = SLOT_H / settings.slotDuration;
   const HEADER_H   = 72;
-  const COL_W      = weekOnly ? 160 : 120;  // 5日表示は列幅を広く
+  const COL_W      = weekOnly ? 160 : 120; 
   const TIME_W     = 48;
   const timelineH  = totalMin * MIN_PX;
 
-  // チェア別カラー（最大8チェア対応）
   const CHAIR_COLORS = [
-    { bg: '#3b82f6', light: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }, // blue
-    { bg: '#10b981', light: '#f0fdf4', border: '#a7f3d0', text: '#065f46' }, // green
-    { bg: '#f59e0b', light: '#fffbeb', border: '#fde68a', text: '#92400e' }, // amber
-    { bg: '#8b5cf6', light: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' }, // violet
-    { bg: '#ef4444', light: '#fef2f2', border: '#fecaca', text: '#991b1b' }, // red
-    { bg: '#06b6d4', light: '#ecfeff', border: '#a5f3fc', text: '#155e75' }, // cyan
-    { bg: '#ec4899', light: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' }, // pink
-    { bg: '#84cc16', light: '#f7fee7', border: '#d9f99d', text: '#3f6212' }, // lime
+    { bg: '#3b82f6', light: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
+    { bg: '#10b981', light: '#f0fdf4', border: '#a7f3d0', text: '#065f46' },
+    { bg: '#f59e0b', light: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    { bg: '#8b5cf6', light: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
+    { bg: '#ef4444', light: '#fef2f2', border: '#fecaca', text: '#991b1b' },
+    { bg: '#06b6d4', light: '#ecfeff', border: '#a5f3fc', text: '#155e75' },
+    { bg: '#ec4899', light: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' },
+    { bg: '#84cc16', light: '#f7fee7', border: '#d9f99d', text: '#3f6212' },
   ];
 
-  // 週全体の最大予約数（稼働率バーの基準）
   const weekMaxAppts = Math.max(
     ...weekDates.map(ds => (weekData[ds]?.appointments?.length || 0)), 1
   );
@@ -692,7 +662,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   function slotTop(t) { return (toMinutes(t) - openMin) * MIN_PX; }
   function durPx(m)   { return m * MIN_PX; }
 
-  // スロット生成（全日共通）
   function genSlots(oMin, cMin, dur) {
     const s = []; let c = oMin;
     while (c + dur <= cMin) { s.push(toTimeStr(c)); c += dur; }
@@ -700,11 +669,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   }
   const allSlots = genSlots(openMin, closeMin, settings.slotDuration);
 
-  // 診療時間（曜日別カスタム考慮）
   function getClinicHours(dateStr) {
     const dow = new Date(dateStr).getDay();
     const ch  = settings.customHours?.[dow];
-    // 空文字・null・undefinedはカスタム設定なし
     if (ch && ch !== '') {
       try {
         const p = typeof ch === 'string' ? JSON.parse(ch) : ch;
@@ -721,9 +688,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const showNow = nowMin >= openMin && nowMin <= closeMin && weekDates.includes(today);
   const todayColIdx = weekDates.indexOf(today);
 
-  // =============================================
-  // 【1+2】週表示: ピクセルD&D + 日またぎ対応
-  // =============================================
   function weekPixelToTime(e, containerEl) {
     const rect = containerEl.getBoundingClientRect();
     const y    = e.clientY - rect.top;
@@ -738,29 +702,26 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   }
   function handleDragEnd() { setDragging(null); setDragOver(null); }
 
-  // 【2】同時刻の予約を重なり表示するレイアウト計算
   function calcOverlapLayout(appts) {
     if (!appts.length) return [];
     const sorted = [...appts].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
 
-    // 各予約に「列」を割り当てる（Googleカレンダー方式）
-    const cols = []; // cols[i] = その列に最後に入れた予約のend_time(分)
-    const colIdx = {}; // appt.id → 列インデックス
+    const cols = [];
+    const colIdx = {};
 
     sorted.forEach(appt => {
       const start = toMinutes(appt.start_time);
       const end   = toMinutes(appt.end_time);
-      // 空いている列を探す
       let placed = false;
       for (let i = 0; i < cols.length; i++) {
-        if (cols[i] <= start) { // この列は空いている
+        if (cols[i] <= start) {
           cols[i] = end;
           colIdx[appt.id] = i;
           placed = true;
           break;
         }
       }
-      if (!placed) { // 新しい列を追加
+      if (!placed) {
         colIdx[appt.id] = cols.length;
         cols.push(end);
       }
@@ -768,13 +729,10 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
     const totalCols = cols.length;
 
-    // 各予約が重なるグループを検出してwidth調整
-    // 単純に: 同じ時間帯に重なる予約の最大列数に合わせてwidthを決める
     return sorted.map(appt => {
       const col = colIdx[appt.id];
       const aStart = toMinutes(appt.start_time);
       const aEnd   = toMinutes(appt.end_time);
-      // この予約と重なる全予約を取得
       const overlapping = sorted.filter(b =>
         toMinutes(b.start_time) < aEnd && toMinutes(b.end_time) > aStart
       );
@@ -788,7 +746,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
     });
   }
 
-  // 週の範囲表示
   const wStart = new Date(weekDates[0]);
   const wEnd   = new Date(weekDates[weekDates.length - 1]);
   const rangeStr = weekOnly
@@ -845,21 +802,17 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const d        = new Date(dateStr);
               const dow      = d.getDay();
               const isToday  = dateStr === today;
-              // customHoursが設定されている場合はopenDaysになくても診療あり
               const hasCustomHours = !!(settings.customHours?.[dow]);
               const isClosed = !openDays.includes(dow) && !hasCustomHours;
-              // 部分診療判定（openDaysにあるがcustomHoursで短縮されている）
               const isPartialDay = hasCustomHours && openDays.includes(dow);
               const dayAppts = weekData[dateStr]?.appointments || [];
               const DOW_LABEL = ['日','月','火','水','木','金','土'];
               const count    = dayAppts.length;
               const barPct   = Math.round((count / weekMaxAppts) * 100);
-              // 混雑度カラー
               const barColor = isClosed ? '#e5e7eb'
                 : barPct >= 80 ? '#ef4444'
                 : barPct >= 50 ? '#3b82f6'
                 : '#22c55e';
-              // チェアカラー（列インデックスでなく日付ベースで固定）
               const chColor = isClosed ? { bg:'#9ca3af', light:'#f9fafb', border:'#e5e7eb', text:'#6b7280' }
                 : CHAIR_COLORS[colIdx % CHAIR_COLORS.length];
 
@@ -1109,15 +1062,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 }
 
 
-// =============================================
-// ②ホバーツールチップ
-// =============================================
 function ApptTooltip({ appt, visible, x, y }) {
   if (!visible || !appt) return null;
 
-  // ダークモード判定
   const isDark = document.documentElement.classList.contains('dark');
-  const bg        = isDark ? '#f1f5f9' : '#1e293b';   // ダーク時は白系、ライト時は濃紺
+  const bg        = isDark ? '#f1f5f9' : '#1e293b';  
   const textMain  = isDark ? '#0f172a' : '#f8fafc';
   const textSub   = isDark ? '#334155' : '#cbd5e1';
   const textGreen = isDark ? '#065f46' : '#6ee7b7';
@@ -1129,7 +1078,6 @@ function ApptTooltip({ appt, visible, x, y }) {
     ? '0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08)'
     : '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)';
 
-  // 画面右端にはみ出さないよう位置調整
   const tooltipW  = 230;
   const left = x + 14 + tooltipW > window.innerWidth ? x - tooltipW - 8 : x + 14;
   const arrowLeft = x + 14 + tooltipW > window.innerWidth;
@@ -1203,16 +1151,12 @@ function ApptTooltip({ appt, visible, x, y }) {
   );
 }
 
-// =============================================
-// 【月カレンダー強化版】
-// =============================================
 function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelectDate, onSwitchToDay }) {
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth   = new Date(year, month, 0).getDate();
   const firstDow      = new Date(year, month-1, 1).getDay();
   const today         = new Date().toISOString().split('T')[0];
 
-  // 月合計統計
   const monthStats = Object.values(monthData).reduce((acc, data) => {
     if (!data) return acc;
     acc.total += data.appointments?.length || 0;
@@ -1225,10 +1169,8 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
     cells.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
   }
 
-  // チェア稼働率計算（その日の最大チェア数に対する割合）
   function getOccupancyRate(appts, maxChairs = 3) {
     if (!appts || appts.length === 0) return 0;
-    // 簡易計算：予約数 / (営業スロット数 * チェア数) 
     return Math.min(100, Math.round((appts.length / (16 * maxChairs)) * 100));
   }
 
@@ -1284,12 +1226,10 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             const isPast   = dateStr < today;
             const isHoliday = data && settings && !data.slots?.length;
 
-            // 治療カラードット用（重複除去）
             const treatmentColors = [...new Set(appts.map(a => a.treatment_type))]
               .slice(0, 5)
               .map(t => getTreatmentColor(t).bg);
 
-            // 稼働率バー
             const maxChairs = settings?.maxChairs || 3;
             const occupancy = getOccupancyRate(appts, maxChairs);
 
@@ -1365,9 +1305,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
   );
 }
 
-// =============================================
-// 新規予約モーダル【4修正: データ取得を修正】
-// =============================================
 function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, onSave }) {
   const [patients, setPatients]               = useState([]);
   const [patientSearch, setPatientSearch]     = useState('');
@@ -1394,7 +1331,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
           axios.get('/api/treatments'),
           axios.get('/api/staff')
         ]);
-        // 【4修正】レスポンス形式に対応
         const treatList = tr.data?.treatments || tr.data || [];
         const staffArr  = st.data?.staff      || st.data || [];
         setTreatments(Array.isArray(treatList) ? treatList : []);
@@ -1577,14 +1513,11 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
   );
 }
 
-// =============================================
-// 予約詳細モーダル【1】患者編集対応
-// =============================================
 function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   const [notes, setNotes]             = useState(appt.notes || '');
   const [saving, setSaving]           = useState(false);
   const [editPatient, setEditPatient] = useState(false);
-  const [reschedule, setReschedule]   = useState(false); // 日程変更モード
+  const [reschedule, setReschedule]   = useState(false);
   const color = getTreatmentColor(appt.treatment_type);
 
   async function handleSave() {
@@ -1694,9 +1627,6 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   );
 }
 
-// =============================================
-// 日程変更モーダル（案A）
-// =============================================
 function RescheduleModal({ appt, onClose, onSave }) {
   const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
   const [newDate, setNewDate]       = useState(appt.appointment_date);
@@ -1708,19 +1638,16 @@ function RescheduleModal({ appt, onClose, onSave }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const color = getTreatmentColor(appt.treatment_type);
 
-  // チェア一覧取得
   useEffect(() => {
     axios.get('/api/appointments/calendar/' + newDate)
       .then(r => { setChairs(r.data?.chairs || []); })
       .catch(() => {});
   }, []);
 
-  // 日付変更時に空き枠を取得
   useEffect(() => {
     setLoadingSlots(true);
     axios.get(`/api/appointments/available-slots/${newDate}`)
       .then(r => {
-        // 自分以外の枠を取得
         const allSlots = r.data?.slots || [];
         setSlots(allSlots);
       })
@@ -1838,9 +1765,6 @@ function RescheduleModal({ appt, onClose, onSave }) {
   );
 }
 
-// =============================================
-// 患者編集モーダル（カレンダーから開く）
-// =============================================
 function PatientEditModal({ patientId, onClose, onSave }) {
   const [patient, setPatient] = useState(null);
   const [form, setForm]       = useState({});
@@ -1853,7 +1777,6 @@ function PatientEditModal({ patientId, onClose, onSave }) {
       .catch(() => alert('患者情報の取得に失敗しました'));
   }, [patientId]);
 
-  // 年代を生年月日から自動計算
   function calcAgeGroup(birthDate) {
     if (!birthDate) return null;
     const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
@@ -1870,7 +1793,6 @@ function PatientEditModal({ patientId, onClose, onSave }) {
     if (!validateKana(form.name_kana)) return;
     setSaving(true);
     try {
-      // 生年月日があれば年代を自動更新
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
       await axios.put(`/api/patients/${patientId}`, { ...form, age_group });
       onSave();
