@@ -946,7 +946,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff',
                     cursor: 'pointer',
                   }}
-                  className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
+                  className="border-r border-gray-100 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
 
                   {/* 上段: 曜日 + 日付 */}
                   <div className="flex items-center justify-between mb-1">
@@ -1046,7 +1046,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     borderLeft: `2px solid ${chColor.border}`,
                     background: isToday ? chColor.light + '60' : 'transparent',
                   }}
-                  className="relative border-r border-gray-100 last:border-r-0"
+                  className="relative"
                   onDragOver={e => {
                     e.preventDefault();
                     const time = weekPixelToTime(e, e.currentTarget);
@@ -1623,7 +1623,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
                   {showPatientList && patients.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto mt-1">
                       {patients.map(p => (
-                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0"
+                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50"
                           onClick={() => { setSelectedPatient(p); setPatientSearch(''); setShowPatientList(false); }}>
                           <span className="font-medium">{p.name_kana}</span>
                           <span className="text-gray-500 ml-1">{p.name}</span>
