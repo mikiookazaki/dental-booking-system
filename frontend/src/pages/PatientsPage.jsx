@@ -59,7 +59,15 @@ export default function PatientsPage() {
     if (kanaErr) { setErrors({ name_kana: kanaErr }); return }
     try {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group
-      await axios.put(`/api/patients/${editPatient.id}`, { ...form, age_group })
+      const payload = {
+        ...form,
+        age_group,
+        birth_date:     form.birth_date     || null,
+        gender:         form.gender         || null,
+        postal_code:    form.postal_code    || null,
+        referral_source: form.referral_source || null,
+      }
+      await axios.put(`/api/patients/${editPatient.id}`, payload)
       setShowModal(false)
       setEditPatient(null)
       setForm({ name:'', name_kana:'', phone:'', birth_date:'', gender:'', age_group:'', postal_code:'', referral_source:'', notes:'' })
@@ -108,7 +116,15 @@ export default function PatientsPage() {
     if (!validate()) return
     try {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
-      await axios.post('/api/patients', { ...form, age_group })
+      const payload = {
+        ...form,
+        age_group,
+        birth_date:     form.birth_date     || null,
+        gender:         form.gender         || null,
+        postal_code:    form.postal_code    || null,
+        referral_source: form.referral_source || null,
+      }
+      await axios.post('/api/patients', payload)
       setShowModal(false)
       setForm({ name: '', name_kana: '', phone: '', birth_date: '', gender: '', age_group: '', postal_code: '', referral_source: '' })
       setErrors({})
@@ -416,8 +432,6 @@ export default function PatientsPage() {
                   <option value="SNS・Instagram">SNS・Instagram</option>
                   <option value="ご紹介">ご紹介</option>
                   <option value="看板・チラシ">看板・チラシ</option>
-                  <option value="TVCM">TVCM</option>
-                <option value="公式HP">公式HP</option>
                   <option value="その他">その他</option>
                 </select>
               </div>
