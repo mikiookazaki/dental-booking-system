@@ -490,7 +490,7 @@ export default function CalendarPage() {
                             onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                            className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
+                            className={'absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ' + (dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5')}
                             style={{ top: top+2, height: height-4, background: color.light, borderLeft: '4px solid ' + color.bg, border: '1px solid ' + color.border, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
@@ -544,9 +544,10 @@ export default function CalendarPage() {
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
                         // 診療時間外判定（休診日 or 時間外）
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
+                        const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
                         return (
                           <div key={slot}
-                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group ${isOutOfHours ? 'bg-gray-100 border-gray-100 ' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50 '}`}
+                            className={slotCls}
                             style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
                             onDragOver={e => e.preventDefault()}
                             onClick={() => setNewApptModal({
@@ -564,7 +565,7 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: 0, transition: "opacity 0.15s" }} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>
-                              <span className={`text-xs ${isOutOfHours ? 'text-orange-400' : 'text-blue-400'}`}>
+                              <span className={'text-xs ' + (isOutOfHours ? 'text-orange-400' : 'text-blue-400')}>
                                 {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
                               </span>
                             </div>
