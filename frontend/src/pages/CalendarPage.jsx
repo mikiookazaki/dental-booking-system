@@ -274,30 +274,6 @@ export default function CalendarPage() {
     return toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - 5)));
   }
 
-  function handleColDragOver(colId) {
-    return e => {
-      e.preventDefault();
-      const time = pixelToTime(e, e.currentTarget);
-      setDragOver({ slot: time, colId });
-    };
-  }
-
-  function handleColDrop(colId) {
-    return e => {
-      e.preventDefault();
-      if (!dragging) return;
-      const appt = dragging.appointment;
-      const time = pixelToTime(e, e.currentTarget);
-      const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
-      const newEndTime = toTimeStr(toMinutes(time) + durationMin);
-      const body = { appointment_date: selectedDate, start_time: time, end_time: newEndTime };
-      if (viewMode === 'chair') body.chair_id = colId;
-      else body.staff_id = colId;
-      moveAppointment(appt.id, body);
-      setDragging(null); setDragOver(null);
-    };
-  }
-
   function handleDragStart(e, appt) {
     setDragging({ appointment: appt });
     e.dataTransfer.effectAllowed = 'move';
@@ -412,7 +388,7 @@ export default function CalendarPage() {
                       </span>
                     </div>
 
-                    <div className="relative" style={{ height: timelineHeight }} onDragOver={handleColDragOver(col.id)} onDrop={handleColDrop(col.id)}>
+                    <div className="relative" style={{ height: timelineHeight }} onDragOver={e => handleColDragOver(e, col.id, e.currentTarget)} onDrop={e => handleColDrop(e, col.id, e.currentTarget)}>
                       <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10" style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
