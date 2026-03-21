@@ -15,4 +15,15 @@ export default defineConfig({
       },
     },
   },
+  esbuild: {
+    // JSXファイルはreact()プラグイン（Babel）で処理するためesbuildのJSX処理を無効化
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+    },
+  },
 })

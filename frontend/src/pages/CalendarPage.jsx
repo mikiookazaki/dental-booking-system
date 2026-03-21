@@ -334,7 +334,8 @@ export default function CalendarPage() {
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                className={`px-3 py-2 text-sm font-medium transition-colors
+                  ${viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 {label}表示
               </button>
             ))}
@@ -348,7 +349,10 @@ export default function CalendarPage() {
               <input type="date" value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
                 className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
-              <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md ${new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' : new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' : 'text-gray-600 bg-gray-50'}`}>
+              <span className={`text-sm font-bold px-1.5 py-0.5 rounded-md
+                ${new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' :
+                  new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' :
+                  'text-gray-600 bg-gray-50'}`}>
                 （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
               </span>
             </div>
@@ -360,7 +364,8 @@ export default function CalendarPage() {
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
               <button key={v} onClick={() => setViewMode(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                className={`px-3 py-2 text-sm font-medium transition-colors
+                  ${viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 {label}
               </button>
             ))}
@@ -396,7 +401,7 @@ export default function CalendarPage() {
             ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
           </span>
         </div>
-      </div>{/* end-fixed header */}
+      </div>{/* /fixed header */}
 
       {/* スクロール領域（ヘッダー高さ分パディング） */}
       <div className="px-4 py-3" style={{ paddingTop: 120 }}>
@@ -438,7 +443,7 @@ export default function CalendarPage() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
                       className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
-                        <span>{viewMode === 'chair' ? '🦷' : '👨‍⚕️'}</span> <span>{col.label}</span>
+                        {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
                       </span>
                     </div>
 
@@ -466,6 +471,32 @@ export default function CalendarPage() {
                         style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
+
+                      {/* 中間の列名ラベル（スクロール位置確認用） */}
+                      {(() => {
+                        // 昼休みあり→昼休み後、昼休みなし→タイムライン中間に表示
+                        const hasLunch = settings.hasLunchBreak !== false && lunchHeight > 0
+                        const midTop = hasLunch
+                          ? lunchTop + lunchHeight
+                          : Math.floor(timelineHeight / 2)
+                        return (
+                          <div className="absolute left-0 right-0 pointer-events-none"
+                            style={{ top: midTop, zIndex: 8 }}>
+                            <div style={{
+                              background: 'rgba(239,246,255,0.92)',
+                              borderTop: '1px solid #bfdbfe',
+                              borderBottom: '2px solid #bfdbfe',
+                              padding: '3px 0',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: '#1d4ed8',
+                              textAlign: 'center',
+                            }}>
+                              {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
@@ -496,7 +527,9 @@ export default function CalendarPage() {
                             onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                            className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
+                            className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing
+                              shadow-sm transition-all select-none z-20
+                              ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
                             style={{ top: top+2, height: height-4,
                               background: color.light, borderLeft: `4px solid ${color.bg}`,
                               border: `1px solid ${color.border}`, borderLeftWidth: 4 }}>
@@ -554,8 +587,13 @@ export default function CalendarPage() {
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         return (
                           <div key={slot}
-                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group ${isDragTarget ? 'border-blue-200' : isOutOfHours ? 'border-gray-100' : 'border-gray-50'}`}
-                            style={{ top: slotTop(slot), height: SLOT_HEIGHT, background: isOutOfHours ? 'rgba(249,250,251,0.8)' : isDragTarget ? '#eff6ff' : 'transparent' }}
+                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group
+                              ${isOutOfHours
+                                ? 'bg-gray-50/80 border-gray-100 hover:bg-orange-50/50'
+                                : isDragTarget
+                                  ? 'bg-blue-50 border-blue-200'
+                                  : 'border-gray-50 hover:bg-blue-50/50'}`}
+                            style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
                             onDragOver={e => e.preventDefault()}
                             onClick={() => setNewApptModal({
                               slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id,
@@ -572,7 +610,7 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <span style={{ fontSize: 12, color: isOutOfHours ? '#fb923c' : '#60a5fa' }}>
+                              <span className={`text-xs ${isOutOfHours ? 'text-orange-400' : 'text-blue-400'}`}>
                                 {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
                               </span>
                             </div>
@@ -607,7 +645,7 @@ export default function CalendarPage() {
         />
       )}
       <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
-      </div>{/* end-content */}
+      </div>{/* /content */}
 
       {/* マニュアルサイドパネル */}
       {showManual && (
@@ -831,7 +869,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                 {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
                   <button key={v} onClick={() => onSwitchView(v)}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${(v === 'week' && !weekOnly) || (v === 'week5' && weekOnly) ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors
+                      ${(v === 'week' && !weekOnly) || (v === 'week5' && weekOnly)
+                        ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                     {label}表示
                   </button>
                 ))}
@@ -1037,19 +1077,19 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {/* 休診日オーバーレイ */}
                   {isClosed && (
-                    <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gray-100/70 z-10 flex items-center justify-center">
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
                     </div>
                   )}
 
                   {/* 時間外グレーアウト（上） */}
                   {!isClosed && clinicH.open > openMin && (
-                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
+                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
                       style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
                   {/* 時間外グレーアウト（下） - closeMin(displayEnd)との比較に修正 */}
                   {!isClosed && clinicH.close < closeMin && (
-                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
+                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
                       style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
 
@@ -1082,7 +1122,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                         onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
                         onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                         onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                        className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
+                        className={`absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all
+                          ${isDrag ? 'opacity-40' : 'hover:shadow-lg'}`}
                         style={{
                           top: top + 1, height: Math.max(height - 2, 18),
                           left: `${left + 0.5}%`, width: `${width - 1}%`,
@@ -1351,7 +1392,8 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         {/* 曜日ヘッダー */}
         <div className="grid grid-cols-7 border-b border-gray-100">
           {['日','月','火','水','木','金','土'].map((d, i) => (
-            <div key={d} className={`py-2 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
+            <div key={d} className={`py-2 text-center text-xs font-bold
+              ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
               {d}
             </div>
           ))}
@@ -1361,7 +1403,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         <div className="grid grid-cols-7">
           {cells.map((dateStr, idx) => {
             if (!dateStr) return (
-              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50" />
+              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50/30" />
             );
             const data     = monthData[dateStr];
             const appts    = data?.appointments || [];
@@ -1383,11 +1425,17 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             return (
               <div key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
-                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ${isToday ? 'bg-blue-50 border-blue-100' : ''} ${isPast && !isToday ? 'bg-gray-50' : ''} ${!isPast && !isToday ? '' : ''}`}>
+                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group
+                  ${isToday ? 'bg-blue-50 border-blue-100' : ''}
+                  ${isPast && !isToday ? 'bg-gray-50/40' : ''}
+                  ${!isPast && !isToday ? 'hover:bg-blue-50/20' : ''}`}>
 
                 {/* 日付 + 件数バッジ */}
                 <div className="flex items-center justify-between mb-1">
-                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
+                  <div className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0
+                    ${isToday ? 'bg-blue-600 text-white' :
+                      dow === 0 ? 'text-red-500' :
+                      dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
                     {new Date(dateStr).getDate()}
                   </div>
                   {appts.length > 0 && (
@@ -1551,7 +1599,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
   const color = selectedTreatment ? getTreatmentColor(selectedTreatment.name) : DEFAULT_COLOR;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: color.light }}>
           <div>
@@ -1729,7 +1777,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="px-5 py-4 rounded-t-2xl" style={{ background: color.light }}>
           <div className="flex items-start justify-between">
@@ -1737,7 +1785,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               <div className="flex items-center gap-2">
                 <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
                 <button onClick={() => setEditPatient(true)}
-                  className="p-1 rounded-lg hover: transition-colors" title="患者情報を編集">
+                  className="p-1 rounded-lg hover:bg-black/10 transition-colors" title="患者情報を編集">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -1748,7 +1796,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
             </div>
             {/* ①Xボタンを強調 */}
             <button onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
+              className="w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
               title="閉じる">✕</button>
           </div>
         </div>
@@ -1864,7 +1912,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
     newChairId !== appt.chair_id;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         {/* ヘッダー */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -1910,7 +1958,10 @@ function RescheduleModal({ appt, onClose, onSave }) {
                     <button key={slot.time} type="button"
                       onClick={() => isAvailable && setNewTime(slot.time)}
                       disabled={!isAvailable}
-                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600' : isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'}`}>
+                      className={`py-1.5 rounded-lg text-xs font-medium border transition-all
+                        ${isSelected ? 'bg-blue-600 text-white border-blue-600' :
+                          isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' :
+                          'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'}`}>
                       {slot.time}
                     </button>
                   );
@@ -1927,7 +1978,8 @@ function RescheduleModal({ appt, onClose, onSave }) {
                 {chairs.map(c => (
                   <button key={c.id} type="button"
                     onClick={() => setNewChairId(c.id)}
-                    className={`py-2 rounded-lg text-xs font-medium border transition-all ${newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'}`}>
+                    className={`py-2 rounded-lg text-xs font-medium border transition-all
+                      ${newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'}`}>
                     {c.name}
                   </button>
                 ))}
@@ -2004,7 +2056,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   }
 
   if (!patient) return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" /></div>
     </div>
   );
@@ -2013,7 +2065,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   const autoAgeGroup = form.birth_date ? calcAgeGroup(form.birth_date) : null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">患者情報編集</h2>
@@ -2067,7 +2119,8 @@ function PatientEditModal({ patientId, onClose, onSave }) {
                 {AGE_GROUPS.map(ag => (
                   <button key={ag} type="button"
                     onClick={() => setForm(f => ({...f, age_group: ag}))}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition-all border ${form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50'}`}>
+                    className={`py-1.5 rounded-lg text-xs font-medium transition-all border
+                      ${form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50'}`}>
                     {ag}
                   </button>
                 ))}
