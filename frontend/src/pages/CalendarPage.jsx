@@ -349,12 +349,10 @@ export default function CalendarPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* ヘッダー固定【3】 */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm px-4 py-3" style={{ marginLeft: 224 }}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* 月・週・5日・日切替 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
               <button key={v} onClick={() => setViewType(v)}
@@ -363,8 +361,6 @@ export default function CalendarPage() {
               </button>
             ))}
           </div>
-
-          {/* 日付ナビ */}
           <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }}
               className="text-gray-500 hover:text-blue-600">◀</button>
@@ -379,8 +375,6 @@ export default function CalendarPage() {
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }}
               className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
-
-          {/* チェア・ドクター切替【3】 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
               <button key={v} onClick={() => setViewMode(v)}
@@ -408,7 +402,6 @@ export default function CalendarPage() {
           </button>
           </div>
         </div>
-        {/* 治療凡例 */}
         <div className="flex flex-wrap gap-1.5 mt-2 items-center">
           {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
             <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
@@ -420,25 +413,19 @@ export default function CalendarPage() {
             ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
           </span>
         </div>
-      </div>{/* end-fixed header */}
+      </div>
 
-      {/* スクロール領域（ヘッダー高さ分パディング） */}
       <div className="px-4 py-3" style={{ paddingTop: 120 }}>
       {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
-
-      {/* ドクターモードで予約なし */}
       {viewMode === "doctor" && allStaff.length === 0 && (
         <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
           本日の予約はありません
         </div>
       )}
-
-      {/* タイムライン */}
       {(viewMode === 'chair' || columns.length > 0) && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100"
           style={{ overflowX: 'auto', overflowY: 'visible' }}>
           <div style={{ display: 'flex', minWidth: (64 + columns.length * 160) + 'px' }}>
-            {/* 時刻軸 */}
             <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
               <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
               <div className="relative" style={{ height: timelineHeight }}>
@@ -450,8 +437,6 @@ export default function CalendarPage() {
                 ))}
               </div>
             </div>
-
-            {/* 列 */}
             <div style={{ flex: 1, display: 'flex' }}>
               {columns.map((col, colIdx) => (
                 <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160, borderRight: colIdx < columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
@@ -464,13 +449,10 @@ export default function CalendarPage() {
                     <div className="relative" style={{ height: timelineHeight }}
                       onDragOver={handleColDragOver(col.id)}
                       onDrop={handleColDrop(col.id)}>
-                      {/* 昼休み */}
                       <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                         style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
-
-                      {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
                         <div className="pointer-events-none z-30"
                           style={{ position: 'absolute', top: nowTop, left: -64, width: (columns.length * 161 + 64) + 'px' }}>
@@ -483,8 +465,6 @@ export default function CalendarPage() {
                           </div>
                         </div>
                       )}
-
-                      {/* 予約ブロック */}
                       {getApptsForColumn(col).map(appt => {
                         const top    = (toMinutes(appt.start_time) - openMin) * MIN_PX;
                         const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
@@ -527,8 +507,6 @@ export default function CalendarPage() {
                           </div>
                         );
                       })}
-
-                      {/* D&Dプレビューライン（5分単位） */}
                       {dragOver?.colId === col.id && (
                         <div className="absolute left-0 right-0 pointer-events-none z-30"
                           style={{ top: slotTop(dragOver.slot), height: 2, background: '#3b82f6' }}>
@@ -538,8 +516,6 @@ export default function CalendarPage() {
                           </span>
                         </div>
                       )}
-
-                      {/* 空きスロット（時間外グレーアウト対応）*/}
                       {slots.map(slot => {
                         const slotMin    = toMinutes(slot);
                         const slotEndMin = slotMin + settings.slotDuration;
@@ -562,7 +538,6 @@ export default function CalendarPage() {
                               slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id,
                               isOutOfHours
                             })}>
-                            {/* 時間外ラベル */}
                             {isOutOfHours && colIdx === 0 && (
                               <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none"
                                 style={{ fontSize: 9 }}>時間外</div>
@@ -608,9 +583,8 @@ export default function CalendarPage() {
         />
       )}
       <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
-      </div>{/* end-content */}
+      </div>
 
-      {/* マニュアルサイドパネル */}
       {showManual && (
         <div style={{
           position: 'fixed', top: 0, right: 0, bottom: 0,
@@ -823,7 +797,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      {/* 週ヘッダー fixed */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm" style={{ marginLeft: 224 }}>
         <div className="px-4 py-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -842,7 +815,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
                 <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
               </div>
-              {/* 週表示はチェア・ドクター切替不要のためコメントアウト */}
               <button onClick={onRefresh}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
                 🔄 更新
@@ -859,18 +831,11 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           </div>
         </div>
       </div>
-
-      {/* コンテンツ（ヘッダー分パディング） */}
       <div className="px-4" style={{ paddingTop: 110 }}>
       {loading && <div className="text-center py-4 text-gray-400 text-sm animate-pulse">読み込み中...</div>}
-
-      {/* 週グリッド */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
         <div style={{ minWidth: TIME_W + COL_W * 7 }}>
-
-          {/* 曜日ヘッダー（週サマリーバー + チェア別カラー） */}
           <div className="flex border-b border-gray-200" style={{ height: HEADER_H }}>
-            {/* 時刻軸ヘッダー */}
             <div style={{ width: TIME_W, flexShrink: 0 }}
               className="bg-gray-50 border-r border-gray-100 flex flex-col items-center justify-end pb-1.5">
               <span className="text-gray-400" style={{ fontSize: 9 }}>時刻</span>
@@ -908,8 +873,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     cursor: 'pointer',
                   }}
                   className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
-
-                  {/* 上段: 曜日 + 日付 */}
                   <div className="flex items-center justify-between mb-1">
                     <span style={{
                       fontSize: 11, fontWeight: 700,
@@ -930,8 +893,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       {d.getDate()}
                     </span>
                   </div>
-
-                  {/* 下段: サマリーバー + 件数 */}
                   {isClosed ? (
                     <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', marginTop: 2 }}>休診</div>
                   ) : isPartialDay ? (
@@ -970,10 +931,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               );
             })}
           </div>
-
-          {/* タイムライン */}
           <div className="flex">
-            {/* 時刻軸 */}
             <div className="bg-gray-50 border-r border-gray-100 relative flex-shrink-0"
               style={{ width: TIME_W, height: timelineH }}>
               {allSlots.map(slot => (
@@ -983,8 +941,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 </div>
               ))}
             </div>
-
-            {/* 各日列 */}
             {weekDates.map((dateStr, dayIdx) => {
               const dow         = new Date(dateStr).getDay();
               const hasCustomH  = !!(settings.customHours?.[dow]);
@@ -1035,40 +991,29 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const firstChair = weekData[dateStr]?.chairs?.[0];
                     setNewApptModal({ slot: time, chairId: firstChair?.id, date: dateStr });
                   }}>
-
-                  {/* 休診日オーバーレイ */}
                   {isClosed && (
                     <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
                     </div>
                   )}
-
-                  {/* 時間外グレーアウト（上） */}
                   {!isClosed && clinicH.open > openMin && (
                     <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
                       style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
-                  {/* 時間外グレーアウト（下） - closeMin(displayEnd)との比較に修正 */}
                   {!isClosed && clinicH.close < closeMin && (
                     <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
                       style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
-
-                  {/* 昼休み */}
                   <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                     style={{ top: lunchS, height: lunchH2 }}>
                     {dayIdx === 0 && <span className="text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>}
                   </div>
-
-                  {/* 現在時刻ライン */}
                   {showNow && dayIdx === 0 && (
                     <div className="pointer-events-none z-30"
                       style={{ position: 'absolute', top: nowTop, left: 0, width: COL_W * 7, height: 2, background: '#ef4444' }}>
                       <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
                     </div>
                   )}
-
-                  {/* 【2】重なり対応予約ブロック */}
                   {layout.map(({ appt, left, width, zIndex }) => {
                     const top    = (toMinutes(appt.start_time) - openMin) * MIN_PX;
                     const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
@@ -1116,9 +1061,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     );
                   })}
 
-                  {/* ドロップゾーンは列全体のdivで処理 - 下のonDragOver・onDropを使用 */}
-
-                  {/* D&Dプレビューライン */}
                   {dragOver?.dateStr === dateStr && (
                     <div className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(dragOver.slot), zIndex: 40 }}>
                       <div style={{ height: 2, background: '#3b82f6', position: 'relative' }}>
@@ -1129,8 +1071,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       </div>
                     </div>
                   )}
-
-                  {/* スロット罫線 */}
                   {allSlots.map(slot => {
                     const isHour = toMinutes(slot) % 60 === 0;
                     return (
@@ -1144,8 +1084,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           </div>
         </div>
       </div>
-
-      {/* 新規予約モーダル */}
       {newApptModal && (
         <NewAppointmentModal
           slot={newApptModal.slot}
@@ -1157,8 +1095,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           onSave={() => { setNewApptModal(null); onRefresh(); }}
         />
       )}
-
-      {/* 詳細モーダル */}
       {detailModal && (
         <AppointmentDetailModal
           appt={detailModal.appt}
@@ -1166,7 +1102,6 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           onUpdate={() => { setDetailModal(null); onRefresh(); }}
         />
       )}
-      {/* ホバーツールチップ */}
       <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
       </div>
     </div>
@@ -1210,7 +1145,6 @@ function ApptTooltip({ appt, visible, x, y }) {
       width: tooltipW,
       border: `1px solid ${border}`,
     }}>
-      {/* 患者名 */}
       <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
         {appt.name_kana || appt.patient_name}
@@ -1220,17 +1154,11 @@ function ApptTooltip({ appt, visible, x, y }) {
           {appt.patient_name}
         </div>
       )}
-
-      {/* 区切り線 */}
       <div style={{ borderTop: '1px solid ' + (isDark ? '#e2e8f0' : '#334155'), margin: '5px 0' }} />
-
-      {/* 治療内容 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 10, color: textSub }}>治療</span>
         <span style={{ fontWeight: 600, color: textGreen }}>{appt.treatment_type}</span>
       </div>
-
-      {/* 日時 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 10, color: textSub }}>日時</span>
         <span style={{ color: textBlue }}>
@@ -1238,16 +1166,12 @@ function ApptTooltip({ appt, visible, x, y }) {
           {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
         </span>
       </div>
-
-      {/* チェア・担当 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ fontSize: 10, color: textSub }}>担当</span>
         <span style={{ color: textAmber }}>
           {appt.chair_name} &nbsp;/&nbsp; Dr.{appt.doctor_name || '未定'}
         </span>
       </div>
-
-      {/* 申し送り */}
       {appt.notes && (
         <div style={{
           marginTop: 5, padding: '4px 6px',
@@ -1258,8 +1182,6 @@ function ApptTooltip({ appt, visible, x, y }) {
           📋 {appt.notes}
         </div>
       )}
-
-      {/* 三角形（左向き or 右向き） */}
       {!arrowLeft ? (
         <div style={{
           position: 'absolute', left: -7, top: 16,
@@ -1323,8 +1245,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
           </div>
         </div>
       </div>
-
-      {/* 月間サマリー */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: '月間予約数', value: `${monthStats.total}件`, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -1339,14 +1259,11 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* 月ナビ */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <button onClick={onPrevMonth} className="p-2 rounded-lg hover:bg-gray-50 text-gray-500">◀</button>
           <h2 className="text-lg font-bold text-gray-800">{year}年{month}月</h2>
           <button onClick={onNextMonth} className="p-2 rounded-lg hover:bg-gray-50 text-gray-500">▶</button>
         </div>
-
-        {/* 曜日ヘッダー */}
         <div className="grid grid-cols-7 border-b border-gray-100">
           {['日','月','火','水','木','金','土'].map((d, i) => (
             <div key={d} className={'py-2 text-center text-xs font-bold ' + (i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500')}>
@@ -1354,8 +1271,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             </div>
           ))}
         </div>
-
-        {/* 日付グリッド */}
         <div className="grid grid-cols-7">
           {cells.map((dateStr, idx) => {
             if (!dateStr) return (
@@ -1382,8 +1297,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
               <div key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
                 className={'h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ' + (isToday ? 'bg-blue-50 border-blue-100' : '' + ' ' + isPast && !isToday ? 'bg-gray-50' : '' + ' ' + !isPast && !isToday ? '' : '')}>
-
-                {/* 日付 + 件数バッジ */}
                 <div className="flex items-center justify-between mb-1">
                   <div className={'text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ' + (isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700')}>
                     {new Date(dateStr).getDate()}
@@ -1394,8 +1307,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                     </span>
                   )}
                 </div>
-
-                {/* 稼働率バー */}
                 {appts.length > 0 && (
                   <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
                     <div className="h-full rounded-full transition-all"
@@ -1405,8 +1316,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                       }} />
                   </div>
                 )}
-
-                {/* 治療カラードット */}
                 {treatmentColors.length > 0 && (
                   <div className="flex gap-1 mb-1">
                     {treatmentColors.map((c, i) => (
@@ -1414,8 +1323,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                     ))}
                   </div>
                 )}
-
-                {/* 予約プレビュー */}
                 <div className="space-y-0.5 overflow-hidden">
                   {appts.slice(0, 2).map(a => {
                     const color = getTreatmentColor(a.treatment_type);
@@ -1432,8 +1339,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                     </div>
                   )}
                 </div>
-
-                {/* 予約なし・休診 */}
                 {appts.length === 0 && (
                   <div className="text-xs text-gray-300 text-center mt-2">
                     {dow === 0 ? '休診' : ''}
@@ -1443,8 +1348,6 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             );
           })}
         </div>
-
-        {/* 凡例 */}
         <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <div className="w-8 h-1 rounded-full bg-green-400" />少ない
@@ -1560,7 +1463,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
         </div>
 
         <div className="p-6 space-y-4">
-          {/* 患者 */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">患者 *</label>
             {!newPatientMode ? (
@@ -1610,8 +1512,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               </div>
             )}
           </div>
-
-          {/* 治療内容 */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">治療内容 *</label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -1629,8 +1529,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               })}
             </div>
           </div>
-
-          {/* 所要時間 */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">所要時間</label>
             <div className="flex items-center gap-3">
@@ -1643,8 +1541,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               </div>
             </div>
           </div>
-
-          {/* チェア */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">チェア</label>
             <select value={selectedChairId} onChange={e => setSelectedChairId(Number(e.target.value))}
@@ -1652,8 +1548,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               {chairs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-
-          {/* 担当スタッフ */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">担当スタッフ</label>
             <select value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)}
@@ -1662,8 +1556,6 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
               {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-
-          {/* 申し送り */}
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">📋 申し送り <span className="text-gray-400 font-normal text-xs">（任意）</span></label>
             <textarea placeholder="次回スタッフへの申し送り事項..." value={notes}
@@ -1744,7 +1636,6 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               </div>
               <div className="text-sm opacity-75" style={{ color: color.text }}>{appt.patient_name}</div>
             </div>
-            {/* ①Xボタンを強調 */}
             <button onClick={onClose}
               className="w-8 h-8 rounded-full bg-white bg-opacity-80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
               title="閉じる">✕</button>
@@ -1769,8 +1660,6 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               <div className="font-bold text-gray-800">{appt.chair_name}</div>
             </div>
           </div>
-
-          {/* 日程変更ボタン */}
           <button onClick={() => setReschedule(true)}
             className="w-full border border-blue-200 text-blue-600 rounded-xl py-2 text-sm font-medium hover:bg-blue-50 flex items-center justify-center gap-2 transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1788,7 +1677,6 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2">
-          {/* ①「キャンセル」→「予約キャンセル」に変更 */}
           <button onClick={handleCancel}
             className="flex-1 border-2 border-red-300 text-red-600 rounded-xl py-2 text-sm font-semibold hover:bg-red-50 flex items-center justify-center gap-1.5 transition-colors">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1864,7 +1752,6 @@ function RescheduleModal({ appt, onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        {/* ヘッダー */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-gray-800">日程・時間を変更</h2>
@@ -1874,7 +1761,6 @@ function RescheduleModal({ appt, onClose, onSave }) {
         </div>
 
         <div className="p-5 space-y-4">
-          {/* 現在の予約 */}
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
             <div className="text-xs text-orange-500 font-medium mb-1">変更前</div>
             <div className="text-orange-800 font-medium">
@@ -1882,16 +1768,12 @@ function RescheduleModal({ appt, onClose, onSave }) {
               {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
             </div>
           </div>
-
-          {/* 新しい日付 */}
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">新しい日付</label>
             <input type="date" value={newDate}
               onChange={e => setNewDate(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-
-          {/* 新しい時間（空き枠から選択） */}
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
               新しい時間
@@ -1916,8 +1798,6 @@ function RescheduleModal({ appt, onClose, onSave }) {
               </div>
             )}
           </div>
-
-          {/* チェア選択 */}
           {chairs.length > 0 && (
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
@@ -1932,8 +1812,6 @@ function RescheduleModal({ appt, onClose, onSave }) {
               </div>
             </div>
           )}
-
-          {/* 変更後プレビュー */}
           {isChanged && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
               <div className="text-xs text-blue-500 font-medium mb-1">変更後</div>
@@ -2049,8 +1927,6 @@ function PatientEditModal({ patientId, onClose, onSave }) {
               </select>
             </div>
           </div>
-
-          {/* 【2】年代フィールド */}
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">
               年代

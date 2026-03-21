@@ -4,11 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: [],
-      },
-    }),
+    react(),
     tailwindcss(),
   ],
   server: {
@@ -18,11 +14,5 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-  },
-  esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: 'react',
-    // JSXファイルもesbuildで処理できるよう明示的に設定
-    loader: 'jsx',
   },
 })
