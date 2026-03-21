@@ -453,7 +453,10 @@ export default function CalendarPage() {
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
                         const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin); const isOutOfHours = isClosedDay || !inRange;
-                        const slotCls = "absolute left-0 right-0 border-b cursor-pointer transition-colors group " + (isOutOfHours ? "bg-gray-100 border-gray-100" : isDragTarget ? "bg-blue-50 border-blue-200" : "border-gray-50");
+                        let slotCls = "absolute left-0 right-0 border-b cursor-pointer transition-colors group ";
+                        if (isOutOfHours) { slotCls += "bg-gray-100 border-gray-100"; }
+                        else if (isDragTarget) { slotCls += "bg-blue-50 border-blue-200"; }
+                        else { slotCls += "border-gray-50"; }
                         return (
                           <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => { const fallbackChair = chairs[0] ? chairs[0].id : null; const isChairMode = col.type === "chair"; setNewApptModal({ slot, chairId: isChairMode ? col.id : fallbackChair, isOutOfHours }); }}>
                             {isOutOfHours && colIdx === 0 && (
