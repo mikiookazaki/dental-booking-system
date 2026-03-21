@@ -416,8 +416,7 @@ export default function CalendarPage() {
           <div style={{ display: 'flex', minWidth: `${64 + columns.length * 160}px` }}>
             {/* 時刻軸 */}
             <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
-              <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20,
-                background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
+              <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
               <div className="relative" style={{ height: timelineHeight }}>
                 {slots.map(slot => (
                   <div key={slot} className="absolute left-0 right-0 flex items-start justify-end pr-2"
@@ -431,12 +430,8 @@ export default function CalendarPage() {
             {/* 列 */}
             <div style={{ flex: 1, display: 'flex' }}>
               {columns.map((col, colIdx) => (
-                <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160,
-                  borderRight: colIdx < columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20,
-                      background: '#fff', borderBottom: '2px solid #e5e7eb',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
-                      className="flex items-center justify-center">
+                <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160, borderRight: colIdx < columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#fff', borderBottom: '2px solid #e5e7eb', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}                     className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
                         {viewMode === 'chair' ? '🦷' : '👨‍⚕️ '}{col.label}
                       </span>
@@ -470,8 +465,7 @@ export default function CalendarPage() {
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
                         <div className="pointer-events-none z-30"
-                          style={{ position: 'absolute', top: nowTop, left: -64,
-                            width: `calc(${columns.length * 161}px + 64px)` }}>
+                          style={{ position: 'absolute', top: nowTop, left: -64, width: `calc(${columns.length * 161}px + 64px)` }}>
                           <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', left: 56, right: 0, height: 2, background: '#ef4444', boxShadow: '0 1px 3px rgba(239,68,68,0.4)' }} />
                             <div style={{ position: 'absolute', left: 48, top: -6, width: 12, height: 12, borderRadius: '50%', background: '#ef4444', boxShadow: '0 1px 4px rgba(239,68,68,0.5)' }} />
@@ -497,9 +491,7 @@ export default function CalendarPage() {
                             onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
                             onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
                             className={`absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ${dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'}`}
-                            style={{ top: top+2, height: height-4,
-                              background: color.light, borderLeft: `4px solid ${color.bg}`,
-                              border: `1px solid ${color.border}`, borderLeftWidth: 4 }}>
+                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: `4px solid ${color.bg}`, border: `1px solid ${color.border}`, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
                                 {appt.name_kana || appt.patient_name}
@@ -1134,9 +1126,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const isHour = toMinutes(slot) % 60 === 0;
                     return (
                       <div key={slot} className="absolute left-0 right-0 pointer-events-none"
-                        style={{ top: slotTop(slot), height: SLOT_H,
-                          borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6',
-                          zIndex: 0 }} />
+                        style={{ top: slotTop(slot), height: SLOT_H, borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6', zIndex: 0 }} />
                     );
                   })}
                 </div>
@@ -1213,8 +1203,7 @@ function ApptTooltip({ appt, visible, x, y }) {
     }}>
       {/* 患者名 */}
       <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-          background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
+        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
         {appt.name_kana || appt.patient_name}
       </div>
       {appt.patient_name && appt.name_kana && (
