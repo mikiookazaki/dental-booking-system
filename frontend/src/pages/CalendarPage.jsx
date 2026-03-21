@@ -330,7 +330,7 @@ export default function CalendarPage() {
 
   async function moveAppointment(id, body) {
     try {
-      await axios.put('/api/appointments/' + id', body);
+      await axios.put('/api/appointments/' + id, body);
       fetchCalendar();
     } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
   }
@@ -1375,12 +1375,12 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
 
   async function handleSave() {
     setSaving(true);
-    try { await axios.put('/api/appointments/' + appt.id', { notes }); onUpdate(); }
+    try { await axios.put('/api/appointments/' + appt.id, { notes }); onUpdate(); }
     catch { alert('更新に失敗しました'); } finally { setSaving(false); }
   }
   async function handleCancel() {
     if (!window.confirm('この予約をキャンセルしますか？')) return;
-    try { await axios.delete('/api/appointments/' + appt.id'); onUpdate(); }
+    try { await axios.delete('/api/appointments/' + appt.id); onUpdate(); }
     catch { alert('キャンセルに失敗しました'); }
   }
 
@@ -1506,7 +1506,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
   async function handleSave() {
     setSaving(true);
     try {
-      await axios.put('/api/appointments/' + appt.id', {
+      await axios.put('/api/appointments/' + appt.id, {
         appointment_date: newDate,
         start_time: newTime,
         end_time:   newEndTime,
@@ -1630,7 +1630,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
     setSaving(true);
     try {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
-      await axios.put('/api/patients/' + patientId', { ...form, age_group });
+      await axios.put('/api/patients/' + patientId, { ...form, age_group });
       onSave();
     } catch (err) {
       alert(err.response?.data?.error || '保存に失敗しました');
