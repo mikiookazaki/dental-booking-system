@@ -41,7 +41,7 @@ export default function CalendarPage() {
   }); 
   const [viewMode, setViewMode]           = useState('chair');
   const [selectedDate, setSelectedDate]   = useState(
-    searchParams.get('date') || new Date().toISOString().split('T')[0]
+    searchParams.get('date') || new Date().toISOString().split("T")[0]
   );
   const [currentMonth, setCurrentMonth]   = useState(() => {
     const d = new Date();
@@ -64,7 +64,7 @@ export default function CalendarPage() {
   function handleManualClick() {
     const mode = localStorage.getItem('manual_display_mode') || 'newtab';
     if (mode === 'newtab') {
-      window.open('/manual.html', '_blank');
+      window.open("/manual.html", "_blank");
     } else {
       setShowManual(prev => !prev);
     }
@@ -75,14 +75,14 @@ export default function CalendarPage() {
     const dow = d.getDay();
     const diff = dow === 0 ? -6 : 1 - dow;
     d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split("T")[0];
   }
   function getWeekDates(dateStr) {
     const start = getWeekStart(dateStr);
     return Array.from({length: 7}, (_, i) => {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
-      return d.toISOString().split('T')[0];
+      return d.toISOString().split("T")[0];
     });
   }
 
@@ -185,11 +185,11 @@ export default function CalendarPage() {
         onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
         onPrevWeek={() => {
           const d = new Date(selectedDate); d.setDate(d.getDate() - 7);
-          setSelectedDate(d.toISOString().split('T')[0]);
+          setSelectedDate(d.toISOString().split("T")[0]);
         }}
         onNextWeek={() => {
           const d = new Date(selectedDate); d.setDate(d.getDate() + 7);
-          setSelectedDate(d.toISOString().split('T')[0]);
+          setSelectedDate(d.toISOString().split("T")[0]);
         }}
         onSwitchView={v => setViewType(v)}
         onViewModeChange={m => setViewMode(m)}
@@ -252,7 +252,7 @@ export default function CalendarPage() {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const nowTop = (nowMin - openMin) * MIN_PX;
   const showNowLine = nowMin >= openMin && nowMin <= closeMin &&
-    selectedDate === new Date().toISOString().split('T')[0];
+    selectedDate === new Date().toISOString().split("T")[0];
 
   const lunchTop    = slotTop(settings.lunchStart);
   const lunchHeight = durationPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
@@ -325,14 +325,14 @@ export default function CalendarPage() {
             ))}
           </div>
           <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2">
-            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]); }} className="text-gray-500 hover:text-blue-600">◀</button>
+            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split("T")[0]); }} className="text-gray-500 hover:text-blue-600">◀</button>
             <div className="flex items-center gap-1.5">
               <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
               <span className={'text-sm font-bold px-1.5 py-0.5 rounded-md ' + (new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' : new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' : 'text-gray-600 bg-gray-50')}>
                 （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
               </span>
             </div>
-            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split('T')[0]); }} className="text-gray-500 hover:text-blue-600">▶</button>
+            <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split("T")[0]); }} className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
@@ -455,7 +455,7 @@ export default function CalendarPage() {
                         const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin); const isOutOfHours = isClosedDay || !inRange;
                         const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
                         return (
-                          <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => { const fallbackChair = chairs[0] ? chairs[0].id : null; setNewApptModal({ slot, chairId: col.type === 'chair' ? col.id : fallbackChair, isOutOfHours }); }}>
+                          <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => { const fallbackChair = chairs[0] ? chairs[0].id : null; const isChairMode = col.type === "chair"; setNewApptModal({ slot, chairId: isChairMode ? col.id : fallbackChair, isOutOfHours }); }}>
                             {isOutOfHours && colIdx === 0 && (
                               <div className="absolute left-1 top-0.5 text-xs text-gray-300 font-medium select-none" style={{ fontSize: 9 }}>時間外</div>
                             )}
@@ -515,7 +515,7 @@ export default function CalendarPage() {
           }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>📖 操作マニュアル</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => window.open('/manual.html', '_blank')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }} >↗ 別タブで開く</button>
+              <button onClick={() => window.open("/manual.html", "_blank")} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }} >↗ 別タブで開く</button>
               <button onClick={() => setShowManual(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }} >✕</button>
             </div>
           </div>
@@ -539,12 +539,12 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   function getWeekStart(ds) {
     const d = new Date(ds); const dow = d.getDay();
     d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split("T")[0];
   }
   const weekStart = getWeekStart(selectedDate);
   const allWeekDates = Array.from({length: 7}, (_, i) => {
     const d = new Date(weekStart); d.setDate(d.getDate() + i);
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split("T")[0];
   });
   const weekDates = weekOnly
     ? allWeekDates.filter(ds => { const dow = new Date(ds).getDay(); return dow >= 1 && dow <= 5; })
@@ -553,7 +553,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const firstData  = Object.values(weekData).find(d => d?.settings);
   const settings   = firstData?.settings;
   const chairs     = firstData?.chairs || [];
-  const today      = new Date().toISOString().split('T')[0];
+  const today      = new Date().toISOString().split("T")[0];
 
   if (!settings) return (
     <div className="p-4 bg-gray-50 min-h-screen">
@@ -1014,7 +1014,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth   = new Date(year, month, 0).getDate();
   const firstDow      = new Date(year, month-1, 1).getDay();
-  const today         = new Date().toISOString().split('T')[0];
+  const today         = new Date().toISOString().split("T")[0];
 
   const monthStats = Object.values(monthData).reduce((acc, data) => {
     if (!data) return acc;
@@ -1040,9 +1040,9 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             <button className="px-3 py-2 text-sm font-medium bg-blue-600 text-white">月表示</button>
-            <button onClick={() => onSwitchToDay('week')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">週表示</button>
-            <button onClick={() => onSwitchToDay('week5')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">5日表示</button>
-            <button onClick={() => onSwitchToDay('day')} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">日表示</button>
+            <button onClick={() => onSwitchToDay("week")} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">週表示</button>
+            <button onClick={() => onSwitchToDay("week5")} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">5日表示</button>
+            <button onClick={() => onSwitchToDay("day")} className="px-3 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50">日表示</button>
           </div>
         </div>
       </div>
