@@ -148,7 +148,7 @@ export default function CalendarPage() {
     finally { setLoading(false); }
   }, [selectedDate]);
 
-  useEffect(() => { if (viewType === 'week' || viewType === 'week5') fetchWeek(); }, [viewType, fetchWeek]);
+  useEffect(() => { if (viewType === 'week' || viewType === 'week5') fetchWeek(); }, [viewType, fetchWeek, selectedDate]);
 
   // ── 月カレンダービュー ──────────────────────────
   if (viewType === 'month') {
