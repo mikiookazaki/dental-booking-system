@@ -130,7 +130,7 @@ async function handleEvent(event) {
         case 'select_treatment':   await handleTreatmentSelect(replyToken, data.get('treatment_id'), patient); break;
         case 'select_date':        await handleDateSelect(replyToken, data.get('treatment_id'), data.get('date'), patient); break;
         case 'select_time':        await handleTimeSelect(replyToken, data, patient); break;
-        case 'confirm_booking':    await handleConfirmBooking(replyToken, data, patient); break;
+        case 'confirm_booking':    await handleConfirmBooking(replyToken, lineUserId, data, patient); break;
         case 'cancel_appointment': await handleCancelAppointment(replyToken, data.get('appointment_id'), patient); break;
         case 'set_age_group':      await handleSetAgeGroup(replyToken, lineUserId, data.get('range')); break;
         case 'set_age_detail':     await handleSetAgeDetail(replyToken, lineUserId, data.get('age_group')); break;
@@ -602,28 +602,48 @@ async function handleTimeSelect(replyToken, data, patient) {
   }]);
 }
 
-async function handleConfirmBooking(replyToken, data, patient) {
+async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
   if (!patient) return;
   const treatmentId = data.get('treatment_id');
   const date        = data.get('date');
   const time        = data.get('time');
-  const chair = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE AND line_bookable=TRUE ORDER BY display_order LIMIT 1')).rows[0];
-  const staff = (await db.query("SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1")).rows[0];
-  if (!chair || !staff) {
-    await replyMessage(replyToken, [{ type: 'text', text: '空き枠の確保に失敗しました。お電話でご予約ください。' }]);
+
+  // チェアを取得（line_bookable優先、なければis_activeのみで取得）
+  let chairRow = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE AND line_bookable=TRUE ORDER BY display_order LIMIT 1')).rows[0];
+  if (!chairRow) {
+    chairRow = (await db.query('SELECT id FROM chairs WHERE is_active=TRUE ORDER BY display_order LIMIT 1')).rows[0];
+  }
+
+  // スタッフを取得（doctor優先、なければis_activeのみで取得）
+  let staffRow = (await db.query("SELECT id FROM staff WHERE role='doctor' AND is_active=TRUE LIMIT 1")).rows[0];
+  if (!staffRow) {
+    staffRow = (await db.query('SELECT id FROM staff WHERE is_active=TRUE LIMIT 1')).rows[0];
+  }
+
+  if (!chairRow || !staffRow) {
+    // replyTokenが切れている可能性があるのでpushMessageで送信
+    await pushMessage(lineUserId, [{ type: 'text', text: '空き枠の確保に失敗しました。お電話でご予約ください。' }]);
     return;
   }
+
   const t = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
   const endTime = addMinutes(time, t.duration);
   const res = await fetch(`${BACKEND_URL}/api/appointments`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ patient_id: patient.id, staff_id: staff.id, chair_id: chair.id,
-      treatment_id: treatmentId, appointment_date: date, start_time: time, end_time: endTime, source: 'line' }),
+    body: JSON.stringify({
+      patient_id: patient.id, staff_id: staffRow.id, chair_id: chairRow.id,
+      treatment_id: treatmentId, appointment_date: date,
+      start_time: time, end_time: endTime, source: 'line'
+    }),
   });
+
+  // replyTokenが切れている場合があるのでpushMessageで返信
   if (res.ok) {
-    await replyMessage(replyToken, [{ type: 'text', text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております` }]);
+    await pushMessage(lineUserId, [{ type: 'text', text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております` }]);
   } else {
-    await replyMessage(replyToken, [{ type: 'text', text: '予約の確定に失敗しました。お電話でご予約ください。' }]);
+    const errText = await res.text();
+    console.error('予約API失敗:', errText);
+    await pushMessage(lineUserId, [{ type: 'text', text: '予約の確定に失敗しました。お電話でご予約ください。' }]);
   }
 }
 
