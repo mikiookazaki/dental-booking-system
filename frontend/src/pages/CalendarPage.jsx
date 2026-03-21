@@ -473,7 +473,7 @@ export default function CalendarPage() {
                         const slotEndMin = slotMin + settings.slotDuration;
                         const isLunch    = slotMin >= toMinutes(settings.lunchStart) && slotMin < toMinutes(settings.lunchEnd);
                         if (isLunch) return null;
-                        const hasAppt = getApptsForColumn(col).some(a => toMinutes(a.start_time) < slotEndMin && toMinutes(a.end_time) > slotMin);
+                        const hasAppt = getApptsForColumn(col).some(a => { const aStart = toMinutes(a.start_time); const aEnd = toMinutes(a.end_time); return aStart < slotEndMin && aEnd > slotMin; });
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
@@ -1071,16 +1071,20 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
-        {[
-          { label: '月間予約数', value: monthStats.total + '件', color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '診療日数', value: Object.values(monthData).filter(d => d?.appointments?.length > 0).length + '日', color: 'text-green-600', bg: 'bg-green-50' },
-          { label: '平均/日', value: (Object.values(monthData).filter(d => d?.appointments?.length > 0).length > 0 ? Math.round(monthStats.total / Object.values(monthData).filter(d => d?.appointments?.length > 0).length) : 0) + '件', color: 'text-purple-600', bg: 'bg-purple-50' },
-        ].map(s => (
+        {(() => {
+          const activeDays = Object.values(monthData).filter(d => !!d?.appointments?.length).length;
+          const avgPerDay = activeDays ? Math.round(monthStats.total / activeDays) : 0;
+          return [
+            { label: '月間予約数', value: monthStats.total + '件', color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: '診療日数', value: activeDays + '日', color: 'text-green-600', bg: 'bg-green-50' },
+            { label: '平均/日', value: avgPerDay + '件', color: 'text-purple-600', bg: 'bg-purple-50' },
+          ].map(s => (
           <div key={s.label} className={s.bg + ' rounded-xl p-3 text-center'}>
             <div className={'text-xl font-bold ' + s.color}>{s.value}</div>
             <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
           </div>
-        ))}
+          ));
+        })()
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
