@@ -580,8 +580,8 @@ export default function CalendarPage() {
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
                         return (
                           <div key={slot}
-                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group ${isOutOfHours ? 'bg-gray-50/80 border-gray-100 hover:bg-orange-50/50' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50 hover:bg-blue-50/50'}`}
-                            style={{ top: slotTop(slot), height: SLOT_HEIGHT }}
+                            className={`absolute left-0 right-0 border-b cursor-pointer transition-colors group ${isDragTarget ? 'border-blue-200' : isOutOfHours ? 'border-gray-100' : 'border-gray-50'}`}
+                            style={{ top: slotTop(slot), height: SLOT_HEIGHT, background: isOutOfHours ? 'rgba(249,250,251,0.8)' : isDragTarget ? '#eff6ff' : 'transparent' }}
                             onDragOver={e => e.preventDefault()}
                             onClick={() => setNewApptModal({
                               slot, chairId: col.type === 'chair' ? col.id : chairs[0]?.id,
@@ -598,7 +598,7 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <span className={`text-xs ${isOutOfHours ? 'text-orange-400' : 'text-blue-400'}`}>
+                              <span style={{ fontSize: 12, color: isOutOfHours ? '#fb923c' : '#60a5fa' }}>
                                 {isOutOfHours ? '＋ 時間外予約' : '＋ 予約追加'}
                               </span>
                             </div>
@@ -1063,19 +1063,19 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {/* 休診日オーバーレイ */}
                   {isClosed && (
-                    <div className="absolute inset-0 bg-gray-100/70 z-10 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
                     </div>
                   )}
 
                   {/* 時間外グレーアウト（上） */}
                   {!isClosed && clinicH.open > openMin && (
-                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
+                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
                       style={{ top: 0, height: (clinicH.open - openMin) * MIN_PX, zIndex: 3 }} />
                   )}
                   {/* 時間外グレーアウト（下） - closeMin(displayEnd)との比較に修正 */}
                   {!isClosed && clinicH.close < closeMin && (
-                    <div className="absolute left-0 right-0 bg-gray-100/60 pointer-events-none"
+                    <div className="absolute left-0 right-0 bg-gray-200 pointer-events-none"
                       style={{ top: (clinicH.close - openMin) * MIN_PX, bottom: 0, zIndex: 3 }} />
                   )}
 
@@ -1387,7 +1387,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         <div className="grid grid-cols-7">
           {cells.map((dateStr, idx) => {
             if (!dateStr) return (
-              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50/30" />
+              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50" />
             );
             const data     = monthData[dateStr];
             const appts    = data?.appointments || [];
@@ -1409,7 +1409,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             return (
               <div key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
-                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ${isToday ? 'bg-blue-50 border-blue-100' : ''} ${isPast && !isToday ? 'bg-gray-50/40' : ''} ${!isPast && !isToday ? 'hover:bg-blue-50/20' : ''}`}>
+                className={`h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ${isToday ? 'bg-blue-50 border-blue-100' : ''} ${isPast && !isToday ? 'bg-gray-50' : ''} ${!isPast && !isToday ? '' : ''}`}>
 
                 {/* 日付 + 件数バッジ */}
                 <div className="flex items-center justify-between mb-1">
@@ -1577,7 +1577,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
   const color = selectedTreatment ? getTreatmentColor(selectedTreatment.name) : DEFAULT_COLOR;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: color.light }}>
           <div>
@@ -1755,7 +1755,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="px-5 py-4 rounded-t-2xl" style={{ background: color.light }}>
           <div className="flex items-start justify-between">
@@ -1763,7 +1763,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
               <div className="flex items-center gap-2">
                 <div className="text-lg font-bold" style={{ color: color.text }}>{appt.name_kana || appt.patient_name}</div>
                 <button onClick={() => setEditPatient(true)}
-                  className="p-1 rounded-lg hover:bg-black/10 transition-colors" title="患者情報を編集">
+                  className="p-1 rounded-lg hover: transition-colors" title="患者情報を編集">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -1774,7 +1774,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
             </div>
             {/* ①Xボタンを強調 */}
             <button onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
+              className="w-8 h-8 rounded-full bg-white hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all shadow-sm hover:shadow font-bold text-lg"
               title="閉じる">✕</button>
           </div>
         </div>
@@ -1890,7 +1890,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
     newChairId !== appt.chair_id;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         {/* ヘッダー */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -2030,7 +2030,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   }
 
   if (!patient) return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" /></div>
     </div>
   );
@@ -2039,7 +2039,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   const autoAgeGroup = form.birth_date ? calcAgeGroup(form.birth_date) : null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">患者情報編集</h2>
