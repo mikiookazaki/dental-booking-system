@@ -356,7 +356,7 @@ export default function CalendarPage() {
               className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
 
-          {/* チェア/ドクター切替【3】 */}
+          {/* チェア・ドクター切替【3】 */}
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
             {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
               <button key={v} onClick={() => setViewMode(v)}
@@ -833,7 +833,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 <span className="text-sm font-semibold text-gray-700 min-w-28 text-center">{rangeStr}</span>
                 <button onClick={onNextWeek} className="text-gray-500 hover:text-blue-600 text-sm">▶</button>
               </div>
-              {/* 週表示はチェア/ドクター切替不要のためコメントアウト */}
+              {/* 週表示はチェア・ドクター切替不要のためコメントアウト */}
               <button onClick={onRefresh}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 shadow-sm">
                 🔄 更新
@@ -1107,7 +1107,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     );
                   })}
 
-                  {/* ドロップゾーンは列全体のdivで処理 - 下のonDragOver/onDropを使用 */}
+                  {/* ドロップゾーンは列全体のdivで処理 - 下のonDragOver・onDropを使用 */}
 
                   {/* D&Dプレビューライン */}
                   {dragOver?.dateStr === dateStr && (
