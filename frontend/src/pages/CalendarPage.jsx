@@ -285,6 +285,30 @@ export default function CalendarPage() {
     return toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - 5)));
   }
 
+  function handleColDragOver(colId) {
+    return e => {
+      e.preventDefault();
+      const time = pixelToTime(e, e.currentTarget);
+      setDragOver({ slot: time, colId });
+    };
+  }
+
+  function handleColDrop(colId) {
+    return e => {
+      e.preventDefault();
+      if (!dragging) return;
+      const appt = dragging.appointment;
+      const time = pixelToTime(e, e.currentTarget);
+      const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
+      const newEndTime = toTimeStr(toMinutes(time) + durationMin);
+      const body = { appointment_date: selectedDate, start_time: time, end_time: newEndTime };
+      if (viewMode === 'chair') body.chair_id = colId;
+      else body.staff_id = colId;
+      moveAppointment(appt.id, body);
+      setDragging(null); setDragOver(null);
+    };
+  }
+
   function handleDragStart(e, appt) {
     setDragging({ appointment: appt });
     e.dataTransfer.effectAllowed = 'move';
@@ -431,31 +455,15 @@ export default function CalendarPage() {
             <div style={{ flex: 1, display: 'flex' }}>
               {columns.map((col, colIdx) => (
                 <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160, borderRight: colIdx < columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#fff', borderBottom: '2px solid #e5e7eb', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}                     className="flex items-center justify-center">
+                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#fff', borderBottom: '2px solid #e5e7eb', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }} className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
                         {viewMode === 'chair' ? '🦷' : '👨‍⚕️ '}{col.label}
                       </span>
                     </div>
 
                     <div className="relative" style={{ height: timelineHeight }}
-                      onDragOver={e => {
-                        e.preventDefault();
-                        const time = pixelToTime(e, e.currentTarget);
-                        setDragOver({ slot: time, colId: col.id });
-                      }}
-                      onDrop={e => {
-                        e.preventDefault();
-                        if (!dragging) return;
-                        const appt = dragging.appointment;
-                        const time = pixelToTime(e, e.currentTarget);
-                        const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
-                        const newEndTime  = toTimeStr(toMinutes(time) + durationMin);
-                        const body = { appointment_date: selectedDate, start_time: time, end_time: newEndTime };
-                        if (viewMode === 'chair') body.chair_id = col.id;
-                        else body.staff_id = col.id;
-                        moveAppointment(appt.id, body);
-                        setDragging(null); setDragOver(null);
-                      }}>
+                      onDragOver={handleColDragOver(col.id)}
+                      onDrop={handleColDrop(col.id)}>
                       {/* 昼休み */}
                       <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10"
                         style={{ top: lunchTop, height: lunchHeight }}>
