@@ -636,9 +636,9 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
     // APIを使わず直接DBにINSERT（認証不要）
     await db.query(`
       INSERT INTO appointments
-        (patient_id, staff_id, chair_id, treatment_id, appointment_date, start_time, end_time, status, source, booked_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', 'line', 'line')
-    `, [patient.id, staffRow.id, chairRow.id, treatmentId, date, time, endTime]);
+        (patient_id, staff_id, chair_id, treatment_id, appointment_date, start_time, end_time, status, source, patient_name, patient_phone)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', 'line', $8, $9)
+    `, [patient.id, staffRow.id, chairRow.id, treatmentId, date, time, endTime, patient.name, patient.phone]);
 
     await pushMessage(lineUserId, [{
       type: 'text',
