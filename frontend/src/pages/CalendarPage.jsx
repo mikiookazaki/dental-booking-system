@@ -396,7 +396,7 @@ export default function CalendarPage() {
             ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
           </span>
         </div>
-      </div>{/* /fixed header */}
+      </div>{/* end-fixed header */}
 
       {/* スクロール領域（ヘッダー高さ分パディング） */}
       <div className="px-4 py-3" style={{ paddingTop: 120 }}>
@@ -633,7 +633,7 @@ export default function CalendarPage() {
         />
       )}
       <ApptTooltip visible={tooltip.visible} appt={tooltip.appt} x={tooltip.x} y={tooltip.y} />
-      </div>{/* /content */}
+      </div>{/* end-content */}
 
       {/* マニュアルサイドパネル */}
       {showManual && (
