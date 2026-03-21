@@ -94,7 +94,7 @@ export default function CalendarPage() {
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/appointments/calendar/' + selectedDate');
+      const res = await axios.get('/api/appointments/calendar/' + selectedDate);
       setCalendarData(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -117,7 +117,7 @@ export default function CalendarPage() {
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         promises.push(
-          axios.get('/api/appointments/calendar/' + dateStr')
+          axios.get('/api/appointments/calendar/' + dateStr)
             .then(r => ({ date: dateStr, data: r.data }))
             .catch(() => ({ date: dateStr, data: null }))
         );
@@ -137,7 +137,7 @@ export default function CalendarPage() {
       const dates = getWeekDates(selectedDate);
       const results = await Promise.all(
         dates.map(d =>
-          axios.get('/api/appointments/calendar/' + d')
+          axios.get('/api/appointments/calendar/' + d)
             .then(r => ({ date: d, data: r.data }))
             .catch(() => ({ date: d, data: null }))
         )
@@ -1218,7 +1218,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
     if (patientSearch.length < 1) { setShowPatientList(false); return; }
     const search = async () => {
       try {
-        const res = await axios.get('/api/patients?q=' + patientSearch');
+        const res = await axios.get('/api/patients?q=' + patientSearch);
         setPatients(res.data.patients || res.data || []);
         setShowPatientList(true);
       } catch {}
@@ -1492,7 +1492,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
 
   useEffect(() => {
     setLoadingSlots(true);
-    axios.get('/api/appointments/available-slots/' + newDate')
+    axios.get('/api/appointments/available-slots/' + newDate)
       .then(r => {
         const allSlots = r.data?.slots || [];
         setSlots(allSlots);
@@ -1608,7 +1608,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   const [kanaError, setKanaError] = useState('');
 
   useEffect(() => {
-    axios.get('/api/patients/' + patientId')
+    axios.get('/api/patients/' + patientId)
       .then(r => { setPatient(r.data); setForm(r.data); })
       .catch(() => alert('患者情報の取得に失敗しました'));
   }, [patientId]);
