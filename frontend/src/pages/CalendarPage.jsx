@@ -438,7 +438,7 @@ export default function CalendarPage() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
                       className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
-                        {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
+                        <span>{viewMode === 'chair' ? '🦷' : '👨‍⚕️'}</span> <span>{col.label}</span>
                       </span>
                     </div>
 
@@ -466,32 +466,6 @@ export default function CalendarPage() {
                         style={{ top: lunchTop, height: lunchHeight }}>
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
-
-                      {/* 中間の列名ラベル（スクロール位置確認用） */}
-                      {(() => {
-                        // 昼休みあり→昼休み後、昼休みなし→タイムライン中間に表示
-                        const hasLunch = settings.hasLunchBreak !== false && lunchHeight > 0
-                        const midTop = hasLunch
-                          ? lunchTop + lunchHeight
-                          : Math.floor(timelineHeight / 2)
-                        return (
-                          <div className="absolute left-0 right-0 pointer-events-none"
-                            style={{ top: midTop, zIndex: 8 }}>
-                            <div style={{
-                              background: 'rgba(239,246,255,0.92)',
-                              borderTop: '1px solid #bfdbfe',
-                              borderBottom: '2px solid #bfdbfe',
-                              padding: '3px 0',
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: '#1d4ed8',
-                              textAlign: 'center',
-                            }}>
-                              {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
-                            </div>
-                          </div>
-                        )
-                      })()}
 
                       {/* 現在時刻ライン */}
                       {showNowLine && colIdx === 0 && (
