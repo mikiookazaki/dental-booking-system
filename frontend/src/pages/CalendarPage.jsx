@@ -1,31 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import axios from '../api';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import axios from "../api";
 
 const TREATMENT_COLORS = {
-  '定期検診':           { bg: '#4A90D9', light: '#EBF4FF', text: '#1a5fa8', border: '#2171c7' },
-  'クリーニング(PMTC)': { bg: '#27AE60', light: '#EDFAF1', text: '#1e8449', border: '#1e8449' },
-  '虫歯治療':           { bg: '#E8534A', light: '#FFF0EF', text: '#c0392b', border: '#c0392b' },
-  '抜歯':               { bg: '#8E44AD', light: '#F5EEF8', text: '#6c3483', border: '#6c3483' },
-  'クラウン・補綴':     { bg: '#D35400', light: '#FEF5EC', text: '#b7440b', border: '#b7440b' },
-  'ホワイトニング':     { bg: '#2980B9', light: '#EBF5FB', text: '#1f618d', border: '#1f618d' },
-  'インプラント相談':   { bg: '#16A085', light: '#E8F8F5', text: '#0e6655', border: '#0e6655' },
-  '歯周病治療':         { bg: '#F39C12', light: '#FEF9E7', text: '#d68910', border: '#d68910' },
-  'その他':             { bg: '#95A5A6', light: '#F4F6F6', text: '#717d7e', border: '#717d7e' },
+  "定期検診":           { bg: "#4A90D9", light: "#EBF4FF", text: "#1a5fa8", border: "#2171c7" },
+  "クリーニング(PMTC)": { bg: "#27AE60", light: "#EDFAF1", text: "#1e8449", border: "#1e8449" },
+  "虫歯治療":           { bg: "#E8534A", light: "#FFF0EF", text: "#c0392b", border: "#c0392b" },
+  "抜歯":               { bg: "#8E44AD", light: "#F5EEF8", text: "#6c3483", border: "#6c3483" },
+  "クラウン・補綴":     { bg: "#D35400", light: "#FEF5EC", text: "#b7440b", border: "#b7440b" },
+  "ホワイトニング":     { bg: "#2980B9", light: "#EBF5FB", text: "#1f618d", border: "#1f618d" },
+  "インプラント相談":   { bg: "#16A085", light: "#E8F8F5", text: "#0e6655", border: "#0e6655" },
+  "歯周病治療":         { bg: "#F39C12", light: "#FEF9E7", text: "#d68910", border: "#d68910" },
+  "その他":             { bg: "#95A5A6", light: "#F4F6F6", text: "#717d7e", border: "#717d7e" },
 };
-const DEFAULT_COLOR = { bg: '#4A90D9', light: '#EBF4FF', text: '#1a5fa8', border: '#2171c7' };
+const DEFAULT_COLOR = { bg: "#4A90D9", light: "#EBF4FF", text: "#1a5fa8", border: "#2171c7" };
 
 function getTreatmentColor(treatmentType) {
   return TREATMENT_COLORS[treatmentType] || DEFAULT_COLOR;
 }
 function toMinutes(timeStr) {
   if (!timeStr) return 0;
-  const [h, m] = timeStr.toString().substring(0, 5).split(':').map(Number);
+  const [h, m] = timeStr.toString().substring(0, 5).split(":").map(Number);
   return h * 60 + m;
 }
 function toTimeStr(minutes) {
-  const h = Math.floor(minutes / 60).toString().padStart(2, '0');
-  const m = (minutes % 60).toString().padStart(2, '0');
+  const h = Math.floor(minutes / 60).toString().padStart(2, "0");
+  const m = (minutes % 60).toString().padStart(2, "0");
   return `${h}:${m}`;
 }
 function formatDate(dateStr) {
@@ -36,16 +36,16 @@ function formatDate(dateStr) {
 export default function CalendarPage() {
   const [searchParams] = useSearchParams(); 
   const [viewType, setViewType]           = useState(() => {
-    const v = searchParams.get('view')
-    return (v === 'month' || v === 'week' || v === 'week5') ? v : 'day'
+    const v = searchParams.get("view")
+    return (v === "month" || v === "week" || v === "week5") ? v : "day"
   }); 
-  const [viewMode, setViewMode]           = useState('chair');
+  const [viewMode, setViewMode]           = useState("chair");
   const [selectedDate, setSelectedDate]   = useState(
-    searchParams.get('date') || new Date().toISOString().split("T")[0]
+    searchParams.get("date") || new Date().toISOString().split("T")[0]
   );
   const [currentMonth, setCurrentMonth]   = useState(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   });
   const [calendarData, setCalendarData]   = useState(null);
   const [monthData, setMonthData]         = useState({});
@@ -62,8 +62,8 @@ export default function CalendarPage() {
   const [showManual, setShowManual]       = useState(false);
 
   function handleManualClick() {
-    const mode = localStorage.getItem('manual_display_mode') || 'newtab';
-    if (mode === 'newtab') {
+    const mode = localStorage.getItem("manual_display_mode") || "newtab";
+    if (mode === "newtab") {
       window.open("/manual.html", "_blank");
     } else {
       setShowManual(prev => !prev);
@@ -94,7 +94,7 @@ export default function CalendarPage() {
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/appointments/calendar/' + selectedDate);
+      const res = await axios.get("/api/appointments/calendar/" + selectedDate);
       setCalendarData(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -111,13 +111,13 @@ export default function CalendarPage() {
 
   const fetchMonth = useCallback(async () => {
     try {
-      const [year, month] = currentMonth.split('-').map(Number);
+      const [year, month] = currentMonth.split("-").map(Number);
       const daysInMonth = new Date(year, month, 0).getDate();
       const promises = [];
       for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dateStr = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
         promises.push(
-          axios.get('/api/appointments/calendar/' + dateStr)
+          axios.get("/api/appointments/calendar/" + dateStr)
             .then(r => ({ date: dateStr, data: r.data }))
             .catch(() => ({ date: dateStr, data: null }))
         );
@@ -129,7 +129,7 @@ export default function CalendarPage() {
     } catch (err) { console.error(err); }
   }, [currentMonth]);
 
-  useEffect(() => { if (viewType === 'month') fetchMonth(); }, [viewType, fetchMonth]);
+  useEffect(() => { if (viewType === "month") fetchMonth(); }, [viewType, fetchMonth]);
 
   const fetchWeek = useCallback(async () => {
     setLoading(true);
@@ -137,7 +137,7 @@ export default function CalendarPage() {
       const dates = getWeekDates(selectedDate);
       const results = await Promise.all(
         dates.map(d =>
-          axios.get('/api/appointments/calendar/' + d)
+          axios.get("/api/appointments/calendar/" + d)
             .then(r => ({ date: d, data: r.data }))
             .catch(() => ({ date: d, data: null }))
         )
@@ -149,30 +149,30 @@ export default function CalendarPage() {
     finally { setLoading(false); }
   }, [selectedDate]);
 
-  useEffect(() => { if (viewType === 'week' || viewType === 'week5') fetchWeek(); }, [viewType, fetchWeek, selectedDate]);
+  useEffect(() => { if (viewType === "week" || viewType === "week5") fetchWeek(); }, [viewType, fetchWeek, selectedDate]);
 
-  if (viewType === 'month') {
+  if (viewType === "month") {
     return (
       <MonthView
         currentMonth={currentMonth}
         monthData={monthData}
         onPrevMonth={() => {
-          const [y, m] = currentMonth.split('-').map(Number);
+          const [y, m] = currentMonth.split("-").map(Number);
           const d = new Date(y, m-2, 1);
-          setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+          setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
         }}
         onNextMonth={() => {
-          const [y, m] = currentMonth.split('-').map(Number);
+          const [y, m] = currentMonth.split("-").map(Number);
           const d = new Date(y, m, 1);
-          setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+          setCurrentMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
         }}
-        onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
-        onSwitchToDay={(v) => setViewType(v || 'day')}
+        onSelectDate={date => { setSelectedDate(date); setViewType("day"); }}
+        onSwitchToDay={(v) => setViewType(v || "day")}
       />
     );
   }
 
-  if (viewType === 'week' || viewType === 'week5') {
+  if (viewType === "week" || viewType === "week5") {
     return (
       <WeekView
         selectedDate={selectedDate}
@@ -181,8 +181,8 @@ export default function CalendarPage() {
         allStaff={allStaff}
         loading={loading}
         now={now}
-        weekOnly={viewType === 'week5'}
-        onSelectDate={date => { setSelectedDate(date); setViewType('day'); }}
+        weekOnly={viewType === "week5"}
+        onSelectDate={date => { setSelectedDate(date); setViewType("day"); }}
         onPrevWeek={() => {
           const d = new Date(selectedDate); d.setDate(d.getDate() - 7);
           setSelectedDate(d.toISOString().split("T")[0]);
@@ -216,7 +216,7 @@ export default function CalendarPage() {
   let clinicOpenMin, clinicCloseMin;
   if (customHour) {
     try {
-      const parsed = typeof customHour === 'string' ? JSON.parse(customHour) : customHour;
+      const parsed = typeof customHour === "string" ? JSON.parse(customHour) : customHour;
       clinicOpenMin  = toMinutes(parsed.open  || settings.openTime);
       clinicCloseMin = toMinutes(parsed.close || settings.closeTime);
     } catch {
@@ -257,12 +257,12 @@ export default function CalendarPage() {
   const lunchTop    = slotTop(settings.lunchStart);
   const lunchHeight = durationPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
 
-  const columns = viewMode === 'chair'
-    ? chairs.map(c => ({ id: c.id, label: c.name, type: 'chair' }))
-    : allStaff.map(s => ({ id: s.id, label: s.name, type: 'doctor' }));
+  const columns = viewMode === "chair"
+    ? chairs.map(c => ({ id: c.id, label: c.name, type: "chair" }))
+    : allStaff.map(s => ({ id: s.id, label: s.name, type: "doctor" }));
 
   function getApptsForColumn(col) {
-    if (col.type === 'chair') return appointments.filter(a => a.chair_id === col.id);
+    if (col.type === "chair") return appointments.filter(a => a.chair_id === col.id);
     return appointments.filter(a => a.staff_id === col.id);
   }
 
@@ -276,10 +276,10 @@ export default function CalendarPage() {
 
   function handleDragStart(e, appt) {
     setDragging({ appointment: appt });
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.effectAllowed = "move";
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetMin = (e.clientY - rect.top) / MIN_PX;
-    e.dataTransfer.setData('offsetMin', String(Math.round(offsetMin)));
+    e.dataTransfer.setData("offsetMin", String(Math.round(offsetMin)));
   }
 
   function handleColDragOver(e, colId, containerEl) {
@@ -296,7 +296,7 @@ export default function CalendarPage() {
     const durationMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
     const newEndTime  = toTimeStr(toMinutes(time) + durationMin);
     const body = { appointment_date: selectedDate, start_time: time, end_time: newEndTime };
-    if (viewMode === 'chair') body.chair_id = colId;
+    if (viewMode === "chair") body.chair_id = colId;
     else body.staff_id = colId;
     moveAppointment(appt.id, body);
     setDragging(null); setDragOver(null);
@@ -306,9 +306,9 @@ export default function CalendarPage() {
 
   async function moveAppointment(id, body) {
     try {
-      await axios.put('/api/appointments/' + id, body);
+      await axios.put("/api/appointments/" + id, body);
       fetchCalendar();
-    } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
+    } catch (err) { alert(err.response?.data?.error || "移動に失敗しました"); }
   }
 
   return (
@@ -318,8 +318,8 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-bold text-gray-800">📅 診療カレンダー</h1>
           <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
-              <button key={v} onClick={() => setViewType(v)} className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewType === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+            {[["month","月"], ["week","週"], ["week5","5日"], ["day","日"]].map(([v, label]) => (
+              <button key={v} onClick={() => setViewType(v)} className={"px-3 py-2 text-sm font-medium transition-colors " + (viewType === v ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50")}>
                 {label}表示
               </button>
             ))}
@@ -328,15 +328,15 @@ export default function CalendarPage() {
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split("T")[0]); }} className="text-gray-500 hover:text-blue-600">◀</button>
             <div className="flex items-center gap-1.5">
               <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="text-sm font-semibold text-gray-700 outline-none cursor-pointer" />
-              <span className={'text-sm font-bold px-1.5 py-0.5 rounded-md ' + (new Date(selectedDate).getDay() === 0 ? 'text-red-600 bg-red-50' : new Date(selectedDate).getDay() === 6 ? 'text-blue-600 bg-blue-50' : 'text-gray-600 bg-gray-50')}>
-                （{'日月火水木金土'[new Date(selectedDate).getDay()]}）
+              <span className={"text-sm font-bold px-1.5 py-0.5 rounded-md " + (new Date(selectedDate).getDay() === 0 ? "text-red-600 bg-red-50" : new Date(selectedDate).getDay() === 6 ? "text-blue-600 bg-blue-50" : "text-gray-600 bg-gray-50")}>
+                （{"日月火水木金土"[new Date(selectedDate).getDay()]}）
               </span>
             </div>
             <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().split("T")[0]); }} className="text-gray-500 hover:text-blue-600">▶</button>
           </div>
           <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            {[['chair','🦷 チェア'], ['doctor','👨‍⚕️ ドクター']].map(([v, label]) => (
-              <button key={v} onClick={() => setViewMode(v)} className={'px-3 py-2 text-sm font-medium transition-colors ' + (viewMode === v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+            {[["chair","🦷 チェア"], ["doctor","👨‍⚕️ ドクター"]].map(([v, label]) => (
+              <button key={v} onClick={() => setViewMode(v)} className={"px-3 py-2 text-sm font-medium transition-colors " + (viewMode === v ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50")}>
                 {label}
               </button>
             ))}
@@ -352,10 +352,10 @@ export default function CalendarPage() {
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2 items-center">
           {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-            <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
+            <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: "1px solid " + color.border }}>
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name} </span>
           ))}
-          <span style={{ fontSize:11, color:'var(--color-text-secondary)', marginLeft:8 }}>
+          <span style={{ fontSize:11, color:"var(--color-text-secondary)", marginLeft:8 }}>
             ｜ 列色=曜日識別　バー: 🟢空き 🔵普通 🔴混雑
           </span>
         </div>
@@ -366,11 +366,11 @@ export default function CalendarPage() {
           本日の予約はありません
         </div>
       )}
-      {(viewMode === 'chair' || columns.length >= 1) && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100" style={{ overflowX: 'auto', overflowY: 'visible' }}>
-          <div style={{ display: 'flex', minWidth: (64 + columns.length * 160) + 'px' }}>
-            <div style={{ width: 64, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #f3f4f6' }}>
-              <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }} />
+      {(viewMode === "chair" || columns.length >= 1) && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100" style={{ overflowX: "auto", overflowY: "visible" }}>
+          <div style={{ display: "flex", minWidth: (64 + columns.length * 160) + "px" }}>
+            <div style={{ width: 64, flexShrink: 0, background: "#f9fafb", borderRight: "1px solid #f3f4f6" }}>
+              <div style={{ height: HEADER_HEIGHT, position: "sticky", top: 110, zIndex: 20, background: "#f9fafb", borderBottom: "1px solid #f3f4f6" }} />
               <div className="relative" style={{ height: timelineHeight }}>
                 {slots.map(slot => (
                   <div key={slot} className="absolute left-0 right-0 flex items-start justify-end pr-2" style={{ top: slotTop(slot), height: SLOT_HEIGHT }}>
@@ -379,12 +379,12 @@ export default function CalendarPage() {
                 ))}
               </div>
             </div>
-            <div style={{ flex: 1, display: 'flex' }}>
+            <div style={{ flex: 1, display: "flex" }}>
               {columns.map((col, colIdx) => (
-                <div key={col.id} style={{ flex: '1 1 160px', minWidth: 160, borderRight: colIdx !== columns.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                    <div style={{ height: HEADER_HEIGHT, position: 'sticky', top: 110, zIndex: 20, background: '#fff', borderBottom: '2px solid #e5e7eb', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }} className="flex items-center justify-center">
+                <div key={col.id} style={{ flex: "1 1 160px", minWidth: 160, borderRight: colIdx !== columns.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                    <div style={{ height: HEADER_HEIGHT, position: "sticky", top: 110, zIndex: 20, background: "#fff", borderBottom: "2px solid #e5e7eb", boxShadow: "0 2px 4px rgba(0,0,0,0.06)" }} className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
-                        {viewMode === 'chair' ? '🦷' : '👨‍⚕️ '}{col.label}
+                        {viewMode === "chair" ? "🦷" : "👨‍⚕️ "}{col.label}
                       </span>
                     </div>
 
@@ -393,12 +393,12 @@ export default function CalendarPage() {
                         <span className="text-xs text-yellow-500 font-medium pl-2 pt-1 block">🍱 昼休み</span>
                       </div>
                       {showNowLine && colIdx === 0 && (
-                        <div className="pointer-events-none z-30" style={{ position: 'absolute', top: nowTop, left: -64, width: (columns.length * 161 + 64) + 'px' }}>
-                          <div style={{ position: 'relative' }}>
-                            <div style={{ position: 'absolute', left: 56, right: 0, height: 2, background: '#ef4444', boxShadow: '0 1px 3px rgba(239,68,68,0.4)' }} />
-                            <div style={{ position: 'absolute', left: 48, top: -6, width: 12, height: 12, borderRadius: '50%', background: '#ef4444', boxShadow: '0 1px 4px rgba(239,68,68,0.5)' }} />
-                            <span style={{ position: 'absolute', left: 60, top: -12, fontSize: 11, color: '#ef4444', fontWeight: 700, background: '#fff', padding: '0 4px', borderRadius: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                              {now.getHours().toString().padStart(2,'0')}:{now.getMinutes().toString().padStart(2,'0')}
+                        <div className="pointer-events-none z-30" style={{ position: "absolute", top: nowTop, left: -64, width: (columns.length * 161 + 64) + "px" }}>
+                          <div style={{ position: "relative" }}>
+                            <div style={{ position: "absolute", left: 56, right: 0, height: 2, background: "#ef4444", boxShadow: "0 1px 3px rgba(239,68,68,0.4)" }} />
+                            <div style={{ position: "absolute", left: 48, top: -6, width: 12, height: 12, borderRadius: "50%", background: "#ef4444", boxShadow: "0 1px 4px rgba(239,68,68,0.5)" }} />
+                            <span style={{ position: "absolute", left: 60, top: -12, fontSize: 11, color: "#ef4444", fontWeight: 700, background: "#fff", padding: "0 4px", borderRadius: 4, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                              {now.getHours().toString().padStart(2,"0")}:{now.getMinutes().toString().padStart(2,"0")}
                             </span>
                           </div>
                         </div>
@@ -408,7 +408,7 @@ export default function CalendarPage() {
                         const height = (toMinutes(appt.end_time) - toMinutes(appt.start_time)) * MIN_PX;
                         const color  = getTreatmentColor(appt.treatment_type);
                         return (
-                          <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={e => { if (!dragging) setDetailModal(appt); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={'absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 ' + ((dragging?.appointment?.id === appt.id ? 'opacity-40 scale-95' : 'hover:shadow-md hover:-translate-y-0.5'))} style={{ top: top+2, height: height-4, background: color.light, borderLeft: '4px solid ' + color.bg, border: '1px solid ' + color.border, borderLeftWidth: 4 }}>
+                          <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={e => { if (!dragging) setDetailModal(appt); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={"absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 " + ((dragging?.appointment?.id === appt.id ? "opacity-40 scale-95" : "hover:shadow-md hover:-translate-y-0.5"))} style={{ top: top+2, height: height-4, background: color.light, borderLeft: "4px solid " + color.bg, border: "1px solid " + color.border, borderLeftWidth: 4 }}>
                             <div className="p-1.5 h-full flex flex-col overflow-hidden">
                               <div className="font-bold text-xs leading-tight" style={{ color: color.text }}>
                                 {appt.name_kana || appt.patient_name}
@@ -437,9 +437,9 @@ export default function CalendarPage() {
                         );
                       })}
                       {dragOver?.colId === col.id && (
-                        <div className="absolute left-0 right-0 pointer-events-none z-30" style={{ top: slotTop(dragOver.slot), height: 2, background: '#3b82f6' }}>
-                          <div style={{ position: 'absolute', left: 0, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
-                          <span style={{ position: 'absolute', left: 12, top: -10, fontSize: 10, color: '#3b82f6', fontWeight: 700, background: '#fff', padding: '0 2px', borderRadius: 3 }}>
+                        <div className="absolute left-0 right-0 pointer-events-none z-30" style={{ top: slotTop(dragOver.slot), height: 2, background: "#3b82f6" }}>
+                          <div style={{ position: "absolute", left: 0, top: -4, width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
+                          <span style={{ position: "absolute", left: 12, top: -10, fontSize: 10, color: "#3b82f6", fontWeight: 700, background: "#fff", padding: "0 2px", borderRadius: 3 }}>
                             {dragOver.slot}
                           </span>
                         </div>
@@ -453,7 +453,7 @@ export default function CalendarPage() {
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
                         const inRange = (slotMin >= clinicOpenMin) && !(slotMin >= clinicCloseMin); const isOutOfHours = isClosedDay || !inRange;
-                        const slotCls = 'absolute left-0 right-0 border-b cursor-pointer transition-colors group ' + (isOutOfHours ? 'bg-gray-100 border-gray-100' : isDragTarget ? 'bg-blue-50 border-blue-200' : 'border-gray-50');
+                        const slotCls = "absolute left-0 right-0 border-b cursor-pointer transition-colors group " + (isOutOfHours ? "bg-gray-100 border-gray-100" : isDragTarget ? "bg-blue-50 border-blue-200" : "border-gray-50");
                         return (
                           <div key={slot} className={slotCls} style={{ top: slotTop(slot), height: SLOT_HEIGHT }} onDragOver={e => e.preventDefault()} onClick={() => { const fallbackChair = chairs[0] ? chairs[0].id : null; const isChairMode = col.type === "chair"; setNewApptModal({ slot, chairId: isChairMode ? col.id : fallbackChair, isOutOfHours }); }}>
                             {isOutOfHours && colIdx === 0 && (
@@ -465,8 +465,8 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="absolute inset-0 flex items-center justify-center" style={{ opacity: isDragTarget ? 1 : 0 }}>
-                              <span className={'text-xs ' + ((isOutOfHours ? 'text-orange-400' : 'text-blue-400'))}>
-                                {isOutOfHours ? '+ 時間外予約' : '+ 予約追加'}
+                              <span className={"text-xs " + ((isOutOfHours ? "text-orange-400" : "text-blue-400"))}>
+                                {isOutOfHours ? "+ 時間外予約" : "+ 予約追加"}
                               </span>
                             </div>
                           </div>
@@ -504,22 +504,22 @@ export default function CalendarPage() {
 
       {showManual && (
         <div style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0,
+          position: "fixed", top: 0, right: 0, bottom: 0,
           width: 520, zIndex: 200,
-          background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
-          display: 'flex', flexDirection: 'column',
+          background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
+          display: "flex", flexDirection: "column",
         }}>
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', background: '#1e3a5f', color: '#fff', flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "12px 16px", background: "#1e3a5f", color: "#fff", flexShrink: 0,
           }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>📖 操作マニュアル</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => window.open("/manual.html", "_blank")} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }} >↗ 別タブで開く</button>
-              <button onClick={() => setShowManual(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }} >✕</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => window.open("/manual.html", "_blank")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer" }} >↗ 別タブで開く</button>
+              <button onClick={() => setShowManual(false)} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1 }} >✕</button>
             </div>
           </div>
-          <iframe src="/manual.html" style={{ flex: 1, border: 'none' }} title="操作マニュアル" />
+          <iframe src="/manual.html" style={{ flex: 1, border: "none" }} title="操作マニュアル" />
         </div>
       )}
     </div>
@@ -578,14 +578,14 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const timelineH  = totalMin * MIN_PX;
 
   const CHAIR_COLORS = [
-    { bg: '#3b82f6', light: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' },
-    { bg: '#10b981', light: '#f0fdf4', border: '#a7f3d0', text: '#065f46' },
-    { bg: '#f59e0b', light: '#fffbeb', border: '#fde68a', text: '#92400e' },
-    { bg: '#8b5cf6', light: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
-    { bg: '#ef4444', light: '#fef2f2', border: '#fecaca', text: '#991b1b' },
-    { bg: '#06b6d4', light: '#ecfeff', border: '#a5f3fc', text: '#155e75' },
-    { bg: '#ec4899', light: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' },
-    { bg: '#84cc16', light: '#f7fee7', border: '#d9f99d', text: '#3f6212' },
+    { bg: "#3b82f6", light: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" },
+    { bg: "#10b981", light: "#f0fdf4", border: "#a7f3d0", text: "#065f46" },
+    { bg: "#f59e0b", light: "#fffbeb", border: "#fde68a", text: "#92400e" },
+    { bg: "#8b5cf6", light: "#f5f3ff", border: "#ddd6fe", text: "#5b21b6" },
+    { bg: "#ef4444", light: "#fef2f2", border: "#fecaca", text: "#991b1b" },
+    { bg: "#06b6d4", light: "#ecfeff", border: "#a5f3fc", text: "#155e75" },
+    { bg: "#ec4899", light: "#fdf2f8", border: "#fbcfe8", text: "#9d174d" },
+    { bg: "#84cc16", light: "#f7fee7", border: "#d9f99d", text: "#3f6212" },
   ];
 
   const weekMaxAppts = Math.max(
@@ -605,9 +605,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   function getClinicHours(dateStr) {
     const dow = new Date(dateStr).getDay();
     const ch  = settings.customHours?.[dow];
-    if (ch && ch !== '') {
+    if (ch && ch !== "") {
       try {
-        const p = typeof ch === 'string' ? JSON.parse(ch) : ch;
+        const p = typeof ch === "string" ? JSON.parse(ch) : ch;
         if (p && p.open && p.close) {
           return { open: toMinutes(p.open), close: toMinutes(p.close) };
         }
@@ -631,7 +631,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
   function handleDragStart(e, appt, fromDate) {
     setDragging({ appt, fromDate });
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.effectAllowed = "move";
   }
   function handleDragEnd() { setDragging(null); setDragOver(null); }
 
@@ -682,8 +682,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const wStart = new Date(weekDates[0]);
   const wEnd   = new Date(weekDates[weekDates.length - 1]);
   const rangeStr = weekOnly
-    ? (wStart.getMonth()+1) + '/' + wStart.getDate() + '(月) 〜 ' + (wEnd.getMonth()+1) + '/' + wEnd.getDate() + '(金)'
-    : (wStart.getMonth()+1) + '/' + wStart.getDate() + ' 〜 ' + (wEnd.getMonth()+1) + '/' + wEnd.getDate();
+    ? (wStart.getMonth()+1) + "/" + wStart.getDate() + "(月) 〜 " + (wEnd.getMonth()+1) + "/" + wEnd.getDate() + "(金)"
+    : (wStart.getMonth()+1) + "/" + wStart.getDate() + " 〜 " + (wEnd.getMonth()+1) + "/" + wEnd.getDate();
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -693,8 +693,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
             <h1 className="text-xl font-bold text-gray-800">📅 診療カレンダー</h1>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                {[['month','月'], ['week','週'], ['week5','5日'], ['day','日']].map(([v, label]) => (
-                  <button key={v} onClick={() => onSwitchView(v)} className={'px-3 py-1.5 text-sm font-medium transition-colors ' + ((v === 'week' && !weekOnly) || (v === 'week5' && weekOnly) ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}>
+                {[["month","月"], ["week","週"], ["week5","5日"], ["day","日"]].map(([v, label]) => (
+                  <button key={v} onClick={() => onSwitchView(v)} className={"px-3 py-1.5 text-sm font-medium transition-colors " + ((v === "week" && !weekOnly) || (v === "week5" && weekOnly) ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50")}>
                     {label}表示
                   </button>
                 ))}
@@ -711,7 +711,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {Object.entries(TREATMENT_COLORS).map(([name, color]) => (
-              <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: '1px solid ' + color.border }}>
+              <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: color.light, color: color.text, border: "1px solid " + color.border }}>
                 <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color.bg }} />{name} </span>
             ))}
           </div>
@@ -733,66 +733,66 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const isClosed = !openDays.includes(dow) && !hasCustomHours;
               const isPartialDay = hasCustomHours && openDays.includes(dow);
               const dayAppts = weekData[dateStr]?.appointments || [];
-              const DOW_LABEL = ['日','月','火','水','木','金','土'];
+              const DOW_LABEL = ["日","月","火","水","木","金","土"];
               const count    = dayAppts.length;
               const barPct   = Math.round((count / weekMaxAppts) * 100);
-              const barColor = isClosed ? '#e5e7eb'
-                : barPct >= 80 ? '#ef4444'
-                : barPct >= 50 ? '#3b82f6'
-                : '#22c55e';
-              const chColor = isClosed ? { bg:'#9ca3af', light:'#f9fafb', border:'#e5e7eb', text:'#6b7280' }
+              const barColor = isClosed ? "#e5e7eb"
+                : barPct >= 80 ? "#ef4444"
+                : barPct >= 50 ? "#3b82f6"
+                : "#22c55e";
+              const chColor = isClosed ? { bg:"#9ca3af", light:"#f9fafb", border:"#e5e7eb", text:"#6b7280" }
                 : CHAIR_COLORS[colIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ width: COL_W, flexShrink: 0, borderLeft: '3px solid ' + (isClosed ? '#e5e7eb' : chColor.bg), background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff', cursor: 'pointer', }} className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
+                <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ width: COL_W, flexShrink: 0, borderLeft: "3px solid " + (isClosed ? "#e5e7eb" : chColor.bg), background: isToday ? chColor.light : isClosed ? "#f9fafb" : "#fff", cursor: "pointer", }} className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
                   <div className="flex items-center justify-between mb-1">
                     <span style={{
                       fontSize: 11, fontWeight: 700,
-                      color: isClosed ? '#9ca3af'
-                        : dow === 0 ? '#ef4444'
-                        : dow === 6 ? '#3b82f6'
+                      color: isClosed ? "#9ca3af"
+                        : dow === 0 ? "#ef4444"
+                        : dow === 6 ? "#3b82f6"
                         : chColor.bg
                     }}>
                       {DOW_LABEL[dow]}
                     </span>
                     <span style={{
-                      width: 24, height: 24, borderRadius: '50%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 24, height: 24, borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 12, fontWeight: 700,
-                      background: isToday ? chColor.bg : 'transparent',
-                      color: isToday ? '#fff' : isClosed ? '#9ca3af' : '#374151',
+                      background: isToday ? chColor.bg : "transparent",
+                      color: isToday ? "#fff" : isClosed ? "#9ca3af" : "#374151",
                     }}>
                       {d.getDate()}
                     </span>
                   </div>
                   {isClosed ? (
-                    <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', marginTop: 2 }}>休診</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", textAlign: "center", marginTop: 2 }}>休診</div>
                   ) : isPartialDay ? (
                     <>
-                      <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
-                        <div style={{ width: barPct + '%', height: '100%', background: barColor, borderRadius: 3 }} />
+                      <div style={{ background: "#f3f4f6", borderRadius: 3, height: 5, overflow: "hidden", marginBottom: 2 }}>
+                        <div style={{ width: barPct + "%", height: "100%", background: barColor, borderRadius: 3 }} />
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
-                          {count >= 1 ? count + '件' : '午前のみ'}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600 }}>
+                          {count >= 1 ? count + "件" : "午前のみ"}
                         </span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
+                      <div style={{ background: "#f3f4f6", borderRadius: 3, height: 5, overflow: "hidden", marginBottom: 2 }}>
                         <div style={{
-                          width: barPct + '%', height: '100%',
+                          width: barPct + "%", height: "100%",
                           background: barColor, borderRadius: 3,
-                          transition: 'width 0.4s ease',
+                          transition: "width 0.4s ease",
                         }} />
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 10, color: barColor, fontWeight: 600 }}>
-                          {count >= 1 ? count + '件' : '空き'}
+                          {count >= 1 ? count + "件" : "空き"}
                         </span>
                         {barPct >= 80 && (
-                          <span style={{ fontSize: 9, background: '#fef2f2', color: '#dc2626', borderRadius: 3, padding: '0 3px', fontWeight: 600 }}>
+                          <span style={{ fontSize: 9, background: "#fef2f2", color: "#dc2626", borderRadius: 3, padding: "0 3px", fontWeight: 600 }}>
                             混
                           </span>
                         )}
@@ -823,13 +823,13 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
               const lunchH2     = durPx(toMinutes(settings.lunchEnd) - toMinutes(settings.lunchStart));
               const layout      = calcOverlapLayout(dayAppts);
               const chColor     = isClosed
-                ? { bg:'#e5e7eb', light:'#f9fafb', border:'#e5e7eb', text:'#9ca3af' }
+                ? { bg:"#e5e7eb", light:"#f9fafb", border:"#e5e7eb", text:"#9ca3af" }
                 : CHAIR_COLORS[dayIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr} className="relative border-r border-gray-100" style={{ width: COL_W, flexShrink: 0, height: timelineH, borderLeft: '2px solid ' + chColor.border, background: isToday ? chColor.light + '60' : 'transparent' }} onDragOver={e => { e.preventDefault(); const time = weekPixelToTime(e, e.currentTarget); setDragOver({ slot: time, dateStr }); }} onDrop={async e => { e.preventDefault(); if (!dragging) return; const { appt } = dragging; const time = weekPixelToTime(e, e.currentTarget); const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time); const newEnd = toTimeStr(toMinutes(time) + durMin); setDragging(null); setDragOver(null); try { await axios.put('/api/appointments/' + appt.id, { appointment_date: dateStr, start_time: time, end_time: newEnd }); onRefresh(); } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); } }} onClick={e => { if (dragging || e.target !== e.currentTarget) return; const rect = e.currentTarget.getBoundingClientRect(); const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX); const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration; const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration))); const dayData = weekData[dateStr]; const dayChairs = dayData ? dayData.chairs : null; const firstChair = dayChairs ? dayChairs[0] : null; const firstChairId = firstChair ? firstChair.id : null; setNewApptModal({ slot: time, chairId: firstChairId, date: dateStr }); }}> {isClosed && (
+                <div key={dateStr} className="relative border-r border-gray-100" style={{ width: COL_W, flexShrink: 0, height: timelineH, borderLeft: "2px solid " + chColor.border, background: isToday ? chColor.light + "60" : "transparent" }} onDragOver={e => { e.preventDefault(); const time = weekPixelToTime(e, e.currentTarget); setDragOver({ slot: time, dateStr }); }} onDrop={async e => { e.preventDefault(); if (!dragging) return; const { appt } = dragging; const time = weekPixelToTime(e, e.currentTarget); const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time); const newEnd = toTimeStr(toMinutes(time) + durMin); setDragging(null); setDragOver(null); try { await axios.put("/api/appointments/" + appt.id, { appointment_date: dateStr, start_time: time, end_time: newEnd }); onRefresh(); } catch (err) { alert(err.response?.data?.error || "移動に失敗しました"); } }} onClick={e => { if (dragging || e.target !== e.currentTarget) return; const rect = e.currentTarget.getBoundingClientRect(); const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX); const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration; const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration))); const dayData = weekData[dateStr]; const dayChairs = dayData ? dayData.chairs : null; const firstChair = dayChairs ? dayChairs[0] : null; const firstChairId = firstChair ? firstChair.id : null; setNewApptModal({ slot: time, chairId: firstChairId, date: dateStr }); }}> {isClosed && (
                     <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
-                      <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
+                      <span className="text-gray-400 text-xs font-medium" style={{ writingMode: "vertical-rl" }}>休診日</span>
                     </div>
                   )}
                   {!isClosed && !(clinicH.open <= openMin) && (
@@ -841,8 +841,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   <div className="absolute left-0 right-0 bg-yellow-50 border-y border-yellow-100 z-10" style={{ top: lunchS, height: lunchH2 }}>
                     {dayIdx === 0 && <span className="text-yellow-400 pl-1" style={{ fontSize: 9 }}>昼休み</span>} </div>
                   {showNow && dayIdx === 0 && (
-                    <div className="pointer-events-none z-30" style={{ position: 'absolute', top: nowTop, left: 0, width: COL_W * 7, height: 2, background: '#ef4444' }}>
-                      <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                    <div className="pointer-events-none z-30" style={{ position: "absolute", top: nowTop, left: 0, width: COL_W * 7, height: 2, background: "#ef4444" }}>
+                      <div style={{ position: "absolute", left: -4, top: -4, width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
                     </div>
                   )}
                   {layout.map(({ appt, left, width, zIndex }) => {
@@ -851,16 +851,16 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const color  = getTreatmentColor(appt.treatment_type);
                     const isDrag = dragging?.appt?.id === appt.id;
                     return (
-                      <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={'absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ' + (isDrag ? 'opacity-40' : 'hover:shadow-lg')} style={{ top: top + 1, height: Math.max(height - 2, 18), left: (left + 0.5) + '%', width: (width - 1) + '%', zIndex: isDrag ? 5 : zIndex, background: color.light, borderLeft: '3px solid ' + color.bg, border: '0.5px solid ' + color.border, borderLeftWidth: 3, }}> <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
-                          <div style={{ display:'flex', alignItems:'center', gap:2, marginBottom:1 }}>
+                      <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={"absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all " + (isDrag ? "opacity-40" : "hover:shadow-lg")} style={{ top: top + 1, height: Math.max(height - 2, 18), left: (left + 0.5) + "%", width: (width - 1) + "%", zIndex: isDrag ? 5 : zIndex, background: color.light, borderLeft: "3px solid " + color.bg, border: "0.5px solid " + color.border, borderLeftWidth: 3, }}> <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
+                          <div style={{ display:"flex", alignItems:"center", gap:2, marginBottom:1 }}>
                             <div className="font-bold leading-tight truncate" style={{ color: color.text, fontSize: 10, flex:1 }}>
                               {appt.name_kana || appt.patient_name}
                             </div>
                             {appt.chair_name && (
                               <span style={{
-                                fontSize: 8, padding: '0 3px', borderRadius: 3, flexShrink: 0,
-                                background: color.bg, color: '#fff', fontWeight: 700, lineHeight: '14px',
-                              }}>{appt.chair_name.replace('チェア','C')}</span>
+                                fontSize: 8, padding: "0 3px", borderRadius: 3, flexShrink: 0,
+                                background: color.bg, color: "#fff", fontWeight: 700, lineHeight: "14px",
+                              }}>{appt.chair_name.replace("チェア","C")}</span>
                             )}
                           </div>
                           {height >= 31 && (
@@ -876,9 +876,9 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 
                   {dragOver?.dateStr === dateStr && (
                     <div className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(dragOver.slot), zIndex: 40 }}>
-                      <div style={{ height: 2, background: '#3b82f6', position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: -4, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
-                        <span style={{ position: 'absolute', left: 8, top: -10, fontSize: 10, color: '#3b82f6', fontWeight: 700, background: 'white', padding: '0 2px', borderRadius: 3 }}>
+                      <div style={{ height: 2, background: "#3b82f6", position: "relative" }}>
+                        <div style={{ position: "absolute", left: -4, top: -4, width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
+                        <span style={{ position: "absolute", left: 8, top: -10, fontSize: 10, color: "#3b82f6", fontWeight: 700, background: "white", padding: "0 2px", borderRadius: 3 }}>
                           {dragOver.slot}
                         </span>
                       </div>
@@ -887,7 +887,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                   {allSlots.map(slot => {
                     const isHour = toMinutes(slot) % 60 === 0;
                     return (
-                      <div key={slot} className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(slot), height: SLOT_H, borderTop: isHour ? '0.5px solid #e5e7eb' : '0.5px solid #f3f4f6', zIndex: 0 }} />
+                      <div key={slot} className="absolute left-0 right-0 pointer-events-none" style={{ top: slotTop(slot), height: SLOT_H, borderTop: isHour ? "0.5px solid #e5e7eb" : "0.5px solid #f3f4f6", zIndex: 0 }} />
                     );
                   })}
                 </div>
@@ -924,18 +924,18 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
 function ApptTooltip({ appt, visible, x, y }) {
   if (!visible || !appt) return null;
 
-  const isDark = document.documentElement.classList.contains('dark');
-  const bg        = isDark ? '#f1f5f9' : '#1e293b';  
-  const textMain  = isDark ? '#0f172a' : '#f8fafc';
-  const textSub   = isDark ? '#334155' : '#cbd5e1';
-  const textGreen = isDark ? '#065f46' : '#6ee7b7';
-  const textBlue  = isDark ? '#1e40af' : '#93c5fd';
-  const textAmber = isDark ? '#92400e' : '#fde68a';
-  const textRed   = isDark ? '#991b1b' : '#fca5a5';
-  const border    = isDark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)';
+  const isDark = document.documentElement.classList.contains("dark");
+  const bg        = isDark ? "#f1f5f9" : "#1e293b";  
+  const textMain  = isDark ? "#0f172a" : "#f8fafc";
+  const textSub   = isDark ? "#334155" : "#cbd5e1";
+  const textGreen = isDark ? "#065f46" : "#6ee7b7";
+  const textBlue  = isDark ? "#1e40af" : "#93c5fd";
+  const textAmber = isDark ? "#92400e" : "#fde68a";
+  const textRed   = isDark ? "#991b1b" : "#fca5a5";
+  const border    = isDark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.1)";
   const shadow    = isDark
-    ? '0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08)'
-    : '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)';
+    ? "0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08)"
+    : "0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)";
 
   const tooltipW  = 230;
   const left = x + 14 + tooltipW >= window.innerWidth ? x - tooltipW - 8 : x + 14;
@@ -943,17 +943,17 @@ function ApptTooltip({ appt, visible, x, y }) {
 
   return (
     <div style={{
-      position: 'fixed', left: left, top: y - 12,
-      zIndex: 9999, pointerEvents: 'none',
+      position: "fixed", left: left, top: y - 12,
+      zIndex: 9999, pointerEvents: "none",
       background: bg,
-      borderRadius: 10, padding: '10px 14px',
+      borderRadius: 10, padding: "10px 14px",
       fontSize: 12, lineHeight: 1.65,
       boxShadow: shadow,
       width: tooltipW,
-      border: '1px solid ' + border,
+      border: "1px solid " + border,
     }}>
-      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
+      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: isDark ? "#3b82f6" : "#60a5fa", flexShrink: 0 }} />
         {appt.name_kana || appt.patient_name}
       </div>
       {appt.patient_name && appt.name_kana && (
@@ -961,28 +961,28 @@ function ApptTooltip({ appt, visible, x, y }) {
           {appt.patient_name}
         </div>
       )}
-      <div style={{ borderTop: '1px solid ' + (isDark ? '#e2e8f0' : '#334155'), margin: '5px 0' }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+      <div style={{ borderTop: "1px solid " + (isDark ? "#e2e8f0" : "#334155"), margin: "5px 0" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 10, color: textSub }}>治療</span>
         <span style={{ fontWeight: 600, color: textGreen }}>{appt.treatment_type}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
         <span style={{ fontSize: 10, color: textSub }}>日時</span>
         <span style={{ color: textBlue }}>
           {appt.appointment_date} &nbsp;
           {appt.start_time?.substring(0,5)}〜{appt.end_time?.substring(0,5)}
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <span style={{ fontSize: 10, color: textSub }}>担当</span>
         <span style={{ color: textAmber }}>
-          {appt.chair_name} &nbsp;/&nbsp; Dr.{appt.doctor_name || '未定'}
+          {appt.chair_name} &nbsp;/&nbsp; Dr.{appt.doctor_name || "未定"}
         </span>
       </div>
       {appt.notes && (
         <div style={{
-          marginTop: 5, padding: '4px 6px',
-          background: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.15)',
+          marginTop: 5, padding: "4px 6px",
+          background: isDark ? "rgba(239,68,68,0.08)" : "rgba(239,68,68,0.15)",
           borderRadius: 5, fontSize: 11,
           color: textRed,
         }}>
@@ -991,19 +991,19 @@ function ApptTooltip({ appt, visible, x, y }) {
       )}
       {!arrowLeft ? (
         <div style={{
-          position: 'absolute', left: -7, top: 16,
+          position: "absolute", left: -7, top: 16,
           width: 0, height: 0,
-          borderTop: '6px solid transparent',
-          borderBottom: '6px solid transparent',
-          borderRight: '7px solid ' + bg,
+          borderTop: "6px solid transparent",
+          borderBottom: "6px solid transparent",
+          borderRight: "7px solid " + bg,
         }} />
       ) : (
         <div style={{
-          position: 'absolute', right: -7, top: 16,
+          position: "absolute", right: -7, top: 16,
           width: 0, height: 0,
-          borderTop: '6px solid transparent',
-          borderBottom: '6px solid transparent',
-          borderLeft: '7px solid ' + bg,
+          borderTop: "6px solid transparent",
+          borderBottom: "6px solid transparent",
+          borderLeft: "7px solid " + bg,
         }} />
       )}
     </div>
@@ -1011,7 +1011,7 @@ function ApptTooltip({ appt, visible, x, y }) {
 }
 
 function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelectDate, onSwitchToDay }) {
-  const [year, month] = currentMonth.split('-').map(Number);
+  const [year, month] = currentMonth.split("-").map(Number);
   const daysInMonth   = new Date(year, month, 0).getDate();
   const firstDow      = new Date(year, month-1, 1).getDay();
   const today         = new Date().toISOString().split("T")[0];
@@ -1025,7 +1025,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
   const cells = [];
   for (let i = 0; i !== firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    cells.push(`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
   }
 
   function getOccupancyRate(appts, maxChairs = 3) {
@@ -1051,12 +1051,12 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
           const activeDays = Object.values(monthData).filter(d => !!d?.appointments?.length).length;
           const avgPerDay = activeDays ? Math.round(monthStats.total / activeDays) : 0;
           return [
-            { label: '月間予約数', value: monthStats.total + '件', color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: '診療日数', value: activeDays + '日', color: 'text-green-600', bg: 'bg-green-50' },
-            { label: '平均/日', value: avgPerDay + '件', color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: "月間予約数", value: monthStats.total + "件", color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "診療日数", value: activeDays + "日", color: "text-green-600", bg: "bg-green-50" },
+            { label: "平均/日", value: avgPerDay + "件", color: "text-purple-600", bg: "bg-purple-50" },
           ].map(s => (
-          <div key={s.label} className={s.bg + ' rounded-xl p-3 text-center'}>
-            <div className={'text-xl font-bold ' + s.color}>{s.value}</div>
+          <div key={s.label} className={s.bg + " rounded-xl p-3 text-center"}>
+            <div className={"text-xl font-bold " + s.color}>{s.value}</div>
             <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
           </div>
           ));
@@ -1070,8 +1070,8 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
           <button onClick={onNextMonth} className="p-2 rounded-lg hover:bg-gray-50 text-gray-500">▶</button>
         </div>
         <div className="grid grid-cols-7 border-b border-gray-100">
-          {['日','月','火','水','木','金','土'].map((d, i) => (
-            <div key={d} className={'py-2 text-center text-xs font-bold ' + (i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500')}>
+          {["日","月","火","水","木","金","土"].map((d, i) => (
+            <div key={d} className={"py-2 text-center text-xs font-bold " + (i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500")}>
               {d}
             </div>
           ))}
@@ -1097,9 +1097,9 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
             const occupancy = getOccupancyRate(appts, maxChairs);
 
             return (
-              <div key={dateStr} onClick={() => onSelectDate(dateStr)} className={'h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group ' + (isToday ? 'bg-blue-50 border-blue-100' : '' + ' ' + isPast && !isToday ? 'bg-gray-50' : '' + ' ' + !isPast && !isToday ? '' : '')}>
+              <div key={dateStr} onClick={() => onSelectDate(dateStr)} className={"h-28 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-all group " + (isToday ? "bg-blue-50 border-blue-100" : "" + " " + isPast && !isToday ? "bg-gray-50" : "" + " " + !isPast && !isToday ? "" : "")}>
                 <div className="flex items-center justify-between mb-1">
-                  <div className={'text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 ' + (isToday ? 'bg-blue-600 text-white' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700')}>
+                  <div className={"text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 " + (isToday ? "bg-blue-600 text-white" : dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-700")}>
                     {new Date(dateStr).getDate()}
                   </div>
                   {appts.length >= 1 && (
@@ -1110,7 +1110,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                 </div>
                 {appts.length >= 1 && (
                   <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: occupancy + '%', background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e' }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: occupancy + "%", background: occupancy >= 80 ? "#ef4444" : occupancy >= 50 ? "#3b82f6" : "#22c55e" }} />
                   </div>
                 )}
                 {treatmentColors.length >= 1 && (
@@ -1124,7 +1124,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                   {appts.slice(0, 2).map(a => {
                     const color = getTreatmentColor(a.treatment_type);
                     return (
-                      <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight" style={{ background: color.light, color: color.text, borderLeft: '2px solid ' + color.bg }}>
+                      <div key={a.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight" style={{ background: color.light, color: color.text, borderLeft: "2px solid " + color.bg }}>
                         {a.start_time?.substring(0,5)} {a.name_kana || a.patient_name}
                       </div>
                     );
@@ -1137,7 +1137,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                 </div>
                 {appts.length === 0 && (
                   <div className="text-xs text-gray-300 text-center mt-2">
-                    {dow === 0 ? '休診' : ''}
+                    {dow === 0 ? "休診" : ""}
                   </div>
                 )}
               </div>
@@ -1160,20 +1160,20 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
 
 function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, onSave }) {
   const [patients, setPatients]               = useState([]);
-  const [patientSearch, setPatientSearch]     = useState('');
+  const [patientSearch, setPatientSearch]     = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showPatientList, setShowPatientList] = useState(false);
   const [treatments, setTreatments]           = useState([]);
   const [staffList, setStaffList]             = useState([]);
   const [selectedTreatment, setSelectedTreatment] = useState(null);
   const [selectedChairId, setSelectedChairId] = useState(chairId);
-  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [duration, setDuration]               = useState(settings.slotDuration);
-  const [notes, setNotes]                     = useState('');
+  const [notes, setNotes]                     = useState("");
   const [saving, setSaving]                   = useState(false);
   const [newPatientMode, setNewPatientMode]   = useState(false);
-  const [newPatient, setNewPatient]           = useState({ name: '', name_kana: '', phone: '' });
-  const [kanaError, setKanaError]             = useState('');
+  const [newPatient, setNewPatient]           = useState({ name: "", name_kana: "", phone: "" });
+  const [kanaError, setKanaError]             = useState("");
 
   const endTime = toTimeStr(toMinutes(slot) + duration);
 
@@ -1181,15 +1181,15 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
     const load = async () => {
       try {
         const [tr, st] = await Promise.all([
-          axios.get('/api/treatments'),
-          axios.get('/api/staff')
+          axios.get("/api/treatments"),
+          axios.get("/api/staff")
         ]);
         const treatList = tr.data?.treatments || tr.data || [];
         const staffArr  = st.data?.staff      || st.data || [];
         setTreatments(Array.isArray(treatList) ? treatList : []);
         setStaffList(Array.isArray(staffArr) ? staffArr : []);
         if (treatList.length) { setSelectedTreatment(treatList[0]); setDuration(treatList[0].duration || settings.slotDuration); }
-      } catch (err) { console.error('load error:', err); }
+      } catch (err) { console.error("load error:", err); }
     };
     load();
   }, []);
@@ -1198,7 +1198,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
     if (!patientSearch.length) { setShowPatientList(false); return; }
     const search = async () => {
       try {
-        const res = await axios.get('/api/patients?q=' + patientSearch);
+        const res = await axios.get("/api/patients?q=" + patientSearch);
         setPatients(res.data.patients || res.data || []);
         setShowPatientList(true);
       } catch {}
@@ -1207,9 +1207,9 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
   }, [patientSearch]);
 
   function validateKana(val) {
-    if (!val) { setKanaError('フリガナは必須です'); return false; }
-    if (!/^[ァ-ヶー　\s]+$/.test(val)) { setKanaError('カタカナで入力してください'); return false; }
-    setKanaError(''); return true;
+    if (!val) { setKanaError("フリガナは必須です"); return false; }
+    if (!/^[ァ-ヶー　\s]+$/.test(val)) { setKanaError("カタカナで入力してください"); return false; }
+    setKanaError(""); return true;
   }
 
   async function handleSave() {
@@ -1218,23 +1218,23 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
       let patientId = selectedPatient?.id;
       if (newPatientMode) {
         if (!newPatient.name || !validateKana(newPatient.name_kana)) { setSaving(false); return; }
-        const pr = await axios.post('/api/patients', newPatient);
+        const pr = await axios.post("/api/patients", newPatient);
         patientId = pr.data.id;
       }
-      if (!patientId) { alert('患者を選択してください'); setSaving(false); return; }
-      if (!selectedTreatment) { alert('治療内容を選択してください'); setSaving(false); return; }
+      if (!patientId) { alert("患者を選択してください"); setSaving(false); return; }
+      if (!selectedTreatment) { alert("治療内容を選択してください"); setSaving(false); return; }
 
-      await axios.post('/api/appointments', {
+      await axios.post("/api/appointments", {
         patient_id: patientId, appointment_date: date,
         start_time: slot, end_time: endTime,
         treatment_id: selectedTreatment.id,
         chair_id: selectedChairId,
         staff_id: selectedStaffId || null,
-        notes, source: 'staff'
+        notes, source: "staff"
       });
       onSave();
     } catch (err) {
-      alert(err.response?.data?.error || '保存に失敗しました');
+      alert(err.response?.data?.error || "保存に失敗しました");
     } finally { setSaving(false); }
   }
 
@@ -1257,11 +1257,11 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
             {!newPatientMode ? (
               <>
                 <div className="relative">
-                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? (selectedPatient.name_kana||'') + ' ' + selectedPatient.name : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? (selectedPatient.name_kana||"") + " " + selectedPatient.name : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   {showPatientList && patients.length >= 1 && (
                     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto mt-1">
                       {patients.map(p => (
-                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0" onClick={() => { setSelectedPatient(p); setPatientSearch(''); setShowPatientList(false); }}>
+                        <button key={p.id} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-50 last:border-0" onClick={() => { setSelectedPatient(p); setPatientSearch(""); setShowPatientList(false); }}>
                           <span className="font-medium">{p.name_kana}</span>
                           <span className="text-gray-500 ml-1">{p.name}</span>
                           <span className="text-gray-400 ml-2 text-xs">{p.phone}</span>
@@ -1283,7 +1283,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
                 <p className="text-xs font-bold text-blue-700">新患登録</p>
                 <input placeholder="氏名 *" value={newPatient.name} onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
                 <div>
-                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana} onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }} className={'w-full border rounded px-2 py-1.5 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
+                  <input placeholder="フリガナ（カタカナ）*" value={newPatient.name_kana} onChange={e => { setNewPatient(p => ({ ...p, name_kana: e.target.value })); validateKana(e.target.value); }} className={"w-full border rounded px-2 py-1.5 text-sm " + (kanaError ? "border-red-400" : "border-gray-200")} />
                   {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
                 </div>
                 <input placeholder="電話番号" value={newPatient.phone} onChange={e => setNewPatient(p => ({ ...p, phone: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
@@ -1298,7 +1298,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
                 const c = getTreatmentColor(t.name);
                 const selected = selectedTreatment?.id === t.id;
                 return (
-                  <button key={t.id} onClick={() => { setSelectedTreatment(t); setDuration(t.duration || settings.slotDuration); }} className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-left" style={{ background: selected ? c.bg : c.light, color: selected ? '#fff' : c.text, borderColor: selected ? c.bg : c.border }}>
+                  <button key={t.id} onClick={() => { setSelectedTreatment(t); setDuration(t.duration || settings.slotDuration); }} className="px-2 py-1.5 rounded-lg text-xs font-medium transition-all border text-left" style={{ background: selected ? c.bg : c.light, color: selected ? "#fff" : c.text, borderColor: selected ? c.bg : c.border }}>
                     {t.name} <span className="opacity-70">{t.duration}分</span>
                   </button>
                 );
@@ -1338,7 +1338,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">キャンセル</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
-            {saving ? '保存中...' : '予約を追加'}
+            {saving ? "保存中..." : "予約を追加"}
           </button>
         </div>
       </div>
@@ -1347,7 +1347,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
 }
 
 function AppointmentDetailModal({ appt, onClose, onUpdate }) {
-  const [notes, setNotes]             = useState(appt.notes || '');
+  const [notes, setNotes]             = useState(appt.notes || "");
   const [saving, setSaving]           = useState(false);
   const [editPatient, setEditPatient] = useState(false);
   const [reschedule, setReschedule]   = useState(false);
@@ -1355,13 +1355,13 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
 
   async function handleSave() {
     setSaving(true);
-    try { await axios.put('/api/appointments/' + appt.id, { notes }); onUpdate(); }
-    catch { alert('更新に失敗しました'); } finally { setSaving(false); }
+    try { await axios.put("/api/appointments/" + appt.id, { notes }); onUpdate(); }
+    catch { alert("更新に失敗しました"); } finally { setSaving(false); }
   }
   async function handleCancel() {
-    if (!window.confirm('この予約をキャンセルしますか？')) return;
-    try { await axios.delete('/api/appointments/' + appt.id); onUpdate(); }
-    catch { alert('キャンセルに失敗しました'); }
+    if (!window.confirm("この予約をキャンセルしますか？")) return;
+    try { await axios.delete("/api/appointments/" + appt.id); onUpdate(); }
+    catch { alert("キャンセルに失敗しました"); }
   }
 
   if (editPatient) {
@@ -1445,7 +1445,7 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
             予約キャンセル
           </button>
           <button onClick={handleSave} disabled={saving} className="flex-1 rounded-xl py-2 text-sm font-bold text-white disabled:opacity-50" style={{ background: color.bg }}>
-            {saving ? '保存中...' : '保存'}
+            {saving ? "保存中..." : "保存"}
           </button>
         </div>
       </div>
@@ -1465,14 +1465,14 @@ function RescheduleModal({ appt, onClose, onSave }) {
   const color = getTreatmentColor(appt.treatment_type);
 
   useEffect(() => {
-    axios.get('/api/appointments/calendar/' + newDate)
+    axios.get("/api/appointments/calendar/" + newDate)
       .then(r => { setChairs(r.data?.chairs || []); })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     setLoadingSlots(true);
-    axios.get('/api/appointments/available-slots/' + newDate)
+    axios.get("/api/appointments/available-slots/" + newDate)
       .then(r => {
         const allSlots = r.data?.slots || [];
         setSlots(allSlots);
@@ -1486,7 +1486,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
   async function handleSave() {
     setSaving(true);
     try {
-      await axios.put('/api/appointments/' + appt.id, {
+      await axios.put("/api/appointments/" + appt.id, {
         appointment_date: newDate,
         start_time: newTime,
         end_time:   newEndTime,
@@ -1494,7 +1494,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
       });
       onSave();
     } catch (err) {
-      alert(err.response?.data?.error || '変更に失敗しました');
+      alert(err.response?.data?.error || "変更に失敗しました");
     } finally { setSaving(false); }
   }
 
@@ -1538,7 +1538,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
                   const isAvailable = slot.available || slot.time === appt.start_time?.substring(0,5);
                   const isSelected  = slot.time === newTime;
                   return (
-                    <button key={slot.time} type="button" onClick={() => isAvailable && setNewTime(slot.time)} disabled={!isAvailable} className={'py-1.5 rounded-lg text-xs font-medium border transition-all ' + (isSelected ? 'bg-blue-600 text-white border-blue-600' : isAvailable ? 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300' : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed')}>
+                    <button key={slot.time} type="button" onClick={() => isAvailable && setNewTime(slot.time)} disabled={!isAvailable} className={"py-1.5 rounded-lg text-xs font-medium border transition-all " + (isSelected ? "bg-blue-600 text-white border-blue-600" : isAvailable ? "bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300" : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed")}>
                       {slot.time}
                     </button>
                   );
@@ -1551,7 +1551,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">チェア</label>
               <div className="grid grid-cols-3 gap-2">
                 {chairs.map(c => (
-                  <button key={c.id} type="button" onClick={() => setNewChairId(c.id)} className={'py-2 rounded-lg text-xs font-medium border transition-all ' + (newChairId === c.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50')}>
+                  <button key={c.id} type="button" onClick={() => setNewChairId(c.id)} className={"py-2 rounded-lg text-xs font-medium border transition-all " + (newChairId === c.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50")}>
                     {c.name}
                   </button>
                 ))}
@@ -1572,8 +1572,8 @@ function RescheduleModal({ appt, onClose, onSave }) {
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">
             戻る
           </button>
-          <button onClick={handleSave} disabled={saving || !isChanged} className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-colors" style={{ background: isChanged ? color.bg : '#9ca3af' }}>
-            {saving ? '変更中...' : '変更を保存'}
+          <button onClick={handleSave} disabled={saving || !isChanged} className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50 transition-colors" style={{ background: isChanged ? color.bg : "#9ca3af" }}>
+            {saving ? "変更中..." : "変更を保存"}
           </button>
         </div>
       </div>
@@ -1585,12 +1585,12 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   const [patient, setPatient] = useState(null);
   const [form, setForm]       = useState({});
   const [saving, setSaving]   = useState(false);
-  const [kanaError, setKanaError] = useState('');
+  const [kanaError, setKanaError] = useState("");
 
   useEffect(() => {
-    axios.get('/api/patients/' + patientId)
+    axios.get("/api/patients/" + patientId)
       .then(r => { setPatient(r.data); setForm(r.data); })
-      .catch(() => alert('患者情報の取得に失敗しました'));
+      .catch(() => alert("患者情報の取得に失敗しました"));
   }, [patientId]);
 
   function calcAgeGroup(birthDate) {
@@ -1600,9 +1600,9 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   }
 
   function validateKana(val) {
-    if (!val) { setKanaError('フリガナは必須です'); return false; }
-    if (!/^[ァ-ヶー　\s]+$/.test(val)) { setKanaError('カタカナで入力してください'); return false; }
-    setKanaError(''); return true;
+    if (!val) { setKanaError("フリガナは必須です"); return false; }
+    if (!/^[ァ-ヶー　\s]+$/.test(val)) { setKanaError("カタカナで入力してください"); return false; }
+    setKanaError(""); return true;
   }
 
   async function handleSave() {
@@ -1610,10 +1610,10 @@ function PatientEditModal({ patientId, onClose, onSave }) {
     setSaving(true);
     try {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
-      await axios.put('/api/patients/' + patientId, { ...form, age_group });
+      await axios.put("/api/patients/" + patientId, { ...form, age_group });
       onSave();
     } catch (err) {
-      alert(err.response?.data?.error || '保存に失敗しました');
+      alert(err.response?.data?.error || "保存に失敗しました");
     } finally { setSaving(false); }
   }
 
@@ -1623,7 +1623,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
     </div>
   );
 
-  const AGE_GROUPS = ['10代','20代','30代','40代','50代','60代','70代','80代','90代以上'];
+  const AGE_GROUPS = ["10代","20代","30代","40代","50代","60代","70代","80代","90代以上"];
   const autoAgeGroup = form.birth_date ? calcAgeGroup(form.birth_date) : null;
 
   return (
@@ -1637,22 +1637,22 @@ function PatientEditModal({ patientId, onClose, onSave }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">氏名 *</label>
-              <input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.name || ""} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">フリガナ *</label>
-              <input value={form.name_kana || ''} onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }} className={'w-full border rounded-lg px-3 py-2 text-sm ' + (kanaError ? 'border-red-400' : 'border-gray-200')} />
+              <input value={form.name_kana || ""} onChange={e => { setForm(f => ({...f, name_kana: e.target.value})); validateKana(e.target.value); }} className={"w-full border rounded-lg px-3 py-2 text-sm " + (kanaError ? "border-red-400" : "border-gray-200")} />
               {kanaError && <p className="text-xs text-red-500 mt-0.5">{kanaError}</p>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">電話番号</label>
-              <input value={form.phone || ''} onChange={e => setForm(f => ({...f, phone: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.phone || ""} onChange={e => setForm(f => ({...f, phone: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">性別</label>
-              <select value={form.gender || ''} onChange={e => setForm(f => ({...f, gender: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+              <select value={form.gender || ""} onChange={e => setForm(f => ({...f, gender: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 <option value="">未設定</option>
                 <option value="male">男性</option>
                 <option value="female">女性</option>
@@ -1671,7 +1671,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
             ) : (
               <div className="grid grid-cols-5 gap-1">
                 {AGE_GROUPS.map(ag => (
-                  <button key={ag} type="button" onClick={() => setForm(f => ({...f, age_group: ag}))} className={'py-1.5 rounded-lg text-xs font-medium transition-all border ' + (form.age_group === ag ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50')}>
+                  <button key={ag} type="button" onClick={() => setForm(f => ({...f, age_group: ag}))} className={"py-1.5 rounded-lg text-xs font-medium transition-all border " + (form.age_group === ag ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-blue-50")}>
                     {ag}
                   </button>
                 ))}
@@ -1681,22 +1681,22 @@ function PatientEditModal({ patientId, onClose, onSave }) {
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">生年月日</label>
-            <input type="date" value={form.birth_date?.substring(0,10) || ''} onChange={e => setForm(f => ({...f, birth_date: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            <input type="date" value={form.birth_date?.substring(0,10) || ""} onChange={e => setForm(f => ({...f, birth_date: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <p className="text-xs text-gray-400 mt-0.5">入力すると年代が自動計算されます</p>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">備考・アレルギー</label>
-            <textarea value={form.notes || ''} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
+            <textarea value={form.notes || ""} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">郵便番号</label>
-              <input value={form.postal_code || ''} onChange={e => setForm(f => ({...f, postal_code: e.target.value}))} placeholder="150-0001" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <input value={form.postal_code || ""} onChange={e => setForm(f => ({...f, postal_code: e.target.value}))} placeholder="150-0001" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">来院きっかけ</label>
-              <select value={form.referral_source || ''} onChange={e => setForm(f => ({...f, referral_source: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+              <select value={form.referral_source || ""} onChange={e => setForm(f => ({...f, referral_source: e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 <option value="">-</option>
                 <option value="インターネット検索">インターネット検索</option>
                 <option value="SNS・Instagram">SNS・Instagram</option>
@@ -1710,7 +1710,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
           <button onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50">キャンセル</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-bold disabled:opacity-50">
-            {saving ? '保存中...' : '保存する'}
+            {saving ? "保存中..." : "保存する"}
           </button>
         </div>
       </div>
