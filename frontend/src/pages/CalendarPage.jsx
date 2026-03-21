@@ -448,21 +448,13 @@ export default function CalendarPage() {
                       })}
                       {dragOver?.colId === col.id && (
                         <div className="absolute left-0 right-0 pointer-events-none z-30" style={{ top: slotTop(dragOver.slot), height: 2, background: "#3b82f6" }}>
-                          <div key={appt.id} draggable
-                            onDragStart={e => { handleDragStart(e, appt); setTooltip({ visible: false, appt: null, x:0, y:0 }); }}
-                            onDragEnd={handleDragEnd}
-                            onClick={e => { if (!dragging) setDetailModal(appt); }}
-                            onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })}
-                            onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))}
-                            onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                            className={dragging && dragging.appointment && dragging.appointment.id === appt.id ? "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 opacity-40 scale-95" : "absolute left-1 right-1 rounded-lg cursor-grab active:cursor-grabbing shadow-sm transition-all select-none z-20 hover:shadow-md hover:-translate-y-0.5"}
-                            style={{ top: top+2, height: height-4, background: color.light, borderLeft: "4px solid " + color.bg, border: "1px solid " + color.border, borderLeftWidth: 4 }}>
+                          <div style={{ position: "absolute", left: 0, top: -4, width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
                           <span style={{ position: "absolute", left: 12, top: -10, fontSize: 10, color: "#3b82f6", fontWeight: 700, background: "#fff", padding: "0 2px", borderRadius: 3 }}>
                             {dragOver.slot}
                           </span>
                         </div>
                       )}
-{slots.map(slot => {
+                      {slots.map(slot => {
                         const slotMin = toMinutes(slot);
                         const slotEndMin = slotMin + settings.slotDuration;
                         const lS = toMinutes(settings.lunchStart);
@@ -504,7 +496,6 @@ export default function CalendarPage() {
                             </div>
                           </div>
                         );
-                      })}
                       })}
                     </div>
                   </div>
