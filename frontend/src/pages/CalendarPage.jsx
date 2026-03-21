@@ -94,7 +94,7 @@ export default function CalendarPage() {
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/appointments/calendar/${selectedDate}`);
+      const res = await axios.get('/api/appointments/calendar/' + selectedDate');
       setCalendarData(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -117,7 +117,7 @@ export default function CalendarPage() {
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         promises.push(
-          axios.get(`/api/appointments/calendar/${dateStr}`)
+          axios.get('/api/appointments/calendar/' + dateStr')
             .then(r => ({ date: dateStr, data: r.data }))
             .catch(() => ({ date: dateStr, data: null }))
         );
@@ -137,7 +137,7 @@ export default function CalendarPage() {
       const dates = getWeekDates(selectedDate);
       const results = await Promise.all(
         dates.map(d =>
-          axios.get(`/api/appointments/calendar/${d}`)
+          axios.get('/api/appointments/calendar/' + d')
             .then(r => ({ date: d, data: r.data }))
             .catch(() => ({ date: d, data: null }))
         )
@@ -330,7 +330,7 @@ export default function CalendarPage() {
 
   async function moveAppointment(id, body) {
     try {
-      await axios.put(`/api/appointments/${id}`, body);
+      await axios.put('/api/appointments/' + id', body);
       fetchCalendar();
     } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
   }
@@ -473,9 +473,7 @@ export default function CalendarPage() {
                         const slotEndMin = slotMin + settings.slotDuration;
                         const isLunch    = slotMin >= toMinutes(settings.lunchStart) && slotMin < toMinutes(settings.lunchEnd);
                         if (isLunch) return null;
-                        const hasAppt = getApptsForColumn(col).some(a =>
-                          toMinutes(a.start_time) < slotEndMin && toMinutes(a.end_time) > slotMin
-                        );
+                        const hasAppt = getApptsForColumn(col).some(a => toMinutes(a.start_time) < slotEndMin && toMinutes(a.end_time) > slotMin);
                         if (hasAppt) return null;
                         const isDragTarget  = dragOver?.slot === slot && dragOver?.colId === col.id;
                         const isOutOfHours = isClosedDay || slotMin < clinicOpenMin || slotMin >= clinicCloseMin;
@@ -708,8 +706,8 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
   const wStart = new Date(weekDates[0]);
   const wEnd   = new Date(weekDates[weekDates.length - 1]);
   const rangeStr = weekOnly
-    ? `${wStart.getMonth()+1}/${wStart.getDate()}(月) 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}(金)`
-    : `${wStart.getMonth()+1}/${wStart.getDate()} 〜 ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
+    ? (wStart.getMonth()+1) + '/' + wStart.getDate() + '(月) 〜 ' + (wEnd.getMonth()+1) + '/' + wEnd.getDate() + '(金)'
+    : (wStart.getMonth()+1) + '/' + wStart.getDate() + ' 〜 ' + (wEnd.getMonth()+1) + '/' + wEnd.getDate();
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -770,7 +768,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 : CHAIR_COLORS[colIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ width: COL_W, flexShrink: 0, borderLeft: `3px solid ${isClosed ? '#e5e7eb' : chColor.bg}`, background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff', cursor: 'pointer', }} className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
+                <div key={dateStr} onClick={() => onSelectDate(dateStr)} style={{ width: COL_W, flexShrink: 0, borderLeft: '3px solid ' + (isClosed ? '#e5e7eb' : chColor.bg), background: isToday ? chColor.light : isClosed ? '#f9fafb' : '#fff', cursor: 'pointer', }} className="border-r border-gray-100 last:border-r-0 flex flex-col px-2 py-1.5 hover:brightness-95 transition-all">
                   <div className="flex items-center justify-between mb-1">
                     <span style={{
                       fontSize: 11, fontWeight: 700,
@@ -800,7 +798,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
-                          {count > 0 ? `${count}件` : '午前のみ'}
+                          {count > 0 ? count + '件' : '午前のみ'}
                         </span>
                       </div>
                     </>
@@ -808,14 +806,14 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     <>
                       <div style={{ background: '#f3f4f6', borderRadius: 3, height: 5, overflow: 'hidden', marginBottom: 2 }}>
                         <div style={{
-                          width: `${barPct}%`, height: '100%',
+                          width: barPct + '%', height: '100%',
                           background: barColor, borderRadius: 3,
                           transition: 'width 0.4s ease',
                         }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 10, color: barColor, fontWeight: 600 }}>
-                          {count > 0 ? `${count}件` : '空き'}
+                          {count > 0 ? count + '件' : '空き'}
                         </span>
                         {barPct >= 80 && (
                           <span style={{ fontSize: 9, background: '#fef2f2', color: '#dc2626', borderRadius: 3, padding: '0 3px', fontWeight: 600 }}>
@@ -853,35 +851,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                 : CHAIR_COLORS[dayIdx % CHAIR_COLORS.length];
 
               return (
-                <div key={dateStr} className="relative border-r border-gray-100" style={{ width: COL_W, flexShrink: 0, height: timelineH, borderLeft: '2px solid ' + chColor.border, background: isToday ? chColor.light + '60' : 'transparent' }}"
-                  onDragOver={e => {
-                    e.preventDefault();
-                    const time = weekPixelToTime(e, e.currentTarget);
-                    setDragOver({ slot: time, dateStr });
-                  }}
-                  onDrop={async e => {
-                    e.preventDefault();
-                    if (!dragging) return;
-                    const { appt } = dragging;
-                    const time = weekPixelToTime(e, e.currentTarget);
-                    const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time);
-                    const newEnd = toTimeStr(toMinutes(time) + durMin);
-                    setDragging(null); setDragOver(null);
-                    try {
-                      await axios.put(`/api/appointments/${appt.id}`, { appointment_date: dateStr, start_time: time, end_time: newEnd });
-                      onRefresh();
-                    } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); }
-                  }}
-                  onClick={e => {
-                    if (dragging || e.target !== e.currentTarget) return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX);
-                    const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration;
-                    const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration)));
-                    const firstChair = weekData[dateStr]?.chairs?.[0];
-                    setNewApptModal({ slot: time, chairId: firstChair?.id, date: dateStr });
-                  }}>
-                  {isClosed && (
+                <div key={dateStr} className="relative border-r border-gray-100" style={{ width: COL_W, flexShrink: 0, height: timelineH, borderLeft: '2px solid ' + chColor.border, background: isToday ? chColor.light + '60' : 'transparent' }} onDragOver={e => { e.preventDefault(); const time = weekPixelToTime(e, e.currentTarget); setDragOver({ slot: time, dateStr }); }} onDrop={async e => { e.preventDefault(); if (!dragging) return; const { appt } = dragging; const time = weekPixelToTime(e, e.currentTarget); const durMin = toMinutes(appt.end_time) - toMinutes(appt.start_time); const newEnd = toTimeStr(toMinutes(time) + durMin); setDragging(null); setDragOver(null); try { await axios.put('/api/appointments/' + appt.id, { appointment_date: dateStr, start_time: time, end_time: newEnd }); onRefresh(); } catch (err) { alert(err.response?.data?.error || '移動に失敗しました'); } }} onClick={e => { if (dragging || e.target !== e.currentTarget) return; const rect = e.currentTarget.getBoundingClientRect(); const rawMin = openMin + ((e.clientY - rect.top) / MIN_PX); const snapped = Math.round(rawMin / settings.slotDuration) * settings.slotDuration; const time = toTimeStr(Math.max(openMin, Math.min(snapped, closeMin - settings.slotDuration))); const firstChair = weekData[dateStr]?.chairs?.[0]; setNewApptModal({ slot: time, chairId: firstChair?.id, date: dateStr }); }}> {isClosed && (
                     <div className="absolute inset-0 bg-gray-100 z-10 flex items-center justify-center">
                       <span className="text-gray-400 text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>休診日</span>
                     </div>
@@ -905,18 +875,7 @@ function WeekView({ selectedDate, weekData, viewMode, allStaff, loading, now,
                     const color  = getTreatmentColor(appt.treatment_type);
                     const isDrag = dragging?.appt?.id === appt.id;
                     return (
-                      <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })}
-                        className={'absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ' + (isDrag ? 'opacity-40' : 'hover:shadow-lg')}
-                        style={{
-                          top: top + 1, height: Math.max(height - 2, 18),
-                          left: `${left + 0.5}%`, width: `${width - 1}%`,
-                          zIndex: isDrag ? 5 : zIndex,
-                          background: color.light,
-                          borderLeft: `3px solid ${color.bg}`,
-                          border: `0.5px solid ${color.border}`,
-                          borderLeftWidth: 3,
-                        }}>
-                        <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
+                      <div key={appt.id} draggable onDragStart={e => { handleDragStart(e, appt, dateStr); setTooltip({ visible: false, appt: null, x:0, y:0 }); }} onDragEnd={handleDragEnd} onClick={() => { if (!dragging) setDetailModal({ appt, dateStr }); }} onMouseEnter={e => setTooltip({ visible: true, appt, x: e.clientX, y: e.clientY })} onMouseMove={e => setTooltip(t => ({ ...t, x: e.clientX, y: e.clientY }))} onMouseLeave={() => setTooltip({ visible: false, appt: null, x:0, y:0 })} className={'absolute rounded cursor-grab active:cursor-grabbing select-none overflow-hidden transition-all ' + (isDrag ? 'opacity-40' : 'hover:shadow-lg')} style={{ top: top + 1, height: Math.max(height - 2, 18), left: (left + 0.5) + '%', width: (width - 1) + '%', zIndex: isDrag ? 5 : zIndex, background: color.light, borderLeft: '3px solid ' + color.bg, border: '0.5px solid ' + color.border, borderLeftWidth: 3, }}> <div className="px-1 py-0.5 h-full flex flex-col overflow-hidden">
                           <div style={{ display:'flex', alignItems:'center', gap:2, marginBottom:1 }}>
                             <div className="font-bold leading-tight truncate" style={{ color: color.text, fontSize: 10, flex:1 }}>
                               {appt.name_kana || appt.patient_name}
@@ -1015,7 +974,7 @@ function ApptTooltip({ appt, visible, x, y }) {
       fontSize: 12, lineHeight: 1.65,
       boxShadow: shadow,
       width: tooltipW,
-      border: `1px solid ${border}`,
+      border: '1px solid ' + border,
     }}>
       <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: textMain, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isDark ? '#3b82f6' : '#60a5fa', flexShrink: 0 }} />
@@ -1060,7 +1019,7 @@ function ApptTooltip({ appt, visible, x, y }) {
           width: 0, height: 0,
           borderTop: '6px solid transparent',
           borderBottom: '6px solid transparent',
-          borderRight: `7px solid ${bg}`,
+          borderRight: '7px solid ' + bg,
         }} />
       ) : (
         <div style={{
@@ -1068,7 +1027,7 @@ function ApptTooltip({ appt, visible, x, y }) {
           width: 0, height: 0,
           borderTop: '6px solid transparent',
           borderBottom: '6px solid transparent',
-          borderLeft: `7px solid ${bg}`,
+          borderLeft: '7px solid ' + bg,
         }} />
       )}
     </div>
@@ -1113,9 +1072,9 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
       </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: '月間予約数', value: `${monthStats.total}件`, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '診療日数', value: `${Object.values(monthData).filter(d => d?.appointments?.length > 0).length}日`, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: '平均/日', value: `${Object.values(monthData).filter(d => d?.appointments?.length > 0).length > 0 ? Math.round(monthStats.total / Object.values(monthData).filter(d => d?.appointments?.length > 0).length) : 0}件`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: '月間予約数', value: monthStats.total + '件', color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: '診療日数', value: Object.values(monthData).filter(d => d?.appointments?.length > 0).length + '日', color: 'text-green-600', bg: 'bg-green-50' },
+          { label: '平均/日', value: (Object.values(monthData).filter(d => d?.appointments?.length > 0).length > 0 ? Math.round(monthStats.total / Object.values(monthData).filter(d => d?.appointments?.length > 0).length) : 0) + '件', color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map(s => (
           <div key={s.label} className={s.bg + ' rounded-xl p-3 text-center'}>
             <div className={'text-xl font-bold ' + s.color}>{s.value}</div>
@@ -1140,7 +1099,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
         <div className="grid grid-cols-7">
           {cells.map((dateStr, idx) => {
             if (!dateStr) return (
-              <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-50 bg-gray-50" />
+              <div key={"empty-" + idx} className="h-28 border-b border-r border-gray-50 bg-gray-50" />
             );
             const data     = monthData[dateStr];
             const appts    = data?.appointments || [];
@@ -1171,7 +1130,7 @@ function MonthView({ currentMonth, monthData, onPrevMonth, onNextMonth, onSelect
                 </div>
                 {appts.length > 0 && (
                   <div className="h-1 bg-gray-100 rounded-full mb-1.5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${occupancy}%`, background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e' }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: occupancy + '%', background: occupancy >= 80 ? '#ef4444' : occupancy >= 50 ? '#3b82f6' : '#22c55e' }} />
                   </div>
                 )}
                 {treatmentColors.length > 0 && (
@@ -1259,7 +1218,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
     if (patientSearch.length < 1) { setShowPatientList(false); return; }
     const search = async () => {
       try {
-        const res = await axios.get(`/api/patients?q=${patientSearch}`);
+        const res = await axios.get('/api/patients?q=' + patientSearch');
         setPatients(res.data.patients || res.data || []);
         setShowPatientList(true);
       } catch {}
@@ -1318,7 +1277,7 @@ function NewAppointmentModal({ slot, chairId, chairs, date, settings, onClose, o
             {!newPatientMode ? (
               <>
                 <div className="relative">
-                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? `${selectedPatient.name_kana||''} ${selectedPatient.name}` : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" placeholder="氏名・フリガナ・電話番号で検索..." value={selectedPatient ? (selectedPatient.name_kana||'') + ' ' + selectedPatient.name : patientSearch} onChange={e => { setPatientSearch(e.target.value); setSelectedPatient(null); }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   {showPatientList && patients.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto mt-1">
                       {patients.map(p => (
@@ -1416,12 +1375,12 @@ function AppointmentDetailModal({ appt, onClose, onUpdate }) {
 
   async function handleSave() {
     setSaving(true);
-    try { await axios.put(`/api/appointments/${appt.id}`, { notes }); onUpdate(); }
+    try { await axios.put('/api/appointments/' + appt.id', { notes }); onUpdate(); }
     catch { alert('更新に失敗しました'); } finally { setSaving(false); }
   }
   async function handleCancel() {
     if (!window.confirm('この予約をキャンセルしますか？')) return;
-    try { await axios.delete(`/api/appointments/${appt.id}`); onUpdate(); }
+    try { await axios.delete('/api/appointments/' + appt.id'); onUpdate(); }
     catch { alert('キャンセルに失敗しました'); }
   }
 
@@ -1533,7 +1492,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
 
   useEffect(() => {
     setLoadingSlots(true);
-    axios.get(`/api/appointments/available-slots/${newDate}`)
+    axios.get('/api/appointments/available-slots/' + newDate')
       .then(r => {
         const allSlots = r.data?.slots || [];
         setSlots(allSlots);
@@ -1547,7 +1506,7 @@ function RescheduleModal({ appt, onClose, onSave }) {
   async function handleSave() {
     setSaving(true);
     try {
-      await axios.put(`/api/appointments/${appt.id}`, {
+      await axios.put('/api/appointments/' + appt.id', {
         appointment_date: newDate,
         start_time: newTime,
         end_time:   newEndTime,
@@ -1649,7 +1608,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
   const [kanaError, setKanaError] = useState('');
 
   useEffect(() => {
-    axios.get(`/api/patients/${patientId}`)
+    axios.get('/api/patients/' + patientId')
       .then(r => { setPatient(r.data); setForm(r.data); })
       .catch(() => alert('患者情報の取得に失敗しました'));
   }, [patientId]);
@@ -1671,7 +1630,7 @@ function PatientEditModal({ patientId, onClose, onSave }) {
     setSaving(true);
     try {
       const age_group = form.birth_date ? calcAgeGroup(form.birth_date) : form.age_group;
-      await axios.put(`/api/patients/${patientId}`, { ...form, age_group });
+      await axios.put('/api/patients/' + patientId', { ...form, age_group });
       onSave();
     } catch (err) {
       alert(err.response?.data?.error || '保存に失敗しました');
