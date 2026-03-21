@@ -443,7 +443,7 @@ export default function CalendarPage() {
                       boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}
                       className="flex items-center justify-center">
                       <span className="text-sm font-bold text-gray-700">
-                        {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
+                        {viewMode === 'chair' ? '🦷 ' : '👨‍⚕️ '}{col.label}
                       </span>
                     </div>
 
@@ -492,7 +492,7 @@ export default function CalendarPage() {
                               color: '#1d4ed8',
                               textAlign: 'center',
                             }}>
-                              {viewMode === 'chair' ? '🦷' : '👨‍⚕️'} {col.label}
+                              {viewMode === 'chair' ? '🦷 ' : '👨‍⚕️ '}{col.label}
                             </div>
                           </div>
                         )
