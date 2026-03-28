@@ -30,6 +30,7 @@ app.use('/api/line',         require('./routes/line'));
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/admin',        require('./routes/admin'));
 app.use('/api/analytics',    require('./routes/analytics'));
+app.use('/api/licenses',     require('./routes/licenses')); // ← 追加
 
 // ── ヘルスチェック ────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -177,6 +178,44 @@ const runMigrations = async () => {
       );
       console.log('  ✅ スタッフユーザー作成 (staff / dental2026)');
     }
+
+    // ── clinic_licenses（ライセンス管理）── 追加 ──────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clinic_licenses (
+        id                  SERIAL PRIMARY KEY,
+        clinic_id           VARCHAR(100) NOT NULL UNIQUE,
+        plan                VARCHAR(20)  NOT NULL DEFAULT 'basic',
+        started_at          TIMESTAMP    NOT NULL DEFAULT NOW(),
+        expires_at          TIMESTAMP,
+        is_active           BOOLEAN      NOT NULL DEFAULT true,
+        stripe_customer_id  VARCHAR(100),
+        stripe_sub_id       VARCHAR(100),
+        notes               TEXT,
+        created_at          TIMESTAMP    NOT NULL DEFAULT NOW(),
+        updated_at          TIMESTAMP    NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(
+      `INSERT INTO clinic_licenses (clinic_id, plan, is_active)
+       VALUES ('default', 'basic', true)
+       ON CONFLICT (clinic_id) DO NOTHING`
+    );
+    console.log('  ✅ clinic_licenses');
+
+    // ── license_history（変更履歴）── 追加 ────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS license_history (
+        id          SERIAL PRIMARY KEY,
+        clinic_id   VARCHAR(100) NOT NULL,
+        from_plan   VARCHAR(20),
+        to_plan     VARCHAR(20)  NOT NULL,
+        changed_by  VARCHAR(100),
+        changed_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+        reason      TEXT
+      )
+    `);
+    console.log('  ✅ license_history');
+
     console.log('✅ マイグレーション完了');
   } catch (err) {
     console.error('❌ マイグレーションエラー:', err.message);
