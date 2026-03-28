@@ -105,6 +105,10 @@ async function handleEvent(event) {
       const session = await getInquirySession(lineUserId);
       if (session && action?.startsWith('inq_')) { await handleInquiryPostback(replyToken, lineUserId, session, action, data); break; }
       switch (action) {
+        case 'existing_patient':
+          // 以前来院あり → QRコード連携案内
+          await replyMessage(replyToken, [{ type: 'text', text: '受付で診察券番号をご確認の上、QRコードを発行してもらってください。\n\nQRコードを読み取ると自動でLINE連携されます。' }]);
+          break;
         case 'start_inquiry':      await startInquiryFlow(replyToken, lineUserId); break;
         case 'select_treatment':   await handleTreatmentSelect(replyToken, data.get('treatment_id'), patient); break;
         case 'select_date':        await handleDateSelect(replyToken, data.get('treatment_id'), data.get('date'), patient); break;
@@ -142,9 +146,13 @@ async function clearSession(lineUserId) {
 // ============================================================
 async function startBookingOrInquiry(replyToken, lineUserId, patient, _reply = replyMessage) {
   if (patient) {
+    // LINE連携済みの患者は直接予約フローへ
     await startBookingFlow(replyToken, patient, _reply);
   } else {
-    await _reply(replyToken, [{ type: 'template', altText: '初めてのご来院ですか？', template: { type: 'confirm', text: 'スマイル歯科クリニックへようこそ！\n\n初めてのご来院ですか？', actions: [{ type: 'postback', label: '初めて（問診へ）', data: 'action=start_inquiry&ts=' + Date.now() }, { type: 'message', label: '以前に来院あり', text: '受付で診察券番号をご確認の上、QRコードを発行してもらってください。' }] } }]);
+    await _reply(replyToken, [{ type: 'template', altText: '初めてのご来院ですか？', template: { type: 'confirm', text: 'スマイル歯科クリニックへようこそ！\n\n初めてのご来院ですか？', actions: [
+      { type: 'postback', label: '初めて（問診へ）',  data: 'action=start_inquiry&ts='     + Date.now() },
+      { type: 'postback', label: '以前に来院あり',    data: 'action=existing_patient&ts='  + Date.now() },
+    ] } }]);
   }
 }
 
@@ -232,10 +240,7 @@ async function registerNewPatient(replyToken, lineUserId, d) {
     if (existing) {
       await clearSession(lineUserId);
       await showRichMenu(lineUserId);
-      await replyMessage(replyToken, [{
-        type: 'text',
-        text: `${existing.name} 様はすでに登録済みです。\n\n続けてご予約いただけます。`
-      }]);
+      await replyMessage(replyToken, [{ type: 'text', text: `${existing.name} 様はすでに登録済みです。\n\n続けてご予約いただけます。` }]);
       await startBookingFlow(replyToken, existing);
       return;
     }
@@ -273,19 +278,13 @@ async function registerNewPatient(replyToken, lineUserId, d) {
     if (error) throw error;
     await clearSession(lineUserId);
     await showRichMenu(lineUserId);
-    await replyMessage(replyToken, [{
-      type: 'text',
-      text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。`
-    }]);
+    await replyMessage(replyToken, [{ type: 'text', text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。` }]);
     await startBookingFlow(replyToken, patient);
   } catch (err) {
     console.error('registerNewPatient error:', err);
     await clearSession(lineUserId);
     await showRichMenu(lineUserId);
-    await replyMessage(replyToken, [{
-      type: 'text',
-      text: '登録中にエラーが発生しました。\n\n「予約する」からもう一度お試しください。'
-    }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '登録中にエラーが発生しました。\n\n「予約する」からもう一度お試しください。' }]);
   }
 }
 
@@ -415,7 +414,7 @@ function addMinutes(timeStr, minutes) {
 // ============================================================
 async function handleEventDebug(event, mockReply, mockPush) {
   const { type, source, replyToken } = event;
-  const lineUserId = source?.userId;
+  const lineUserId      = source?.userId;
   const productionMode  = event._productionMode || false;
   const overridePatient = event._debugPatient   || null;
   const getPatient = async (uid) => overridePatient || getPatientByLineId(uid);
@@ -457,6 +456,9 @@ async function handleEventDebug(event, mockReply, mockPush) {
       const patient = await getPatient(lineUserId);
 
       switch (action) {
+        case 'existing_patient':
+          await mockReply(replyToken, [{ type: 'text', text: '受付で診察券番号をご確認の上、QRコードを発行してもらってください。\n\nQRコードを読み取ると自動でLINE連携されます。' }]);
+          break;
         case 'start_inquiry':
           await saveSession(lineUserId, 'name', {});
           await mockReply(replyToken, [{ type: 'text', text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子' }]);
