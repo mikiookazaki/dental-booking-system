@@ -1,17 +1,28 @@
 // ============================================================
-// routes/settings.js
+// routes/settings.js  （Supabase移行版）
 // ============================================================
 const express = require('express');
 const router  = express.Router();
-const db      = require('../config/database');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // 全設定を取得
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT key, value FROM clinic_settings ORDER BY key');
+    const { data, error } = await supabase
+      .from('clinic_settings')
+      .select('key, value')
+      .order('key');
+
+    if (error) throw error;
+
     // AdminSettings.jsx が期待する { settings: { key: { value } } } 形式に変換
     const settings = {};
-    result.rows.forEach(row => { settings[row.key] = { value: row.value }; });
+    data.forEach(row => { settings[row.key] = { value: row.value }; });
     res.json({ settings });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -20,14 +31,14 @@ router.get('/', async (req, res) => {
 
 // 設定を一括更新
 router.put('/', async (req, res) => {
-  const { updates, settings } = req.body; // AdminSettingsはupdatesで送信
+  const { updates, settings } = req.body;
   const data = updates || settings || {};
   try {
     for (const [key, value] of Object.entries(data)) {
-      await db.query(`
-        INSERT INTO clinic_settings (key, value) VALUES ($1, $2)
-        ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()
-      `, [key, String(value)]);
+      const { error } = await supabase
+        .from('clinic_settings')
+        .upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
     }
     res.json({ message: '設定を保存しました' });
   } catch (err) {
@@ -39,9 +50,10 @@ module.exports = router;
 
 
 // ============================================================
-// routes/blockedSlots.js  ← 別ファイルに書くが今回はまとめる
+// blockedSlots 部分（Supabase移行版）
 // ============================================================
-// このファイルを blockedSlots.js としても使えるようエクスポート
+const db = require('../config/database'); // blockedSlotsはまだRender側を使用
+
 const blockedRouter = express.Router();
 
 blockedRouter.get('/', async (req, res) => {
