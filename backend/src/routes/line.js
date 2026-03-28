@@ -225,9 +225,39 @@ async function showConfirm(replyToken, lineUserId, d) {
 
 async function registerNewPatient(replyToken, lineUserId, d) {
   try {
-    const { data: patient, error } = await supabase.from('patients').insert({ name: d.name, name_kana: d.name_kana, phone: d.phone, age_group: d.age_group || null, postal_code: d.postal_code || null, referral_source: d.referral_source || null, notes: d.memo || null, line_user_id: lineUserId, line_linked_at: new Date().toISOString(), is_active: true }).select().single();
+    // patient_code を自動生成
+    const { data: lastPatient } = await supabase
+      .from('patients')
+      .select('patient_code')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const lastNum = lastPatient?.patient_code
+      ? parseInt(lastPatient.patient_code.replace('P-', '')) + 1
+      : 1;
+    const patient_code = `P-${String(lastNum).padStart(5, '0')}`;
+
+    const { data: patient, error } = await supabase
+      .from('patients')
+      .insert({
+        name:            d.name,
+        name_kana:       d.name_kana,
+        phone:           d.phone,
+        age_group:       d.age_group        || null,
+        postal_code:     d.postal_code      || null,
+        referral_source: d.referral_source  || null,
+        notes:           d.memo             || null,
+        line_user_id:    lineUserId,
+        line_linked_at:  new Date().toISOString(),
+        is_active:       true,
+        patient_code,
+      })
+      .select()
+      .single();
+
     if (error) throw error;
-    await clearSession(lineUserId); await showRichMenu(lineUserId);
+    await clearSession(lineUserId);
+    await showRichMenu(lineUserId);
     await replyMessage(replyToken, [{ type: 'text', text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。` }]);
     await startBookingFlow(replyToken, patient);
   } catch (err) {
@@ -410,7 +440,6 @@ async function handleEventDebug(event, mockReply, mockPush) {
           await saveSession(lineUserId, 'name', {});
           await mockReply(replyToken, [{ type: 'text', text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子' }]);
           break;
-
         case 'select_treatment': {
           const treatmentId = data.get('treatment_id');
           const { data: setting } = await supabase.from('clinic_settings').select('value').eq('key', 'open_days').single();
@@ -420,26 +449,22 @@ async function handleEventDebug(event, mockReply, mockPush) {
           await mockReply(replyToken, [{ type: 'template', altText: '日程を選択してください', template: { type: 'buttons', text: '診察日を選択してください', actions: dates.map(date => ({ type: 'postback', label: formatDateJP(date), data: `action=select_date&treatment_id=${treatmentId}&date=${date}&ts=${Date.now()}` })) } }]);
           break;
         }
-
         case 'select_date': {
           const treatmentId = data.get('treatment_id'); const date = data.get('date');
           await mockReply(replyToken, [{ type: 'template', altText: '時間を選択してください', template: { type: 'buttons', text: `${formatDateJP(date)}の空き時間`, actions: ['09:00','10:00','11:00','14:00'].map(time => ({ type: 'postback', label: `${time}〜`, data: `action=select_time&treatment_id=${treatmentId}&date=${date}&time=${time}&ts=${Date.now()}` })) } }]);
           break;
         }
-
         case 'select_time': {
           const treatmentId = data.get('treatment_id'); const date = data.get('date'); const time = data.get('time');
           const { data: t } = await supabase.from('treatments').select('name, duration').eq('id', treatmentId).single();
           await mockReply(replyToken, [{ type: 'template', altText: '予約内容の確認', template: { type: 'confirm', text: `以下で予約しますか？\n\n${formatDateJP(date)}\n${time}〜\n${t?.name}（${t?.duration}分）`, actions: [{ type: 'postback', label: '予約する', data: `action=confirm_booking&treatment_id=${treatmentId}&date=${date}&time=${time}&ts=${Date.now()}` }, { type: 'postback', label: 'やり直す', data: 'action=restart' }] } }]);
           break;
         }
-
         case 'confirm_booking': {
           if (!patient) { await mockReply(replyToken, [{ type: 'text', text: '患者情報が見つかりません。' }]); break; }
           const date = data.get('date'); const time = data.get('time'); const treatmentId = data.get('treatment_id');
           const { data: t } = await supabase.from('treatments').select('name, duration').eq('id', treatmentId).single();
           const endTime = addMinutes(time, t?.duration || 30);
-
           if (productionMode) {
             try {
               const { data: bookedChairs } = await supabase.from('appointments').select('chair_id').eq('appointment_date', date).eq('status', 'confirmed').lt('start_time', endTime).gt('end_time', time);
@@ -460,8 +485,6 @@ async function handleEventDebug(event, mockReply, mockPush) {
                 patient_name: patient.name, patient_phone: patient.phone,
               });
               if (insertError) throw insertError;
-
-              // ✅ デバッグ本番モードも患者名入り
               await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜${endTime}\n🦷 ${t?.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n※テスト予約です（削除可能）` }]);
             } catch (err) {
               console.error('debug booking error:', err);
@@ -472,12 +495,10 @@ async function handleEventDebug(event, mockReply, mockPush) {
           }
           break;
         }
-
         case 'cancel_appointment': {
           await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] キャンセルシミュレーション\n予約ID: ${data.get('appointment_id')}\n\n※実際のキャンセルは行われません` }]);
           break;
         }
-
         default:
           await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] postback: ${action || '不明'}` }]);
       }
