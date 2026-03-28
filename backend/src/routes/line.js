@@ -92,8 +92,8 @@ async function handleEvent(event) {
       break;
     }
     case 'postback': {
-      const data   = new URLSearchParams(event.postback.data);
-      const action = data.get('action');
+      const data    = new URLSearchParams(event.postback.data);
+      const action  = data.get('action');
       const patient = await getPatientByLineId(lineUserId);
       const ts = data.get('ts');
       if (ts && ['select_date','select_time','confirm_booking','cancel_appointment'].includes(action)) {
@@ -149,12 +149,14 @@ async function startBookingOrInquiry(replyToken, lineUserId, patient, _reply = r
 }
 
 async function startInquiryFlow(replyToken, lineUserId) {
-  await saveSession(lineUserId, 'name', {}); await hideRichMenu(lineUserId);
+  await saveSession(lineUserId, 'name', {});
+  await hideRichMenu(lineUserId);
   await replyMessage(replyToken, [{ type: 'text', text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子' }]);
 }
 
 async function handleInquiryMessage(replyToken, lineUserId, session, text) {
-  const step = session.step; const data = session.data || {};
+  const step = session.step;
+  const data = session.data || {};
   switch (step) {
     case 'name': {
       if (!text || text.length < 2) { await replyMessage(replyToken, [{ type: 'text', text: 'お名前を入力してください（例：山田 花子）' }]); return; }
@@ -225,6 +227,19 @@ async function showConfirm(replyToken, lineUserId, d) {
 
 async function registerNewPatient(replyToken, lineUserId, d) {
   try {
+    // 既にこのLINEIDで登録済みか確認
+    const existing = await getPatientByLineId(lineUserId);
+    if (existing) {
+      await clearSession(lineUserId);
+      await showRichMenu(lineUserId);
+      await replyMessage(replyToken, [{
+        type: 'text',
+        text: `${existing.name} 様はすでに登録済みです。\n\n続けてご予約いただけます。`
+      }]);
+      await startBookingFlow(replyToken, existing);
+      return;
+    }
+
     // patient_code を自動生成
     const { data: lastPatient } = await supabase
       .from('patients')
@@ -243,10 +258,10 @@ async function registerNewPatient(replyToken, lineUserId, d) {
         name:            d.name,
         name_kana:       d.name_kana,
         phone:           d.phone,
-        age_group:       d.age_group        || null,
-        postal_code:     d.postal_code      || null,
-        referral_source: d.referral_source  || null,
-        notes:           d.memo             || null,
+        age_group:       d.age_group       || null,
+        postal_code:     d.postal_code     || null,
+        referral_source: d.referral_source || null,
+        notes:           d.memo            || null,
         line_user_id:    lineUserId,
         line_linked_at:  new Date().toISOString(),
         is_active:       true,
@@ -258,11 +273,19 @@ async function registerNewPatient(replyToken, lineUserId, d) {
     if (error) throw error;
     await clearSession(lineUserId);
     await showRichMenu(lineUserId);
-    await replyMessage(replyToken, [{ type: 'text', text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。` }]);
+    await replyMessage(replyToken, [{
+      type: 'text',
+      text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。`
+    }]);
     await startBookingFlow(replyToken, patient);
   } catch (err) {
     console.error('registerNewPatient error:', err);
-    await replyMessage(replyToken, [{ type: 'text', text: '登録中にエラーが発生しました。受付にお問い合わせください。' }]);
+    await clearSession(lineUserId);
+    await showRichMenu(lineUserId);
+    await replyMessage(replyToken, [{
+      type: 'text',
+      text: '登録中にエラーが発生しました。\n\n「予約する」からもう一度お試しください。'
+    }]);
   }
 }
 
@@ -328,8 +351,6 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
     if (!availableStaff) { const { data: anyStaff } = await supabase.from('staff').select('id, name').eq('is_active', true).order('id'); availableStaff = anyStaff?.find(s => !bookedStaffIds.includes(s.id)); }
     if (!availableStaff) { await pushMessage(lineUserId, [{ type: 'text', text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。` }]); return; }
     await supabase.from('appointments').insert({ patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id, treatment_id: parseInt(treatmentId), appointment_date: date, start_time: time, end_time: endTime, status: 'confirmed', source: 'line', patient_name: patient.name, patient_phone: patient.phone });
-
-    // ✅ 予約完了メッセージ（患者名入り）
     await pushMessage(lineUserId, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜\n🦷 ${t.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n前日にリマインドをお送りします。\nご来院をお待ちしております😊` }]);
   } catch (err) {
     console.error('予約確定エラー:', err);
@@ -395,8 +416,8 @@ function addMinutes(timeStr, minutes) {
 async function handleEventDebug(event, mockReply, mockPush) {
   const { type, source, replyToken } = event;
   const lineUserId = source?.userId;
-  const productionMode = event._productionMode || false;
-  const overridePatient = event._debugPatient || null;
+  const productionMode  = event._productionMode || false;
+  const overridePatient = event._debugPatient   || null;
   const getPatient = async (uid) => overridePatient || getPatientByLineId(uid);
 
   switch (type) {
@@ -431,8 +452,8 @@ async function handleEventDebug(event, mockReply, mockPush) {
       break;
     }
     case 'postback': {
-      const data   = new URLSearchParams(event.postback?.data);
-      const action = data.get('action');
+      const data    = new URLSearchParams(event.postback?.data);
+      const action  = data.get('action');
       const patient = await getPatient(lineUserId);
 
       switch (action) {
