@@ -2,7 +2,7 @@
 const express   = require('express');
 const router    = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-const { pushMessage }  = require('./line'); // 既存のLINE送信関数を再利用
+const { pushMessage }  = require('./line');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -13,7 +13,6 @@ const supabase = createClient(
 // ① 予約リマインダー（前日 / 当日）
 // ─────────────────────────────────────────────────────────
 async function runAppointmentReminders() {
-  // JST で今日・明日の日付を計算
   const now        = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const today      = now.toISOString().slice(0, 10);
   const tomorrowDt = new Date(now);
@@ -25,7 +24,6 @@ async function runAppointmentReminders() {
     { date: tomorrow, type: 'appointment_day_before', label: '明日' },
   ];
 
-  // ライセンスチェック
   const { data: lic } = await supabase
     .from('clinic_licenses')
     .select('plan')
@@ -37,7 +35,6 @@ async function runAppointmentReminders() {
   const results = [];
 
   for (const { date, type, label } of targets) {
-    // basic プランは前日リマインドのみ（当日はスキップ）
     if (type === 'appointment_same_day' && plan === 'basic') continue;
 
     const { data: appointments } = await supabase
@@ -52,9 +49,21 @@ async function runAppointmentReminders() {
 
     for (const appt of appointments ?? []) {
       const patient = appt.patients;
-      if (!patient?.line_user_id) continue; // LINE未連携はスキップ
 
-      // 重複チェック（同じ予約・同じ種別で送信済みならスキップ）
+      // LINE未連携はno_lineとして記録
+      if (!patient?.line_user_id) {
+        await supabase.from('reminder_logs').insert({
+          appointment_id: appt.id,
+          patient_id:     patient?.id,
+          reminder_type:  type,
+          status:         'no_line',
+          error_message:  'LINE未連携',
+        });
+        results.push({ type, patient: patient?.name, status: 'no_line' });
+        continue;
+      }
+
+      // 重複チェック
       const { data: dup } = await supabase
         .from('reminder_logs')
         .select('id')
@@ -66,7 +75,7 @@ async function runAppointmentReminders() {
 
       try {
         await pushMessage(patient.line_user_id, [
-          buildAppointmentMessage(label, appt.start_time?.slice(0, 5) || '', appt.treatments?.name)
+          buildAppointmentMessage(label, appt.start_time?.slice(0, 5) || '', appt.treatments?.name, patient.name)
         ]);
         await supabase.from('reminder_logs').insert({
           appointment_id: appt.id,
@@ -101,7 +110,7 @@ async function runRecallReminders() {
     .eq('is_active', true)
     .single();
   const plan = lic?.plan || 'basic';
-  if (plan === 'basic') return []; // basic はリコールなし
+  if (plan === 'basic') return [];
 
   const results = [];
 
@@ -121,7 +130,6 @@ async function runRecallReminders() {
     for (const patient of patients ?? []) {
       const reminderType = `recall_${months}month`;
 
-      // 直近7日以内に同じリマインドを送っていればスキップ
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data: recent } = await supabase
         .from('reminder_logs')
@@ -133,7 +141,7 @@ async function runRecallReminders() {
       if (recent) continue;
 
       try {
-        await pushMessage(patient.line_user_id, [buildRecallMessage(months)]);
+        await pushMessage(patient.line_user_id, [buildRecallMessage(months, patient.name)]);
         await supabase.from('reminder_logs').insert({
           patient_id:    patient.id,
           reminder_type: reminderType,
@@ -156,7 +164,7 @@ async function runRecallReminders() {
 // ─────────────────────────────────────────────────────────
 // LINE メッセージテンプレート
 // ─────────────────────────────────────────────────────────
-function buildAppointmentMessage(label, time, treatmentName) {
+function buildAppointmentMessage(label, time, treatmentName, patientName) {
   return {
     type: 'flex',
     altText: `${label}のご予約リマインダー`,
@@ -173,6 +181,8 @@ function buildAppointmentMessage(label, time, treatmentName) {
       body: {
         type: 'box', layout: 'vertical', spacing: 'sm',
         contents: [
+          { type: 'text', text: `${patientName} 様`, size: 'md', weight: 'bold', color: '#1f2937' },
+          { type: 'separator', margin: 'sm' },
           { type: 'text', text: `時間: ${time || '—'}`,             size: 'sm', color: '#555555' },
           { type: 'text', text: `内容: ${treatmentName || '診療'}`, size: 'sm', color: '#555555' },
           { type: 'separator', margin: 'md' },
@@ -183,7 +193,7 @@ function buildAppointmentMessage(label, time, treatmentName) {
   };
 }
 
-function buildRecallMessage(months) {
+function buildRecallMessage(months, patientName) {
   return {
     type: 'flex',
     altText: '定期検診のご案内',
@@ -200,6 +210,8 @@ function buildRecallMessage(months) {
       body: {
         type: 'box', layout: 'vertical', spacing: 'sm',
         contents: [
+          { type: 'text', text: `${patientName} 様`, size: 'md', weight: 'bold', color: '#1f2937' },
+          { type: 'separator', margin: 'sm' },
           {
             type: 'text',
             text: `前回の来院から${months}ヶ月が経過しました。\n定期検診はお済みでしょうか？`,
@@ -236,9 +248,10 @@ router.post('/run', async (req, res, next) => {
       appointment: appt,
       recall,
       summary: {
-        appt_sent:   appt.filter(r => r.status === 'sent').length,
-        appt_failed: appt.filter(r => r.status === 'failed').length,
-        recall_sent: recall.filter(r => r.status === 'sent').length,
+        appt_sent:    appt.filter(r => r.status === 'sent').length,
+        appt_failed:  appt.filter(r => r.status === 'failed').length,
+        appt_no_line: appt.filter(r => r.status === 'no_line').length,
+        recall_sent:  recall.filter(r => r.status === 'sent').length,
       },
     });
   } catch (err) { next(err); }

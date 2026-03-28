@@ -298,7 +298,9 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
     if (!availableStaff) { const { data: anyStaff } = await supabase.from('staff').select('id, name').eq('is_active', true).order('id'); availableStaff = anyStaff?.find(s => !bookedStaffIds.includes(s.id)); }
     if (!availableStaff) { await pushMessage(lineUserId, [{ type: 'text', text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。` }]); return; }
     await supabase.from('appointments').insert({ patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id, treatment_id: parseInt(treatmentId), appointment_date: date, start_time: time, end_time: endTime, status: 'confirmed', source: 'line', patient_name: patient.name, patient_phone: patient.phone });
-    await pushMessage(lineUserId, [{ type: 'text', text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n担当: ${availableStaff.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております` }]);
+
+    // ✅ 予約完了メッセージ（患者名入り）
+    await pushMessage(lineUserId, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜\n🦷 ${t.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n前日にリマインドをお送りします。\nご来院をお待ちしております😊` }]);
   } catch (err) {
     console.error('予約確定エラー:', err);
     await pushMessage(lineUserId, [{ type: 'text', text: '予約の確定に失敗しました。お電話でご予約ください。' }]);
@@ -325,7 +327,7 @@ async function showUpcomingAppointments(replyToken, patient) {
   const today = new Date().toISOString().split('T')[0];
   const { data: appts } = await supabase.from('appointments').select('appointment_date, start_time, treatments(name), staff(name)').eq('patient_id', patient.id).eq('status', 'confirmed').gte('appointment_date', today).order('appointment_date').limit(3);
   if (!appts?.length) { await replyMessage(replyToken, [{ type: 'text', text: '現在ご予約はありません。' }]); return; }
-  await replyMessage(replyToken, [{ type: 'text', text: `ご予約一覧\n\n${appts.map(a => `${formatDateJP(a.appointment_date)}\n${a.start_time.substring(0,5)} ${a.treatments?.name}\nDr.${a.staff?.name}`).join('\n\n')}` }]);
+  await replyMessage(replyToken, [{ type: 'text', text: `${patient.name} 様のご予約一覧\n\n${appts.map(a => `${formatDateJP(a.appointment_date)}\n${a.start_time.substring(0,5)} ${a.treatments?.name}\nDr.${a.staff?.name}`).join('\n\n')}` }]);
 }
 
 async function handleSetAgeGroup(replyToken, lineUserId, range) {
@@ -393,7 +395,7 @@ async function handleEventDebug(event, mockReply, mockPush) {
           const today = new Date().toISOString().split('T')[0];
           const { data: appts } = await supabase.from('appointments').select('appointment_date, start_time, treatments(name), staff(name)').eq('patient_id', patient.id).eq('status', 'confirmed').gte('appointment_date', today).order('appointment_date').limit(3);
           if (!appts?.length) { await mockReply(replyToken, [{ type: 'text', text: '現在ご予約はありません。' }]); }
-          else { await mockReply(replyToken, [{ type: 'text', text: `ご予約一覧\n\n${appts.map(a => `${a.appointment_date} ${a.start_time?.substring(0,5)}\n${a.treatments?.name}\nDr.${a.staff?.name}`).join('\n\n')}` }]); }
+          else { await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様のご予約一覧\n\n${appts.map(a => `${a.appointment_date} ${a.start_time?.substring(0,5)}\n${a.treatments?.name}\nDr.${a.staff?.name}`).join('\n\n')}` }]); }
         } else { await mockReply(replyToken, [{ type: 'text', text: '患者登録が必要です。' }]); }
       } else { await mockReply(replyToken, [{ type: 'text', text: '下のメニューから操作してください' }]); }
       break;
@@ -439,20 +441,17 @@ async function handleEventDebug(event, mockReply, mockPush) {
           const endTime = addMinutes(time, t?.duration || 30);
 
           if (productionMode) {
-            // 本番モード: 実際にDBに保存
             try {
               const { data: bookedChairs } = await supabase.from('appointments').select('chair_id').eq('appointment_date', date).eq('status', 'confirmed').lt('start_time', endTime).gt('end_time', time);
               const bookedChairIds = bookedChairs?.map(a => a.chair_id) || [];
               const { data: chairs } = await supabase.from('chairs').select('id, name').eq('is_active', true).order('display_order');
               const availableChair = chairs?.find(c => !bookedChairIds.includes(c.id));
               if (!availableChair) { await mockReply(replyToken, [{ type: 'text', text: `${formatDateJP(date)} ${time}〜 は満員です。` }]); break; }
-
               const { data: bookedStaff } = await supabase.from('appointments').select('staff_id').eq('appointment_date', date).eq('status', 'confirmed').lt('start_time', endTime).gt('end_time', time);
               const bookedStaffIds = bookedStaff?.map(a => a.staff_id) || [];
               const { data: staffList } = await supabase.from('staff').select('id, name').eq('is_active', true).eq('role', 'doctor').order('id');
               const availableStaff = staffList?.find(s => !bookedStaffIds.includes(s.id));
               if (!availableStaff) { await mockReply(replyToken, [{ type: 'text', text: 'スタッフが空いておりません。' }]); break; }
-
               const { error: insertError } = await supabase.from('appointments').insert({
                 patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id,
                 treatment_id: parseInt(treatmentId), appointment_date: date,
@@ -462,15 +461,14 @@ async function handleEventDebug(event, mockReply, mockPush) {
               });
               if (insertError) throw insertError;
 
-              console.log(`[LINE Debug] 予約保存完了: patient=${patient.id}, date=${date}, time=${time}`);
-              await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] 予約をDBに保存しました！\n\n${formatDateJP(date)} ${time}〜${endTime}\n${t?.name}\n担当: ${availableStaff.name}\n\n※テスト予約です（削除可能）` }]);
+              // ✅ デバッグ本番モードも患者名入り
+              await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜${endTime}\n🦷 ${t?.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n※テスト予約です（削除可能）` }]);
             } catch (err) {
               console.error('debug booking error:', err);
               await mockReply(replyToken, [{ type: 'text', text: `保存エラー: ${err.message}` }]);
             }
           } else {
-            // シミュレーションモード: DBに保存しない
-            await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] 予約確定シミュレーション\n\n${formatDateJP(date)} ${time}〜${endTime}\n${t?.name}\n患者: ${patient.name}\n\n※実際の予約はDBに保存されません` }]);
+            await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様\n\nご予約確定シミュレーション\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜${endTime}\n🦷 ${t?.name}\n\n※実際の予約はDBに保存されません` }]);
           }
           break;
         }
