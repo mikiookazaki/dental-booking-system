@@ -30,6 +30,7 @@ app.use('/api/line',         require('./routes/line'));
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/admin',        require('./routes/admin'));
 app.use('/api/analytics',    require('./routes/analytics'));
+app.use('/api/line-debug',   require('./routes/lineDebug'));
 app.use('/api/licenses',     require('./routes/licenses')); // ← 追加
 
 // ── ヘルスチェック ────────────────────────────────────────

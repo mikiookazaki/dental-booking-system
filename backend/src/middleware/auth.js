@@ -1,7 +1,6 @@
 // backend/src/middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-// ── JWT認証ミドルウェア ────────────────────────────────────
 function requireAuth(req, res, next) {
   const header = req.headers['authorization'];
   if (!header || !header.startsWith('Bearer ')) {
@@ -17,12 +16,18 @@ function requireAuth(req, res, next) {
   }
 }
 
-// ── 管理者権限チェック ────────────────────────────────────
 function requireAdmin(req, res, next) {
-  if (req.admin?.role !== 'admin') {
+  if (!['admin', 'superadmin'].includes(req.admin?.role)) {
     return res.status(403).json({ error: '管理者権限が必要です' });
   }
   next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+function requireSuperAdmin(req, res, next) {
+  if (req.admin?.role !== 'superadmin') {
+    return res.status(403).json({ error: 'スーパー管理者権限が必要です' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin };

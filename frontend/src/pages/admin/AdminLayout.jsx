@@ -1,18 +1,20 @@
 // frontend/src/pages/admin/AdminLayout.jsx
 import { useState } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
-import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen, X } from 'lucide-react'
+import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen, X, Bug } from 'lucide-react'
 
 const NAV = [
-  { path: '/admin/dashboard', label: 'ダッシュボード', icon: <BarChart2 size={18} /> },
-  { path: '/admin/settings',  label: 'システム設定',   icon: <Settings size={18} /> },
-  { path: '/admin/blocks',    label: '予約制限管理',   icon: <CalendarOff size={18} /> },
+  { path: '/admin/dashboard', label: 'ダッシュボード', icon: <BarChart2 size={18} />,  roles: ['admin','superadmin'] },
+  { path: '/admin/settings',  label: 'システム設定',   icon: <Settings size={18} />,   roles: ['admin','superadmin'] },
+  { path: '/admin/blocks',    label: '予約制限管理',   icon: <CalendarOff size={18} />, roles: ['admin','superadmin'] },
+  { path: '/admin/line-debug',label: 'LINEデバッグ',   icon: <Bug size={18} />,         roles: ['superadmin'] },
 ]
 
 export default function AdminLayout({ onLogout }) {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const adminName = localStorage.getItem('admin_name') || '管理者'
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const adminName  = localStorage.getItem('admin_name') || '管理者'
+  const currentRole = localStorage.getItem('admin_role') || 'admin'
   const [showManualPanel, setShowManualPanel] = useState(false)
 
   function openManual() {
@@ -31,20 +33,27 @@ export default function AdminLayout({ onLogout }) {
     onLogout()
   }
 
+  const visibleNav = NAV.filter(item => item.roles.includes(currentRole))
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: '"Noto Sans JP", sans-serif', background: '#f8fafc' }}>
       {/* サイドバー */}
-      <div style={{
-        width: 220, background: '#1e3a5f', display: 'flex', flexDirection: 'column',
-        flexShrink: 0,
-      }}>
+      <div style={{ width: 220, background: '#1e3a5f', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '24px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>🦷 スマイル歯科</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>管理者画面</div>
+          {/* ロールバッジ */}
+          {currentRole === 'superadmin' && (
+            <div style={{ marginTop: 6, display: 'inline-block', background: '#BA7517', color: '#fff', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>
+              スーパー管理者
+            </div>
+          )}
         </div>
+
         <nav style={{ flex: 1, padding: '12px 8px' }}>
-          {NAV.map(item => {
+          {visibleNav.map(item => {
             const active = location.pathname === item.path
+            const isSuperOnly = item.roles.length === 1 && item.roles[0] === 'superadmin'
             return (
               <button
                 key={item.path}
@@ -52,14 +61,21 @@ export default function AdminLayout({ onLogout }) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                   padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  background: active ? 'rgba(255,255,255,0.15)' : 'transparent',
+                  background: active
+                    ? (isSuperOnly ? 'rgba(186,117,23,0.3)' : 'rgba(255,255,255,0.15)')
+                    : 'transparent',
                   color: active ? '#fff' : 'rgba(255,255,255,0.65)',
                   fontSize: 13, fontWeight: active ? 600 : 400,
-                  marginBottom: 2, textAlign: 'left',
-                  transition: 'all 0.15s',
+                  marginBottom: 2, textAlign: 'left', transition: 'all 0.15s',
                 }}
               >
-                {item.icon}{item.label}
+                {item.icon}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {isSuperOnly && (
+                  <span style={{ fontSize: 9, background: '#BA7517', color: '#fff', padding: '1px 5px', borderRadius: 10, fontWeight: 600 }}>
+                    DEV
+                  </span>
+                )}
               </button>
             )
           })}
@@ -88,8 +104,7 @@ export default function AdminLayout({ onLogout }) {
               padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: showManualPanel ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)',
               color: showManualPanel ? '#93c5fd' : 'rgba(255,255,255,0.85)',
-              fontSize: 13, fontWeight: 600,
-              transition: 'all 0.15s',
+              fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
             }}
           >
             <BookOpen size={15} />📖 操作マニュアル

@@ -10,21 +10,32 @@ import AdminLayout    from './pages/admin/AdminLayout'
 import AdminSettings  from './pages/admin/AdminSettings'
 import AdminBlocks    from './pages/admin/AdminBlocks'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import LineDebugPage  from './pages/admin/LineDebugPage'
 
 // ── 管理者認証ガード ────────────────────────────────────────
-function AdminGuard({ children, onLogout }) {
+function AdminGuard({ children }) {
   const token = localStorage.getItem('admin_token')
   const role  = localStorage.getItem('admin_role')
-  if (!token || role !== 'admin') {
+  if (!token || !['admin', 'superadmin'].includes(role)) {
     return <Navigate to="/admin/login" replace />
   }
   return children
 }
 
+// ── スーパー管理者専用ガード ────────────────────────────────
+function SuperAdminGuard({ children }) {
+  const token = localStorage.getItem('admin_token')
+  const role  = localStorage.getItem('admin_role')
+  if (!token || role !== 'superadmin') {
+    return <Navigate to="/admin/dashboard" replace />
+  }
+  return children
+}
+
 function App() {
-  // ログイン状態をstateで管理してリレンダーを発火させる
   const [adminLoggedIn, setAdminLoggedIn] = useState(
-    !!(localStorage.getItem('admin_token') && localStorage.getItem('admin_role') === 'admin')
+    !!(localStorage.getItem('admin_token') &&
+      ['admin', 'superadmin'].includes(localStorage.getItem('admin_role')))
   )
 
   return (
@@ -75,6 +86,13 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="settings"  element={<AdminSettings />} />
           <Route path="blocks"    element={<AdminBlocks />} />
+
+          {/* スーパー管理者専用 */}
+          <Route path="line-debug" element={
+            <SuperAdminGuard>
+              <LineDebugPage />
+            </SuperAdminGuard>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>

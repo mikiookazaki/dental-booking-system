@@ -17,7 +17,7 @@ export default function AdminLogin({ onLogin }) {
       const res = await axios.post('/api/auth/login', { username, password })
 
       if (mode === 'admin') {
-        if (res.data.role !== 'admin') {
+        if (!['admin', 'superadmin'].includes(res.data.role)) {
           setError('管理者権限がありません')
           setLoading(false)
           return
