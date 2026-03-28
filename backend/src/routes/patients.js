@@ -1,14 +1,18 @@
-// routes/patients.js
+// routes/patients.js （Supabase移行版）
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
+const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 function isValidKana(str) {
   return /^[ァ-ヶー　\s]+$/.test(str);
 }
 
-// 生年月日から年代を計算
 function calcAgeGroup(birthDate) {
   if (!birthDate) return null;
   const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
@@ -20,22 +24,21 @@ function calcAgeGroup(birthDate) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const search = req.query.q || req.query.search || '';
-    let query = `
-      SELECT id, patient_code, name, name_kana, phone, email,
-             birth_date, gender, address, notes, age_group,
-             postal_code, referral_source,
-             line_user_id, total_visits, created_at
-      FROM patients
-      WHERE is_active = TRUE
-    `;
-    const params = [];
+
+    let query = supabase
+      .from('patients')
+      .select('id, patient_code, name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source, line_user_id, total_visits, created_at')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
     if (search) {
-      params.push(`%${search}%`);
-      query += ` AND (name ILIKE $1 OR name_kana ILIKE $1 OR phone LIKE $1 OR patient_code ILIKE $1)`;
+      query = query.or(`name.ilike.%${search}%,name_kana.ilike.%${search}%,phone.ilike.%${search}%,patient_code.ilike.%${search}%`);
     }
-    query += ' ORDER BY created_at DESC';
-    const result = await pool.query(query, params);
-    res.json({ patients: result.rows });
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json({ patients: data });
   } catch (err) {
     console.error('GET patients error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
@@ -45,9 +48,14 @@ router.get('/', requireAuth, async (req, res) => {
 // GET /api/patients/:id
 router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM patients WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
-    res.json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) return res.status(404).json({ error: '患者が見つかりません' });
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'サーバーエラー' });
   }
@@ -56,18 +64,20 @@ router.get('/:id', requireAuth, async (req, res) => {
 // GET /api/patients/:id/qr
 router.get('/:id/qr', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, patient_code, name, name_kana, line_user_id FROM patients WHERE id = $1',
-      [req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
-    const p = result.rows[0];
+    const { data, error } = await supabase
+      .from('patients')
+      .select('id, patient_code, name, name_kana, line_user_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) return res.status(404).json({ error: '患者が見つかりません' });
+
     const lineId = process.env.LINE_BOT_BASIC_ID || '@210vmmzk';
-    const qr_url = `https://line.me/R/ti/p/${lineId}?patientCode=${p.patient_code}`;
+    const qr_url = `https://line.me/R/ti/p/${lineId}?patientCode=${data.patient_code}`;
     res.json({
-      id: p.id, patient_code: p.patient_code,
-      name: p.name, name_kana: p.name_kana,
-      line_linked: !!p.line_user_id, qr_url,
+      id: data.id, patient_code: data.patient_code,
+      name: data.name, name_kana: data.name_kana,
+      line_linked: !!data.line_user_id, qr_url,
     });
   } catch (err) {
     res.status(500).json({ error: 'サーバーエラー' });
@@ -82,16 +92,22 @@ router.post('/', requireAuth, async (req, res) => {
     if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
     if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
 
-    // 年代：生年月日があれば自動計算、なければ入力値
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : (age_group || null);
 
-    const result = await pool.query(`
-      INSERT INTO patients (name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-      RETURNING *
-    `, [name.trim(), name_kana.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, postal_code || null, referral_source || null]);
+    const { data, error } = await supabase
+      .from('patients')
+      .insert({
+        name: name.trim(), name_kana: name_kana.trim(),
+        phone, email, birth_date, gender, address, notes,
+        age_group: finalAgeGroup,
+        postal_code: postal_code || null,
+        referral_source: referral_source || null,
+      })
+      .select()
+      .single();
 
-    res.status(201).json(result.rows[0]);
+    if (error) throw error;
+    res.status(201).json(data);
   } catch (err) {
     console.error('POST patient error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
@@ -108,29 +124,30 @@ router.put('/:id', requireAuth, async (req, res) => {
       if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
     }
 
-    // 生年月日があれば年代を自動更新
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : age_group;
 
-    const result = await pool.query(`
-      UPDATE patients SET
-        name             = COALESCE($1, name),
-        name_kana        = COALESCE($2, name_kana),
-        phone            = COALESCE($3, phone),
-        email            = COALESCE($4, email),
-        birth_date       = COALESCE($5, birth_date),
-        gender           = COALESCE($6, gender),
-        address          = COALESCE($7, address),
-        notes            = COALESCE($8, notes),
-        age_group        = COALESCE($9, age_group),
-        postal_code      = COALESCE($10, postal_code),
-        referral_source  = COALESCE($11, referral_source),
-        updated_at       = NOW()
-      WHERE id = $12
-      RETURNING *
-    `, [name?.trim(), name_kana?.trim(), phone, email, birth_date, gender, address, notes, finalAgeGroup, postal_code, referral_source, req.params.id]);
+    const updateData = { updated_at: new Date().toISOString() };
+    if (name !== undefined)            updateData.name            = name.trim();
+    if (name_kana !== undefined)       updateData.name_kana       = name_kana.trim();
+    if (phone !== undefined)           updateData.phone           = phone;
+    if (email !== undefined)           updateData.email           = email;
+    if (birth_date !== undefined)      updateData.birth_date      = birth_date;
+    if (gender !== undefined)          updateData.gender          = gender;
+    if (address !== undefined)         updateData.address         = address;
+    if (notes !== undefined)           updateData.notes           = notes;
+    if (finalAgeGroup !== undefined)   updateData.age_group       = finalAgeGroup;
+    if (postal_code !== undefined)     updateData.postal_code     = postal_code;
+    if (referral_source !== undefined) updateData.referral_source = referral_source;
 
-    if (result.rows.length === 0) return res.status(404).json({ error: '患者が見つかりません' });
-    res.json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('patients')
+      .update(updateData)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) return res.status(404).json({ error: '患者が見つかりません' });
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'サーバーエラー' });
   }
