@@ -32,6 +32,7 @@ app.use('/api/admin',        require('./routes/admin'));
 app.use('/api/analytics',    require('./routes/analytics'));
 app.use('/api/line-debug',   require('./routes/lineDebug'));
 app.use('/api/licenses',     require('./routes/licenses')); // ← 追加
+app.use('/api/reminders',    require('./routes/reminders'));
 
 // ── ヘルスチェック ────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -216,12 +217,31 @@ const runMigrations = async () => {
       )
     `);
     console.log('  ✅ license_history');
+    // ── reminder_logs・patients リコール用カラム（Supabaseで作成済み）──
+    console.log('  ✅ reminder_logs / recall columns（Supabase作成済み）');
 
     console.log('✅ マイグレーション完了');
   } catch (err) {
     console.error('❌ マイグレーションエラー:', err.message);
   }
 };
+
+// ── Cron: 毎日 9:00 JST にリマインダー送信 ──────────────
+const cron = require('node-cron');
+const { runAppointmentReminders, runRecallReminders } = require('./routes/reminders');
+
+cron.schedule('0 0 * * *', async () => { // UTC 0:00 = JST 9:00
+  console.log('⏰ [CRON] リマインダー送信開始...');
+  try {
+    const [appt, recall] = await Promise.all([
+      runAppointmentReminders(),
+      runRecallReminders(),
+    ]);
+    console.log(`✅ [CRON] 予約:${appt.length}件 リコール:${recall.length}件`);
+  } catch (err) {
+    console.error('❌ [CRON] エラー:', err.message);
+  }
+});
 
 // ── 起動 ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
