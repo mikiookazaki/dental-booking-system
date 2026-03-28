@@ -5,7 +5,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const tables = ['patients', 'appointments', 'appointment_logs'];
+const tables = ['chairs', 'treatments', 'blocked_slots', 'blocked_slot_chairs', 'booking_blocks', 'line_inquiry_sessions', 'admin_users'];
 
 async function main() {
   for (const table of tables) {

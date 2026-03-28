@@ -1,7 +1,13 @@
+// routes/line.js （Supabase移行版）
 const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
-const db      = require('../config/database');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
@@ -31,7 +37,6 @@ async function pushMessage(lineUserId, messages) {
   if (!res.ok) console.error('LINE push error:', await res.text());
 }
 
-// リッチメニューを非表示（テキスト入力モード）
 async function hideRichMenu(lineUserId) {
   await fetch(`https://api.line.me/v2/bot/user/${lineUserId}/richmenu`, {
     method: 'DELETE',
@@ -39,9 +44,7 @@ async function hideRichMenu(lineUserId) {
   }).catch(() => {});
 }
 
-// リッチメニューを再表示（デフォルトに戻す）
 async function showRichMenu(lineUserId) {
-  // デフォルトのリッチメニューIDが設定されている場合は復元
   const menuId = process.env.LINE_RICH_MENU_ID;
   if (!menuId) return;
   await fetch(`https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${menuId}`, {
@@ -50,15 +53,17 @@ async function showRichMenu(lineUserId) {
   }).catch(() => {});
 }
 
-// GET /api/line/link?code=P-00001
+// GET /api/line/link
 router.get('/link', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).send('patient_code が必要です');
-  const patient = await db.query(
-    'SELECT id, name, patient_code FROM patients WHERE patient_code = $1 AND is_active = TRUE',
-    [code]
-  );
-  if (!patient.rows.length) return res.status(404).send('患者が見つかりません');
+  const { data: patient } = await supabase
+    .from('patients')
+    .select('id, name, patient_code')
+    .eq('patient_code', code)
+    .eq('is_active', true)
+    .single();
+  if (!patient) return res.status(404).send('患者が見つかりません');
   const botId   = process.env.LINE_BOT_ID;
   const text    = `link:${code}`;
   const lineUrl = `https://line.me/R/oaMessage/${encodeURIComponent(botId)}/?text=${encodeURIComponent(text)}`;
@@ -95,7 +100,6 @@ async function handleEvent(event) {
       const raw       = event.message.text.trim();
       const cleanText = raw.replace(/^text=/, '');
 
-      // QRコード経由の患者連携
       if (cleanText.startsWith('link:')) {
         const code = cleanText.replace('link:', '').trim();
         await handleLineLink(replyToken, lineUserId, code);
@@ -103,8 +107,6 @@ async function handleEvent(event) {
       }
 
       const patient = await getPatientByLineId(lineUserId);
-
-      // 問診セッション中かチェック
       const session = await getInquirySession(lineUserId);
       if (session) {
         await handleInquiryMessage(replyToken, lineUserId, session, cleanText);
@@ -123,21 +125,16 @@ async function handleEvent(event) {
       const action  = data.get('action');
       const patient = await getPatientByLineId(lineUserId);
 
-      // タイムスタンプチェック（30分）
       const ts = data.get('ts');
       const timeoutActions = ['select_date','select_time','confirm_booking','cancel_appointment'];
       if (ts && timeoutActions.includes(action)) {
         const elapsed = Date.now() - parseInt(ts);
         if (elapsed > 30 * 60 * 1000) {
-          await replyMessage(replyToken, [{
-            type: 'text',
-            text: 'このボタンの有効期限が切れました。\nもう一度メニューから操作してください。',
-          }]);
+          await replyMessage(replyToken, [{ type: 'text', text: 'このボタンの有効期限が切れました。\nもう一度メニューから操作してください。' }]);
           break;
         }
       }
 
-      // 問診のpostback処理
       const session = await getInquirySession(lineUserId);
       if (session && action && action.startsWith('inq_')) {
         await handleInquiryPostback(replyToken, lineUserId, session, action, data);
@@ -160,17 +157,44 @@ async function handleEvent(event) {
 }
 
 // ============================================================
+// 問診セッション管理
+// ============================================================
+async function getInquirySession(lineUserId) {
+  const { data } = await supabase
+    .from('line_inquiry_sessions')
+    .select('*')
+    .eq('line_user_id', lineUserId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!data) return null;
+  if (new Date() - new Date(data.updated_at) > 60 * 60 * 1000) {
+    await supabase.from('line_inquiry_sessions').delete().eq('line_user_id', lineUserId);
+    return null;
+  }
+  return data;
+}
+
+async function saveSession(lineUserId, step, data) {
+  await supabase
+    .from('line_inquiry_sessions')
+    .upsert({ line_user_id: lineUserId, step, data, updated_at: new Date().toISOString() }, { onConflict: 'line_user_id' });
+}
+
+async function clearSession(lineUserId) {
+  await supabase.from('line_inquiry_sessions').delete().eq('line_user_id', lineUserId);
+}
+
+// ============================================================
 // 予約 or 問診フロー分岐
 // ============================================================
 async function startBookingOrInquiry(replyToken, lineUserId, patient) {
   if (patient) {
-    // 既存患者 → 予約フローへ
     await startBookingFlow(replyToken, patient);
   } else {
-    // 未登録 → 問診or既存確認
     await replyMessage(replyToken, [{
-      type: 'template',
-      altText: '初めてのご来院ですか？',
+      type: 'template', altText: '初めてのご来院ですか？',
       template: {
         type: 'confirm',
         text: 'スマイル歯科クリニックへようこそ！\n\n初めてのご来院ですか？',
@@ -184,46 +208,12 @@ async function startBookingOrInquiry(replyToken, lineUserId, patient) {
 }
 
 // ============================================================
-// 問診セッション管理
-// ============================================================
-async function getInquirySession(lineUserId) {
-  const r = await db.query(
-    'SELECT * FROM line_inquiry_sessions WHERE line_user_id=$1 ORDER BY updated_at DESC LIMIT 1',
-    [lineUserId]
-  );
-  if (!r.rows.length) return null;
-  const s = r.rows[0];
-  // 1時間以上経過したセッションは破棄
-  if (new Date() - new Date(s.updated_at) > 60 * 60 * 1000) {
-    await db.query('DELETE FROM line_inquiry_sessions WHERE line_user_id=$1', [lineUserId]);
-    return null;
-  }
-  return s;
-}
-
-async function saveSession(lineUserId, step, data) {
-  await db.query(`
-    INSERT INTO line_inquiry_sessions (line_user_id, step, data, updated_at)
-    VALUES ($1,$2,$3,NOW())
-    ON CONFLICT (line_user_id) DO UPDATE SET step=$2, data=$3, updated_at=NOW()
-  `, [lineUserId, step, JSON.stringify(data)]);
-}
-
-async function clearSession(lineUserId) {
-  await db.query('DELETE FROM line_inquiry_sessions WHERE line_user_id=$1', [lineUserId]);
-}
-
-// ============================================================
 // 問診フロー
-// STEP: start → name → kana → age → phone → postal → referral → memo → confirm → done
 // ============================================================
 async function startInquiryFlow(replyToken, lineUserId) {
   await saveSession(lineUserId, 'name', {});
   await hideRichMenu(lineUserId);
-  await replyMessage(replyToken, [{
-    type: 'text',
-    text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子',
-  }]);
+  await replyMessage(replyToken, [{ type: 'text', text: '問診を開始します。\n\n【1/5】お名前を入力してください。\n例：山田 花子' }]);
 }
 
 async function handleInquiryMessage(replyToken, lineUserId, session, text) {
@@ -237,32 +227,21 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
         return;
       }
       data.name = text;
-      // フリガナを自動生成（カタカナ変換は簡易的に）
       await saveSession(lineUserId, 'kana', data);
-      await replyMessage(replyToken, [{
-        type: 'text',
-        text: `【2/5】フリガナを入力してください。\n\n「${text}」さんのフリガナをカタカナで入力してください。\n例：ヤマダ ハナコ`,
-      }]);
+      await replyMessage(replyToken, [{ type: 'text', text: `【2/5】フリガナを入力してください。\n\n「${text}」さんのフリガナをカタカナで入力してください。\n例：ヤマダ ハナコ` }]);
       break;
     }
-
     case 'kana': {
-      // カタカナチェック
       if (!/^[ァ-ヶーぁ-ん\s　]+$/.test(text)) {
         await replyMessage(replyToken, [{ type: 'text', text: 'カタカナで入力してください。\n例：ヤマダ ハナコ' }]);
         return;
       }
-      data.name_kana = text.replace(/[ぁ-ん]/g, c =>
-        String.fromCharCode(c.charCodeAt(0) + 0x60)
-      );
+      data.name_kana = text.replace(/[ぁ-ん]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
       await saveSession(lineUserId, 'age', data);
-
       await replyMessage(replyToken, [{
-        type: 'template',
-        altText: '年代を選択してください',
+        type: 'template', altText: '年代を選択してください',
         template: {
-          type: 'buttons',
-          text: '【3/5】あなたの年代を教えてください',
+          type: 'buttons', text: '【3/5】あなたの年代を教えてください',
           actions: [
             { type: 'postback', label: '10〜30代', data: 'action=inq_age&range=young' },
             { type: 'postback', label: '40〜50代', data: 'action=inq_age&range=middle' },
@@ -273,7 +252,6 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
       }]);
       break;
     }
-
     case 'phone': {
       const phone = text.replace(/[^0-9-]/g, '');
       if (phone.length < 10) {
@@ -283,11 +261,9 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
       data.phone = phone;
       await saveSession(lineUserId, 'postal', data);
       await replyMessage(replyToken, [{
-        type: 'template',
-        altText: '郵便番号を入力しますか？',
+        type: 'template', altText: '郵便番号を入力しますか？',
         template: {
-          type: 'confirm',
-          text: '【4/5 続き】郵便番号を教えていただけますか？（任意）',
+          type: 'confirm', text: '【4/5 続き】郵便番号を教えていただけますか？（任意）',
           actions: [
             { type: 'postback', label: '入力する', data: 'action=inq_postal_yes' },
             { type: 'postback', label: 'スキップ', data: 'action=inq_postal_skip' },
@@ -296,19 +272,13 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
       }]);
       break;
     }
-
     case 'postal_input': {
       const postal = text.replace(/[^0-9]/g, '');
-      if (postal.length === 7) {
-        data.postal_code = `${postal.substring(0,3)}-${postal.substring(3)}`;
-      } else {
-        data.postal_code = text;
-      }
+      data.postal_code = postal.length === 7 ? `${postal.substring(0,3)}-${postal.substring(3)}` : text;
       await saveSession(lineUserId, 'referral', data);
       await askReferral(replyToken, lineUserId);
       break;
     }
-
     case 'memo': {
       data.memo = text;
       await saveSession(lineUserId, 'confirm', data);
@@ -316,7 +286,6 @@ async function handleInquiryMessage(replyToken, lineUserId, session, text) {
       await showConfirm(replyToken, lineUserId, data);
       break;
     }
-
     default: {
       await replyMessage(replyToken, [{ type: 'text', text: '下のメニューから操作してください' }]);
     }
@@ -336,25 +305,17 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
     const ages = rangeMap[data.get('range')] || rangeMap.young;
     await replyMessage(replyToken, [{
       type: 'template', altText: '年代を選択',
-      template: {
-        type: 'buttons', text: '年代を選択してください',
-        actions: ages.map(([label, act]) => ({ type: 'postback', label, data: `action=${act}` })),
-      },
+      template: { type: 'buttons', text: '年代を選択してください', actions: ages.map(([label, act]) => ({ type: 'postback', label, data: `action=${act}` })) },
     }]);
     return;
   }
 
   if (action.startsWith('inq_age_')) {
-    const ageMap = { inq_age_10:'10代', inq_age_20:'20代', inq_age_30:'30代',
-      inq_age_40:'40代', inq_age_50:'50代', inq_age_60:'60代',
-      inq_age_70:'70代', inq_age_80:'80代', inq_age_90:'90代以上' };
+    const ageMap = { inq_age_10:'10代', inq_age_20:'20代', inq_age_30:'30代', inq_age_40:'40代', inq_age_50:'50代', inq_age_60:'60代', inq_age_70:'70代', inq_age_80:'80代', inq_age_90:'90代以上' };
     sData.age_group = ageMap[action] || '';
     await saveSession(lineUserId, 'phone', sData);
     await hideRichMenu(lineUserId);
-    await replyMessage(replyToken, [{
-      type: 'text',
-      text: `【4/5】電話番号を入力してください。\n例：090-1234-5678`,
-    }]);
+    await replyMessage(replyToken, [{ type: 'text', text: '【4/5】電話番号を入力してください。\n例：090-1234-5678' }]);
     return;
   }
 
@@ -373,7 +334,6 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
   }
 
   if (action === 'inq_referral_cat') {
-    // 大分類選択後に詳細を表示
     await saveSession(lineUserId, 'referral', sData);
     await askReferralDetail(replyToken, data.get('cat'));
     return;
@@ -382,13 +342,11 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
   if (action === 'inq_referral') {
     sData.referral_source = data.get('source');
     await saveSession(lineUserId, 'memo', sData);
-    await showRichMenu(lineUserId); // 選択肢ボタンなのでリッチメニュー戻す
+    await showRichMenu(lineUserId);
     await replyMessage(replyToken, [{
-      type: 'template',
-      altText: 'その他ご連絡事項はありますか？',
+      type: 'template', altText: 'その他ご連絡事項はありますか？',
       template: {
-        type: 'confirm',
-        text: '最後に、アレルギーや服用中のお薬など\nスタッフへの伝言はありますか？',
+        type: 'confirm', text: '最後に、アレルギーや服用中のお薬など\nスタッフへの伝言はありますか？',
         actions: [
           { type: 'postback', label: 'あり（入力する）', data: 'action=inq_memo_yes' },
           { type: 'postback', label: 'なし（スキップ）', data: 'action=inq_memo_skip' },
@@ -401,10 +359,7 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
   if (action === 'inq_memo_yes') {
     await saveSession(lineUserId, 'memo', sData);
     await hideRichMenu(lineUserId);
-    await replyMessage(replyToken, [{
-      type: 'text',
-      text: 'アレルギーや服用中のお薬など、スタッフへ伝えたいことを入力してください。',
-    }]);
+    await replyMessage(replyToken, [{ type: 'text', text: 'アレルギーや服用中のお薬など、スタッフへ伝えたいことを入力してください。' }]);
     return;
   }
 
@@ -430,11 +385,9 @@ async function handleInquiryPostback(replyToken, lineUserId, session, action, da
 
 async function askReferral(replyToken, lineUserId) {
   await replyMessage(replyToken, [{
-    type: 'template',
-    altText: 'クリニックをどこで知りましたか？',
+    type: 'template', altText: 'クリニックをどこで知りましたか？',
     template: {
-      type: 'buttons',
-      text: '【5/5】当クリニックをどこでお知りになりましたか？\nカテゴリを選んでください。',
+      type: 'buttons', text: '【5/5】当クリニックをどこでお知りになりましたか？\nカテゴリを選んでください。',
       actions: [
         { type: 'postback', label: 'Web・デジタル系', data: 'action=inq_referral_cat&cat=web' },
         { type: 'postback', label: '口コミ・広告系',  data: 'action=inq_referral_cat&cat=ads' },
@@ -455,27 +408,17 @@ async function askReferralDetail(replyToken, cat) {
     { type: 'postback', label: 'TVCM',        data: 'action=inq_referral&source=TVCM' },
   ];
   await replyMessage(replyToken, [{
-    type: 'template',
-    altText: '来院きっかけを選んでください',
-    template: {
-      type: 'buttons',
-      text: '具体的にどちらですか？',
-      actions: cat === 'web' ? webActions : adsActions,
-    },
+    type: 'template', altText: '来院きっかけを選んでください',
+    template: { type: 'buttons', text: '具体的にどちらですか？', actions: cat === 'web' ? webActions : adsActions },
   }]);
 }
 
 async function showConfirm(replyToken, lineUserId, d) {
   const confirmText =
     `ご入力内容を確認してください。\n\n` +
-    `お名前: ${d.name}\n` +
-    `フリガナ: ${d.name_kana}\n` +
-    `年代: ${d.age_group}\n` +
-    `電話番号: ${d.phone}\n` +
-    `郵便番号: ${d.postal_code || 'なし'}\n` +
-    `来院きっかけ: ${d.referral_source || 'なし'}\n` +
-    `その他: ${d.memo || 'なし'}\n\n` +
-    `この内容で登録しますか？`;
+    `お名前: ${d.name}\nフリガナ: ${d.name_kana}\n年代: ${d.age_group}\n` +
+    `電話番号: ${d.phone}\n郵便番号: ${d.postal_code || 'なし'}\n` +
+    `来院きっかけ: ${d.referral_source || 'なし'}\nその他: ${d.memo || 'なし'}\n\nこの内容で登録しますか？`;
 
   await replyMessage(replyToken, [{
     type: 'template', altText: '入力内容の確認',
@@ -491,36 +434,25 @@ async function showConfirm(replyToken, lineUserId, d) {
 
 async function registerNewPatient(replyToken, lineUserId, d) {
   try {
-    // 患者を新規登録
-    const result = await db.query(`
-      INSERT INTO patients
-        (name, name_kana, phone, age_group, postal_code, referral_source, notes,
-         line_user_id, line_linked_at, is_active)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),TRUE)
-      RETURNING *
-    `, [
-      d.name, d.name_kana, d.phone,
-      d.age_group || null,
-      d.postal_code || null,
-      d.referral_source || null,
-      d.memo || null,
-      lineUserId,
-    ]);
-    const patient = result.rows[0];
-    await clearSession(lineUserId);
-    await showRichMenu(lineUserId); // 問診完了でリッチメニューを戻す
+    const { data: patient, error } = await supabase
+      .from('patients')
+      .insert({
+        name: d.name, name_kana: d.name_kana, phone: d.phone,
+        age_group: d.age_group || null, postal_code: d.postal_code || null,
+        referral_source: d.referral_source || null, notes: d.memo || null,
+        line_user_id: lineUserId, line_linked_at: new Date().toISOString(), is_active: true,
+      })
+      .select()
+      .single();
 
+    if (error) throw error;
+    await clearSession(lineUserId);
+    await showRichMenu(lineUserId);
     await replyMessage(replyToken, [{
       type: 'text',
-      text: `✅ 患者登録が完了しました！\n\n` +
-            `患者番号: ${patient.patient_code}\n` +
-            `${patient.name} 様\n\n` +
-            `続けてご予約いただけます。`,
+      text: `✅ 患者登録が完了しました！\n\n患者番号: ${patient.patient_code}\n${patient.name} 様\n\n続けてご予約いただけます。`,
     }]);
-
-    // すぐに予約フローへ
     await startBookingFlow(replyToken, patient);
-
   } catch (err) {
     console.error('registerNewPatient error:', err);
     await replyMessage(replyToken, [{ type: 'text', text: '登録中にエラーが発生しました。受付にお問い合わせください。' }]);
@@ -528,17 +460,20 @@ async function registerNewPatient(replyToken, lineUserId, d) {
 }
 
 // ============================================================
-// QRコードによる患者連携
+// QRコード連携
 // ============================================================
 async function handleLineLink(replyToken, lineUserId, patientCode) {
-  const result = await db.query(
-    'SELECT * FROM patients WHERE patient_code = $1 AND is_active = TRUE', [patientCode]
-  );
-  if (!result.rows.length) {
+  const { data: patient } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('patient_code', patientCode)
+    .eq('is_active', true)
+    .single();
+
+  if (!patient) {
     await replyMessage(replyToken, [{ type: 'text', text: '患者番号が見つかりません。\n受付にお問い合わせください。' }]);
     return;
   }
-  const patient = result.rows[0];
   if (patient.line_user_id && patient.line_user_id !== lineUserId) {
     await replyMessage(replyToken, [{ type: 'text', text: 'このQRコードはすでに別のアカウントで連携されています。\n受付にお問い合わせください。' }]);
     return;
@@ -547,20 +482,19 @@ async function handleLineLink(replyToken, lineUserId, patientCode) {
     await replyMessage(replyToken, [{ type: 'text', text: `${patient.name} 様はすでに連携済みです。\nメニューからご予約いただけます` }]);
     return;
   }
-  await db.query(
-    'UPDATE patients SET line_user_id=$1, line_linked_at=NOW(), updated_at=NOW() WHERE id=$2',
-    [lineUserId, patient.id]
-  );
 
-  // 年代未登録なら質問
+  await supabase
+    .from('patients')
+    .update({ line_user_id: lineUserId, line_linked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', patient.id);
+
   if (!patient.age_group && !patient.birth_date) {
     await replyMessage(replyToken, [
       { type: 'text', text: `${patient.name} 様（${patient.patient_code}）、LINE連携が完了しました！` },
       {
         type: 'template', altText: 'あなたの年代を教えてください',
         template: {
-          type: 'buttons',
-          text: 'あなたの年代を教えてください（データ分析にのみ使用します）',
+          type: 'buttons', text: 'あなたの年代を教えてください（データ分析にのみ使用します）',
           actions: [
             { type: 'postback', label: '10〜30代', data: 'action=set_age_group&range=young' },
             { type: 'postback', label: '40〜50代', data: 'action=set_age_group&range=middle' },
@@ -571,10 +505,7 @@ async function handleLineLink(replyToken, lineUserId, patientCode) {
       },
     ]);
   } else {
-    await replyMessage(replyToken, [{
-      type: 'text',
-      text: `${patient.name} 様（${patient.patient_code}）、LINE連携が完了しました！\n\n「予約する」から診察の予約ができます`,
-    }]);
+    await replyMessage(replyToken, [{ type: 'text', text: `${patient.name} 様（${patient.patient_code}）、LINE連携が完了しました！\n\n「予約する」から診察の予約ができます` }]);
   }
 }
 
@@ -586,12 +517,18 @@ async function startBookingFlow(replyToken, patient) {
     await replyMessage(replyToken, [{ type: 'text', text: '受付で発行したQRコードを読み取って患者登録を先に行ってください。' }]);
     return;
   }
-  const treatments = await db.query('SELECT * FROM treatments WHERE is_active=TRUE AND line_visible=TRUE ORDER BY display_order');
-  if (!treatments.rows.length) {
+  const { data: treatments } = await supabase
+    .from('treatments')
+    .select('*')
+    .eq('is_active', true)
+    .eq('line_visible', true)
+    .order('display_order');
+
+  if (!treatments?.length) {
     await replyMessage(replyToken, [{ type: 'text', text: '現在予約できる治療メニューがありません。' }]);
     return;
   }
-  const columns = treatments.rows.slice(0, 10).map(t => ({
+  const columns = treatments.slice(0, 10).map(t => ({
     title: t.name.substring(0, 40), text: `所要時間: ${t.duration}分`,
     actions: [{ type: 'postback', label: '選択する', data: `action=select_treatment&treatment_id=${t.id}&ts=${Date.now()}` }],
   }));
@@ -599,8 +536,13 @@ async function startBookingFlow(replyToken, patient) {
 }
 
 async function handleTreatmentSelect(replyToken, treatmentId, patient) {
-  const settingsResult = await db.query("SELECT value FROM clinic_settings WHERE key = 'open_days'");
-  const openDays = settingsResult.rows.length ? JSON.parse(settingsResult.rows[0].value) : [1,2,3,4,5,6];
+  const { data: setting } = await supabase
+    .from('clinic_settings')
+    .select('value')
+    .eq('key', 'open_days')
+    .single();
+
+  const openDays = setting ? JSON.parse(setting.value) : [1,2,3,4,5,6];
   const dates = [];
   const today = new Date();
   for (let i = 1; i <= 30; i++) {
@@ -621,8 +563,8 @@ async function handleTreatmentSelect(replyToken, treatmentId, patient) {
 }
 
 async function handleDateSelect(replyToken, treatmentId, date, patient) {
-  const res   = await fetch(`${BACKEND_URL}/api/appointments/available-slots/${date}`);
-  const data  = await res.json();
+  const res  = await fetch(`${BACKEND_URL}/api/appointments/available-slots/${date}`);
+  const data = await res.json();
   const slots = (data.slots || []).filter(s => s.available);
   if (!slots.length) {
     await replyMessage(replyToken, [{ type: 'text', text: `${formatDateJP(date)}は空き枠がありません。別の日程を選択してください。` }]);
@@ -639,7 +581,8 @@ async function handleTimeSelect(replyToken, data, patient) {
   const treatmentId = data.get('treatment_id');
   const date        = data.get('date');
   const time        = data.get('time');
-  const t           = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
+
+  const { data: t } = await supabase.from('treatments').select('*').eq('id', treatmentId).single();
   await replyMessage(replyToken, [{
     type: 'template', altText: '予約内容の確認',
     template: {
@@ -660,96 +603,78 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
   const time        = data.get('time');
 
   try {
-    const t = (await db.query('SELECT * FROM treatments WHERE id=$1', [treatmentId])).rows[0];
+    const { data: t } = await supabase.from('treatments').select('*').eq('id', treatmentId).single();
     if (!t) {
       await pushMessage(lineUserId, [{ type: 'text', text: '治療メニューの取得に失敗しました。お電話でご予約ください。' }]);
       return;
     }
     const endTime = addMinutes(time, t.duration);
 
-    // ── 空きチェアを選択（重複チェックあり） ──
-    // 指定日時に既存予約と時間が重複していないチェアを取得
-    const chairResult = await db.query(`
-      SELECT c.id, c.name FROM chairs c
-      WHERE c.is_active = TRUE
-        AND (c.line_bookable = TRUE OR TRUE)
-      AND c.id NOT IN (
-        SELECT a.chair_id FROM appointments a
-        WHERE a.appointment_date = $1
-          AND a.status = 'confirmed'
-          AND a.start_time < $3::time
-          AND a.end_time   > $2::time
-      )
-      ORDER BY c.display_order
-      LIMIT 1
-    `, [date, time, endTime]);
+    // 空きチェアを取得
+    const { data: bookedChairs } = await supabase
+      .from('appointments')
+      .select('chair_id')
+      .eq('appointment_date', date)
+      .eq('status', 'confirmed')
+      .lt('start_time', endTime)
+      .gt('end_time', time);
 
-    if (!chairResult.rows.length) {
-      await pushMessage(lineUserId, [{
-        type: 'text',
-        text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は満員です。
-他の日時をお選びいただくか、お電話でご相談ください。`
-      }]);
-      return;
-    }
-    const chairRow = chairResult.rows[0];
+    const bookedChairIds = bookedChairs?.map(a => a.chair_id) || [];
+    const { data: chairs } = await supabase
+      .from('chairs')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('display_order');
 
-    // ── 空きドクターを選択（重複チェックあり） ──
-    // 指定日時に既存予約と時間が重複していないドクターを取得
-    const staffResult = await db.query(`
-      SELECT s.id, s.name FROM staff s
-      WHERE s.is_active = TRUE
-        AND s.role = 'doctor'
-        AND s.id NOT IN (
-          SELECT a.staff_id FROM appointments a
-          WHERE a.appointment_date = $1
-            AND a.status = 'confirmed'
-            AND a.start_time < $3::time
-            AND a.end_time   > $2::time
-        )
-      ORDER BY s.id
-      LIMIT 1
-    `, [date, time, endTime]);
-
-    // ドクターが全員埋まっている場合は他のスタッフで代替
-    let staffRow = staffResult.rows[0];
-    if (!staffRow) {
-      const anyStaff = await db.query(`
-        SELECT s.id, s.name FROM staff s
-        WHERE s.is_active = TRUE
-          AND s.id NOT IN (
-            SELECT a.staff_id FROM appointments a
-            WHERE a.appointment_date = $1
-              AND a.status = 'confirmed'
-              AND a.start_time < $3::time
-              AND a.end_time   > $2::time
-          )
-        ORDER BY s.id LIMIT 1
-      `, [date, time, endTime]);
-      staffRow = anyStaff.rows[0];
-    }
-
-    if (!staffRow) {
-      await pushMessage(lineUserId, [{
-        type: 'text',
-        text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。
-他の日時をお選びいただくか、お電話でご相談ください。`
-      }]);
+    const availableChair = chairs?.find(c => !bookedChairIds.includes(c.id));
+    if (!availableChair) {
+      await pushMessage(lineUserId, [{ type: 'text', text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は満員です。\n他の日時をお選びいただくか、お電話でご相談ください。` }]);
       return;
     }
 
-    // ── 予約を登録 ──
-    await db.query(`
-      INSERT INTO appointments
-        (patient_id, staff_id, chair_id, treatment_id, appointment_date, start_time, end_time, status, source, patient_name, patient_phone)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', 'line', $8, $9)
-    `, [patient.id, staffRow.id, chairRow.id, treatmentId, date, time, endTime, patient.name, patient.phone]);
+    // 空きスタッフを取得
+    const { data: bookedStaff } = await supabase
+      .from('appointments')
+      .select('staff_id')
+      .eq('appointment_date', date)
+      .eq('status', 'confirmed')
+      .lt('start_time', endTime)
+      .gt('end_time', time);
+
+    const bookedStaffIds = bookedStaff?.map(a => a.staff_id) || [];
+    const { data: staffList } = await supabase
+      .from('staff')
+      .select('id, name')
+      .eq('is_active', true)
+      .eq('role', 'doctor')
+      .order('id');
+
+    let availableStaff = staffList?.find(s => !bookedStaffIds.includes(s.id));
+    if (!availableStaff) {
+      const { data: anyStaff } = await supabase
+        .from('staff')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('id');
+      availableStaff = anyStaff?.find(s => !bookedStaffIds.includes(s.id));
+    }
+
+    if (!availableStaff) {
+      await pushMessage(lineUserId, [{ type: 'text', text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。\n他の日時をお選びいただくか、お電話でご相談ください。` }]);
+      return;
+    }
+
+    // 予約登録
+    await supabase.from('appointments').insert({
+      patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id,
+      treatment_id: parseInt(treatmentId), appointment_date: date, start_time: time, end_time: endTime,
+      status: 'confirmed', source: 'line', patient_name: patient.name, patient_phone: patient.phone,
+    });
 
     await pushMessage(lineUserId, [{
       type: 'text',
-      text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n担当: ${staffRow.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております`
+      text: `予約が完了しました！\n\n${formatDateJP(date)}\n${time}〜\n${t.name}\n担当: ${availableStaff.name}\n\n前日にリマインドをお送りします。ご来院をお待ちしております`,
     }]);
-
   } catch (err) {
     console.error('予約確定エラー:', err);
     await pushMessage(lineUserId, [{ type: 'text', text: '予約の確定に失敗しました。お電話でご予約ください。' }]);
@@ -761,19 +686,23 @@ async function startCancelFlow(replyToken, patient) {
     await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。受付で発行したQRコードを読み取ってください。' }]);
     return;
   }
-  const result = await db.query(`
-    SELECT a.id, a.appointment_date, a.start_time, t.name AS treatment_name
-    FROM appointments a JOIN treatments t ON a.treatment_id = t.id
-    WHERE a.patient_id=$1 AND a.status='confirmed' AND a.appointment_date >= CURRENT_DATE
-    ORDER BY a.appointment_date LIMIT 3
-  `, [patient.id]);
-  if (!result.rows.length) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data: appts } = await supabase
+    .from('appointments')
+    .select('id, appointment_date, start_time, treatments(name)')
+    .eq('patient_id', patient.id)
+    .eq('status', 'confirmed')
+    .gte('appointment_date', today)
+    .order('appointment_date')
+    .limit(3);
+
+  if (!appts?.length) {
     await replyMessage(replyToken, [{ type: 'text', text: 'キャンセルできる予約がありません。' }]);
     return;
   }
-  const actions = result.rows.map(appt => ({
+  const actions = appts.map(appt => ({
     type: 'postback',
-    label: `${formatDateJP(appt.appointment_date.toISOString().split('T')[0])} ${appt.start_time.substring(0,5)}`,
+    label: `${formatDateJP(appt.appointment_date)} ${appt.start_time.substring(0,5)}`,
     data: `action=cancel_appointment&appointment_id=${appt.id}&ts=${Date.now()}`,
   }));
   await replyMessage(replyToken, [{ type: 'template', altText: 'キャンセルする予約を選択', template: { type: 'buttons', text: 'キャンセルする予約を選択してください', actions } }]);
@@ -781,11 +710,10 @@ async function startCancelFlow(replyToken, patient) {
 
 async function handleCancelAppointment(replyToken, appointmentId, patient) {
   try {
-    // 直接DBを更新（API認証不要）
-    await db.query(
-      "UPDATE appointments SET status='cancelled', cancelled_by='patient', cancel_reason='LINEからキャンセル', updated_at=NOW() WHERE id=$1",
-      [appointmentId]
-    );
+    await supabase.from('appointments').update({
+      status: 'cancelled', cancelled_by: 'patient',
+      cancel_reason: 'LINEからキャンセル', updated_at: new Date().toISOString(),
+    }).eq('id', appointmentId);
     await replyMessage(replyToken, [{ type: 'text', text: '予約をキャンセルしました。またのご来院をお待ちしております。' }]);
   } catch (err) {
     console.error('キャンセルエラー:', err);
@@ -795,35 +723,39 @@ async function handleCancelAppointment(replyToken, appointmentId, patient) {
 
 async function showUpcomingAppointments(replyToken, patient) {
   if (!patient) { await replyMessage(replyToken, [{ type: 'text', text: '患者登録が必要です。' }]); return; }
-  const result = await db.query(`
-    SELECT a.appointment_date, a.start_time, t.name AS treatment_name, s.name AS staff_name
-    FROM appointments a JOIN treatments t ON a.treatment_id=t.id JOIN staff s ON a.staff_id=s.id
-    WHERE a.patient_id=$1 AND a.status='confirmed' AND a.appointment_date >= CURRENT_DATE
-    ORDER BY a.appointment_date LIMIT 3
-  `, [patient.id]);
-  if (!result.rows.length) { await replyMessage(replyToken, [{ type: 'text', text: '現在ご予約はありません。' }]); return; }
-  const text = result.rows.map(a =>
-    `${formatDateJP(a.appointment_date.toISOString().split('T')[0])}\n${a.start_time.substring(0,5)} ${a.treatment_name}\nDr.${a.staff_name}`
+  const today = new Date().toISOString().split('T')[0];
+  const { data: appts } = await supabase
+    .from('appointments')
+    .select('appointment_date, start_time, treatments(name), staff(name)')
+    .eq('patient_id', patient.id)
+    .eq('status', 'confirmed')
+    .gte('appointment_date', today)
+    .order('appointment_date')
+    .limit(3);
+
+  if (!appts?.length) { await replyMessage(replyToken, [{ type: 'text', text: '現在ご予約はありません。' }]); return; }
+  const text = appts.map(a =>
+    `${formatDateJP(a.appointment_date)}\n${a.start_time.substring(0,5)} ${a.treatments?.name}\nDr.${a.staff?.name}`
   ).join('\n\n');
   await replyMessage(replyToken, [{ type: 'text', text: `ご予約一覧\n\n${text}` }]);
 }
 
 // ============================================================
-// 年代設定フロー（QR連携後）
+// 年代設定
 // ============================================================
 async function handleSetAgeGroup(replyToken, lineUserId, range) {
   const rangeMap = {
-    young:  [['10代','inq_age_10'],['20代','inq_age_20'],['30代','inq_age_30']],
-    middle: [['40代','inq_age_40'],['50代','inq_age_50']],
-    senior: [['60代','inq_age_60'],['70代','inq_age_70']],
-    elder:  [['80代','inq_age_80'],['90代以上','inq_age_90']],
+    young:  [['10代','10代'],['20代','20代'],['30代','30代']],
+    middle: [['40代','40代'],['50代','50代']],
+    senior: [['60代','60代'],['70代','70代']],
+    elder:  [['80代','80代'],['90代以上','90代以上']],
   };
   const ages = rangeMap[range] || rangeMap.young;
   await replyMessage(replyToken, [{
     type: 'template', altText: '年代を選択してください',
     template: {
       type: 'buttons', text: '年代を選択してください',
-      actions: ages.map(([label, act]) => ({ type: 'postback', label, data: `action=set_age_detail&age_group=${label}` })),
+      actions: ages.map(([label, ag]) => ({ type: 'postback', label, data: `action=set_age_detail&age_group=${ag}` })),
     },
   }]);
 }
@@ -831,11 +763,8 @@ async function handleSetAgeGroup(replyToken, lineUserId, range) {
 async function handleSetAgeDetail(replyToken, lineUserId, ageGroup) {
   const patient = await getPatientByLineId(lineUserId);
   if (!patient) return;
-  await db.query('UPDATE patients SET age_group=$1, updated_at=NOW() WHERE id=$2', [ageGroup, patient.id]);
-  await replyMessage(replyToken, [{
-    type: 'text',
-    text: `ありがとうございます！\n\n「予約する」から診察の予約ができます\nご来院をお待ちしております`,
-  }]);
+  await supabase.from('patients').update({ age_group: ageGroup, updated_at: new Date().toISOString() }).eq('id', patient.id);
+  await replyMessage(replyToken, [{ type: 'text', text: `ありがとうございます！\n\n「予約する」から診察の予約ができます\nご来院をお待ちしております` }]);
 }
 
 // ============================================================
@@ -843,8 +772,8 @@ async function handleSetAgeDetail(replyToken, lineUserId, ageGroup) {
 // ============================================================
 async function getPatientByLineId(lineUserId) {
   if (!lineUserId) return null;
-  const result = await db.query('SELECT * FROM patients WHERE line_user_id=$1', [lineUserId]);
-  return result.rows[0] || null;
+  const { data } = await supabase.from('patients').select('*').eq('line_user_id', lineUserId).single();
+  return data || null;
 }
 
 function formatDateJP(dateStr) {

@@ -1,16 +1,25 @@
 // ============================================================
-// routes/treatments.js
+// routes/treatments.js （Supabase移行版）
 // ============================================================
 const express = require('express');
 const router  = express.Router();
-const db      = require('../config/database');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query(
-      'SELECT * FROM treatments ORDER BY display_order, id'
-    );
-    res.json({ treatments: result.rows });
+    const { data, error } = await supabase
+      .from('treatments')
+      .select('*')
+      .order('display_order')
+      .order('id');
+
+    if (error) throw error;
+    res.json({ treatments: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -19,11 +28,14 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name, name_en, duration, category, assignable_roles, price, color, line_visible } = req.body;
   try {
-    const result = await db.query(`
-      INSERT INTO treatments (name,name_en,duration,category,assignable_roles,price,color,line_visible)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
-    `, [name, name_en, duration, category, assignable_roles, price, color, line_visible]);
-    res.status(201).json({ treatment: result.rows[0] });
+    const { data, error } = await supabase
+      .from('treatments')
+      .insert({ name, name_en, duration, category, assignable_roles, price, color, line_visible })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json({ treatment: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -32,12 +44,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { name, name_en, duration, category, assignable_roles, price, color, is_active, line_visible } = req.body;
   try {
-    const result = await db.query(`
-      UPDATE treatments SET name=$1,name_en=$2,duration=$3,category=$4,
-        assignable_roles=$5,price=$6,color=$7,is_active=$8,line_visible=$9
-      WHERE id=$10 RETURNING *
-    `, [name, name_en, duration, category, assignable_roles, price, color, is_active, line_visible, req.params.id]);
-    res.json({ treatment: result.rows[0] });
+    const { data, error } = await supabase
+      .from('treatments')
+      .update({ name, name_en, duration, category, assignable_roles, price, color, is_active, line_visible })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ treatment: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
