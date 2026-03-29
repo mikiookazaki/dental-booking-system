@@ -6,11 +6,13 @@ import api from '../../api'
 const API = import.meta.env.VITE_API_URL || ''
 
 function authHeader() {
-  const token = localStorage.getItem('admin_token')
+  const token      = localStorage.getItem('admin_token')
+  const isTestMode = localStorage.getItem('test_mode') === 'true'
+  const role       = localStorage.getItem('admin_role') || ''
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization:  `Bearer ${token}`,
     'Content-Type': 'application/json',
-    'x-test-mode': 'true',
+    ...(isTestMode && role === 'superadmin' ? { 'x-test-mode': 'true' } : {}),
   }
 }
 
