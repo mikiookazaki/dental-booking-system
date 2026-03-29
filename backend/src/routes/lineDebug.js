@@ -45,11 +45,7 @@ router.post('/simulate', async (req, res) => {
 
   if (patientId) {
     const { data: patient } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('id', patientId)
-      .single();
-
+      .from('patients').select('*').eq('id', patientId).single();
     if (patient) {
       debugPatient = patient;
       lineUserId   = patient.line_user_id || `debug_${patient.id}`;
@@ -63,7 +59,6 @@ router.post('/simulate', async (req, res) => {
     logs.push({ type: 'reply', time: new Date().toISOString(), messages });
     responses.push(...messages);
   }
-
   async function mockPush(userId, messages) {
     logs.push({ type: 'push', time: new Date().toISOString(), userId, messages });
     responses.push(...messages);
@@ -74,13 +69,12 @@ router.post('/simulate', async (req, res) => {
     if (typeof lineModule.handleEventDebug !== 'function') {
       return res.status(500).json({ error: 'handleEventDebugが未定義です。' });
     }
-
     await lineModule.handleEventDebug(
       {
         type,
-        message:     { type: 'text', text },
-        source:      { userId: lineUserId },
-        replyToken:  'debug_token',
+        message:         { type: 'text', text },
+        source:          { userId: lineUserId },
+        replyToken:      'debug_token',
         _debugPatient:   debugPatient,
         _productionMode: productionMode,
         _isTestMode:     req.isTestMode,
@@ -88,7 +82,6 @@ router.post('/simulate', async (req, res) => {
       mockReply,
       mockPush
     );
-
     res.json({ responses, logs, lineUserId, productionMode });
   } catch (err) {
     console.error('simulate error:', err);
@@ -107,11 +100,7 @@ router.post('/postback', async (req, res) => {
 
   if (patientId) {
     const { data: patient } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('id', patientId)
-      .single();
-
+      .from('patients').select('*').eq('id', patientId).single();
     if (patient) {
       debugPatient = patient;
       lineUserId   = patient.line_user_id || `debug_${patient.id}`;
@@ -125,10 +114,47 @@ router.post('/postback', async (req, res) => {
     logs.push({ type: 'reply', time: new Date().toISOString(), messages });
     responses.push(...messages);
   }
-
   async function mockPush(userId, messages) {
     logs.push({ type: 'push', time: new Date().toISOString(), userId, messages });
     responses.push(...messages);
+  }
+
+  // restart は lineDebug 側で直接処理（治療メニュー選択に戻る）
+  const params = new URLSearchParams(postbackData || '');
+  if (params.get('action') === 'restart') {
+    try {
+      const { data: treatments } = await supabase
+        .from('treatments')
+        .select('*')
+        .eq('is_active', true)
+        .eq('line_visible', true)
+        .order('display_order');
+
+      if (!treatments?.length) {
+        responses.push({ type: 'text', text: '現在予約できる治療メニューがありません。' });
+      } else {
+        responses.push({
+          type: 'template',
+          altText: '治療メニューを選択してください',
+          template: {
+            type: 'carousel',
+            columns: treatments.slice(0, 10).map(t => ({
+              title: t.name.substring(0, 40),
+              text:  `所要時間: ${t.duration}分`,
+              actions: [{
+                type:  'postback',
+                label: '選択する',
+                data:  `action=select_treatment&treatment_id=${t.id}&ts=${Date.now()}`,
+              }],
+            })),
+          },
+        });
+      }
+      logs.push({ type: 'reply', time: new Date().toISOString(), messages: responses });
+      return res.json({ responses, logs, lineUserId, productionMode });
+    } catch (err) {
+      return res.status(500).json({ error: err.message, logs });
+    }
   }
 
   try {
@@ -136,13 +162,12 @@ router.post('/postback', async (req, res) => {
     if (typeof lineModule.handleEventDebug !== 'function') {
       return res.status(500).json({ error: 'handleEventDebugが未定義です。' });
     }
-
     await lineModule.handleEventDebug(
       {
-        type:       'postback',
-        postback:   { data: postbackData },
-        source:     { userId: lineUserId },
-        replyToken: 'debug_token',
+        type:            'postback',
+        postback:        { data: postbackData },
+        source:          { userId: lineUserId },
+        replyToken:      'debug_token',
         _debugPatient:   debugPatient,
         _productionMode: productionMode,
         _isTestMode:     req.isTestMode,
@@ -150,7 +175,6 @@ router.post('/postback', async (req, res) => {
       mockReply,
       mockPush
     );
-
     res.json({ responses, logs, lineUserId, productionMode });
   } catch (err) {
     res.status(500).json({ error: err.message, logs });
@@ -159,6 +183,7 @@ router.post('/postback', async (req, res) => {
 
 // ============================================================
 // DELETE /api/line-debug/test-appointments
+// デバッグで作成したテスト予約を削除
 // ============================================================
 router.delete('/test-appointments', async (req, res) => {
   try {
