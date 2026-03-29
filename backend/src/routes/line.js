@@ -26,12 +26,21 @@ async function replyMessage(replyToken, messages) {
 }
 
 async function pushMessage(lineUserId, messages) {
-  const res = await fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
-    body: JSON.stringify({ to: lineUserId, messages }),
-  });
-  if (!res.ok) console.error('LINE push error:', await res.text());
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+      body: JSON.stringify({ to: lineUserId, messages }),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      console.error('LINE push error:', res.status, body);
+    } else {
+      console.log('LINE push success:', lineUserId, 'messages:', messages.length);
+    }
+  } catch (err) {
+    console.error('LINE push exception:', err.message);
+  }
 }
 
 async function hideRichMenu(lineUserId) {
