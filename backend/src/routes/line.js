@@ -349,7 +349,7 @@ async function handleConfirmBooking(replyToken, lineUserId, data, patient) {
     let availableStaff = staffList?.find(s => !bookedStaffIds.includes(s.id));
     if (!availableStaff) { const { data: anyStaff } = await supabase.from('staff').select('id, name').eq('is_active', true).order('id'); availableStaff = anyStaff?.find(s => !bookedStaffIds.includes(s.id)); }
     if (!availableStaff) { await pushMessage(lineUserId, [{ type: 'text', text: `申し訳ございません。${formatDateJP(date)} ${time}〜 は担当スタッフが空いておりません。` }]); return; }
-    await supabase.from('appointments').insert({ patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id, treatment_id: parseInt(treatmentId), appointment_date: date, start_time: time, end_time: endTime, status: 'confirmed', source: 'line', patient_name: patient.name, patient_phone: patient.phone });
+    await supabase.from('appointments').insert({ patient_id: patient.id, staff_id: availableStaff.id, chair_id: availableChair.id, treatment_id: parseInt(treatmentId), appointment_date: date, start_time: time, end_time: endTime, status: 'confirmed', source: 'line', patient_name: patient.name, patient_phone: patient.phone, is_test: patient.is_test || false });
     await pushMessage(lineUserId, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜\n🦷 ${t.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n前日にリマインドをお送りします。\nご来院をお待ちしております😊` }]);
   } catch (err) {
     console.error('予約確定エラー:', err);
@@ -506,6 +506,7 @@ async function handleEventDebug(event, mockReply, mockPush) {
                 start_time: time, end_time: endTime,
                 status: 'confirmed', source: 'line_debug',
                 patient_name: patient.name, patient_phone: patient.phone,
+                is_test: patient.is_test || false,  // ← 追加
               });
               if (insertError) throw insertError;
               await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜${endTime}\n🦷 ${t?.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n※テスト予約です（削除可能）` }]);

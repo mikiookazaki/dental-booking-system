@@ -291,12 +291,33 @@ router.post('/run-test', async (req, res, next) => {
 // 送信履歴取得（管理画面用）
 router.get('/logs', async (req, res, next) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const { data, error } = await supabase
+    const limit  = Math.min(Number(req.query.limit) || 50, 200);
+    const isTest = req.isTestMode;
+
+    // テストモード時はテスト患者のログ、本番時は本番患者のログを返す
+    const { data: testPatientIds } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('is_test', isTest)
+      .eq('is_active', true);
+
+    const ids = (testPatientIds || []).map(p => p.id);
+
+    let query = supabase
       .from('reminder_logs')
-      .select('*, patients(name)')
+      .select('*, patients(name, is_test)')
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    // テストモード: テスト患者のログのみ / 本番モード: 本番患者のログのみ
+    if (ids.length > 0) {
+      query = query.in('patient_id', ids);
+    } else {
+      // 該当患者なしの場合は空を返す
+      return res.json([]);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     res.json(data);
   } catch (err) { next(err); }
