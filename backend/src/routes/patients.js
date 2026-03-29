@@ -88,21 +88,34 @@ router.get('/:id/qr', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source } = req.body;
-    if (!name?.trim())       return res.status(400).json({ error: '氏名は必須です' });
-    if (!name_kana?.trim())  return res.status(400).json({ error: 'フリガナは必須です' });
+    if (!name?.trim())      return res.status(400).json({ error: '氏名は必須です' });
+    if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
     if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
 
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : (age_group || null);
+
+    // patient_code を自動生成
+    const { data: lastPatient } = await supabase
+      .from('patients')
+      .select('patient_code')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const lastNum = lastPatient?.patient_code
+      ? parseInt(lastPatient.patient_code.replace('P-', '')) + 1
+      : 1;
+    const patient_code = `P-${String(lastNum).padStart(5, '0')}`;
 
     const { data, error } = await supabase
       .from('patients')
       .insert({
         name: name.trim(), name_kana: name_kana.trim(),
         phone, email, birth_date, gender, address, notes,
-        age_group: finalAgeGroup,
+        age_group:       finalAgeGroup,
         postal_code:     postal_code     || null,
         referral_source: referral_source || null,
-        is_test: req.isTestMode ? true : false,
+        is_test:         req.isTestMode ? true : false,
+        patient_code,
       })
       .select()
       .single();
