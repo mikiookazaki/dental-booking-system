@@ -12,7 +12,7 @@ const supabase = createClient(
 // ─────────────────────────────────────────────────────────
 // ① 予約リマインダー（前日 / 当日）
 // ─────────────────────────────────────────────────────────
-async function runAppointmentReminders() {
+async function runAppointmentReminders(isTest = false) {
   const now        = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const today      = now.toISOString().slice(0, 10);
   const tomorrowDt = new Date(now);
@@ -24,13 +24,17 @@ async function runAppointmentReminders() {
     { date: tomorrow, type: 'appointment_day_before', label: '明日' },
   ];
 
-  const { data: lic } = await supabase
-    .from('clinic_licenses')
-    .select('plan')
-    .eq('clinic_id', 'default')
-    .eq('is_active', true)
-    .single();
-  const plan = lic?.plan || 'basic';
+  // ライセンスチェック（テストモードはプラン制限なし）
+  let plan = 'standard';
+  if (!isTest) {
+    const { data: lic } = await supabase
+      .from('clinic_licenses')
+      .select('plan')
+      .eq('clinic_id', 'default')
+      .eq('is_active', true)
+      .single();
+    plan = lic?.plan || 'basic';
+  }
 
   const results = [];
 
@@ -45,12 +49,12 @@ async function runAppointmentReminders() {
         treatments ( name )
       `)
       .eq('appointment_date', date)
+      .eq('is_test', isTest)
       .in('status', ['confirmed', 'pending']);
 
     for (const appt of appointments ?? []) {
       const patient = appt.patients;
 
-      // LINE未連携はno_lineとして記録
       if (!patient?.line_user_id) {
         await supabase.from('reminder_logs').insert({
           appointment_id: appt.id,
@@ -102,15 +106,17 @@ async function runAppointmentReminders() {
 // ─────────────────────────────────────────────────────────
 // ② 定期検診リマインド（3 / 6 ヶ月後）
 // ─────────────────────────────────────────────────────────
-async function runRecallReminders() {
-  const { data: lic } = await supabase
-    .from('clinic_licenses')
-    .select('plan')
-    .eq('clinic_id', 'default')
-    .eq('is_active', true)
-    .single();
-  const plan = lic?.plan || 'basic';
-  if (plan === 'basic') return [];
+async function runRecallReminders(isTest = false) {
+  if (!isTest) {
+    const { data: lic } = await supabase
+      .from('clinic_licenses')
+      .select('plan')
+      .eq('clinic_id', 'default')
+      .eq('is_active', true)
+      .single();
+    const plan = lic?.plan || 'basic';
+    if (plan === 'basic') return [];
+  }
 
   const results = [];
 
@@ -125,11 +131,11 @@ async function runRecallReminders() {
       .eq('last_visit_date', targetStr)
       .eq('recall_months', months)
       .eq('is_active', true)
+      .eq('is_test', isTest)
       .not('line_user_id', 'is', null);
 
     for (const patient of patients ?? []) {
       const reminderType = `recall_${months}month`;
-
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data: recent } = await supabase
         .from('reminder_logs')
@@ -233,18 +239,43 @@ function buildRecallMessage(months, patientName) {
 // エンドポイント
 // ─────────────────────────────────────────────────────────
 
-// Cron・手動実行用
+// Cron・手動実行用（本番データ）
 router.post('/run', async (req, res, next) => {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
     const [appt, recall] = await Promise.all([
-      runAppointmentReminders(),
-      runRecallReminders(),
+      runAppointmentReminders(false),
+      runRecallReminders(false),
     ]);
     res.json({
       success: true,
+      appointment: appt,
+      recall,
+      summary: {
+        appt_sent:    appt.filter(r => r.status === 'sent').length,
+        appt_failed:  appt.filter(r => r.status === 'failed').length,
+        appt_no_line: appt.filter(r => r.status === 'no_line').length,
+        recall_sent:  recall.filter(r => r.status === 'sent').length,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// テストモード用手動実行（管理画面から）
+router.post('/run-test', async (req, res, next) => {
+  if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const [appt, recall] = await Promise.all([
+      runAppointmentReminders(true),
+      runRecallReminders(true),
+    ]);
+    res.json({
+      success: true,
+      mode: 'test',
       appointment: appt,
       recall,
       summary: {

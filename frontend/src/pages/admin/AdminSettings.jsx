@@ -182,21 +182,26 @@ function ReminderTab() {
   }
 
   async function handleRunNow() {
-    setRunning(true)
-    setRunResult(null)
-    try {
-      const res  = await fetch(`${API}/api/reminders/run`, {
-        method: 'POST',
-        headers: { ...authHeader(), 'x-cron-secret': 'smile-dental-cron-2026' },
-      })
-      const data = await res.json()
-      setRunResult(data)
-      fetchLogs()
-    } catch (e) {
-      setRunResult({ error: e.message })
-    }
-    setRunning(false)
-  }
+  　setRunning(true)
+  　setRunResult(null)
+  　try {
+    　const isTestMode = localStorage.getItem('test_mode') === 'true'
+    　const role       = localStorage.getItem('admin_role') || ''
+    　const endpoint   = (isTestMode && role === 'superadmin')
+    　  ? `${API}/api/reminders/run-test`
+    　  : `${API}/api/reminders/run`
+    　const res  = await fetch(endpoint, {
+      　method: 'POST',
+      　headers: { ...authHeader(), 'x-cron-secret': 'smile-dental-cron-2026' },
+    　})
+    　const data = await res.json()
+    　setRunResult(data)
+    　fetchLogs()
+  　} catch (e) {
+    　setRunResult({ error: e.message })
+  　}
+  　setRunning(false)
+　}
 
   function update(key, val) { setSettings(prev => ({ ...prev, [key]: val })) }
 
