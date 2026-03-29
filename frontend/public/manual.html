@@ -23,6 +23,8 @@
     --white: #ffffff;
     --shadow: 0 4px 24px rgba(30,64,175,0.08);
     --shadow-lg: 0 8px 40px rgba(30,64,175,0.13);
+    --test: #d97706;
+    --test-pale: #fffbeb;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,7 +37,6 @@
     font-size: 15px;
   }
 
-  /* ── カバーページ ── */
   .cover {
     background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 40%, #0891b2 100%);
     min-height: 100vh;
@@ -99,7 +100,7 @@
     border-radius: 16px;
     padding: 28px 40px;
     backdrop-filter: blur(10px);
-    max-width: 600px;
+    max-width: 680px;
     width: 100%;
   }
   .cover-toc h3 {
@@ -125,7 +126,6 @@
   }
   .cover-toc-item span { font-size: 18px; }
 
-  /* ── ナビ ── */
   .nav {
     position: sticky;
     top: 0;
@@ -164,10 +164,8 @@
   }
   .nav a:hover { color: var(--primary); border-bottom-color: var(--primary); }
 
-  /* ── メインレイアウト ── */
   .main { max-width: 1100px; margin: 0 auto; padding: 48px 24px; }
 
-  /* ── セクション ── */
   .section {
     background: var(--white);
     border-radius: 20px;
@@ -202,7 +200,6 @@
   }
   .section-body { padding: 36px; }
 
-  /* ── 章見出し ── */
   .chapter-num {
     display: inline-block;
     background: var(--primary);
@@ -215,7 +212,6 @@
     letter-spacing: 0.1em;
   }
 
-  /* ── イラストブロック ── */
   .illust-block {
     background: var(--bg);
     border-radius: 16px;
@@ -227,8 +223,8 @@
   .illust-block.cyan  { background: var(--accent-light); border-color: #a5f3fc; }
   .illust-block.green { background: #f0fdf4; border-color: #a7f3d0; }
   .illust-block.amber { background: #fffbeb; border-color: #fde68a; }
+  .illust-block.test  { background: #fffbeb; border-color: #f59e0b; border-width: 2px; }
 
-  /* ── スクリーンモック ── */
   .screen-mock {
     background: #1e293b;
     border-radius: 12px;
@@ -254,7 +250,6 @@
     overflow: hidden;
   }
 
-  /* ── ログイン画面モック ── */
   .login-mock {
     background: linear-gradient(135deg, #1e3a8a, #0891b2);
     padding: 32px;
@@ -298,10 +293,7 @@
     cursor: pointer;
   }
 
-  /* ── カレンダーモック ── */
-  .cal-mock {
-    padding: 16px;
-  }
+  .cal-mock { padding: 16px; }
   .cal-header-mock {
     display: flex;
     align-items: center;
@@ -310,10 +302,7 @@
     padding-bottom: 8px;
     border-bottom: 1px solid #e5e7eb;
   }
-  .cal-modes {
-    display: flex;
-    gap: 4px;
-  }
+  .cal-modes { display: flex; gap: 4px; }
   .cal-mode {
     background: #eff6ff;
     color: #1e40af;
@@ -322,10 +311,7 @@
     font-size: 11px;
     font-weight: 600;
   }
-  .cal-mode.active {
-    background: #1e40af;
-    color: #fff;
-  }
+  .cal-mode.active { background: #1e40af; color: #fff; }
   .cal-grid {
     display: grid;
     grid-template-columns: 60px repeat(5, 1fr);
@@ -340,17 +326,8 @@
     color: #374151;
     border-radius: 6px;
   }
-  .cal-time {
-    color: #9ca3af;
-    padding: 4px 8px;
-    text-align: right;
-    font-size: 10px;
-  }
-  .cal-cell {
-    border-radius: 4px;
-    height: 28px;
-    background: #f9fafb;
-  }
+  .cal-time { color: #9ca3af; padding: 4px 8px; text-align: right; font-size: 10px; }
+  .cal-cell { border-radius: 4px; height: 28px; background: #f9fafb; }
   .cal-appt {
     background: #3b82f6;
     color: #fff;
@@ -367,24 +344,14 @@
   .cal-appt.purple { background: #7c3aed; }
   .cal-appt.amber { background: #d97706; }
 
-  /* ── サイドバーモック ── */
-  .sidebar-mock {
-    display: flex;
-    height: 200px;
-  }
+  .sidebar-mock { display: flex; height: 240px; }
   .sidebar-left {
     width: 180px;
     background: #1e293b;
     padding: 12px 8px;
     flex-shrink: 0;
   }
-  .sidebar-logo {
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 8px;
-    margin-bottom: 8px;
-  }
+  .sidebar-logo { color: #fff; font-size: 11px; font-weight: 700; padding: 8px; margin-bottom: 4px; }
   .sidebar-item {
     color: rgba(255,255,255,0.6);
     font-size: 11px;
@@ -395,29 +362,12 @@
     align-items: center;
     gap: 6px;
   }
-  .sidebar-item.active {
-    background: rgba(59,130,246,0.3);
-    color: #93c5fd;
-  }
-  .sidebar-right {
-    flex: 1;
-    background: #f8fafc;
-    padding: 12px;
-    overflow: hidden;
-  }
+  .sidebar-item.active { background: rgba(59,130,246,0.3); color: #93c5fd; }
+  .sidebar-item.test-item { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .sidebar-right { flex: 1; background: #f8fafc; padding: 12px; overflow: hidden; }
 
-  /* ── ステップ ── */
-  .steps {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin: 20px 0;
-  }
-  .step {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-  }
+  .steps { display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+  .step { display: flex; gap: 16px; align-items: flex-start; }
   .step-num {
     width: 36px; height: 36px;
     border-radius: 50%;
@@ -435,7 +385,6 @@
   .step-content h4 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
   .step-content p { font-size: 13px; color: var(--text-sub); }
 
-  /* ── Tips/Note ── */
   .tip {
     display: flex;
     gap: 12px;
@@ -444,13 +393,13 @@
     margin: 16px 0;
     font-size: 13px;
   }
-  .tip.info  { background: var(--primary-pale); border-left: 4px solid var(--primary-light); }
-  .tip.warn  { background: #fffbeb; border-left: 4px solid var(--warning); }
+  .tip.info    { background: var(--primary-pale); border-left: 4px solid var(--primary-light); }
+  .tip.warn    { background: #fffbeb; border-left: 4px solid var(--warning); }
   .tip.success { background: #f0fdf4; border-left: 4px solid var(--success); }
+  .tip.test    { background: #fffbeb; border-left: 4px solid #f59e0b; }
   .tip-icon { font-size: 18px; flex-shrink: 0; }
   .tip strong { font-weight: 700; display: block; margin-bottom: 2px; }
 
-  /* ── テーブル ── */
   .role-table {
     width: 100%;
     border-collapse: collapse;
@@ -465,7 +414,7 @@
     font-weight: 600;
   }
   .role-table th:first-child { border-radius: 8px 0 0 0; }
-  .role-table th:last-child { border-radius: 0 8px 0 0; }
+  .role-table th:last-child  { border-radius: 0 8px 0 0; }
   .role-table td {
     padding: 10px 14px;
     border-bottom: 1px solid var(--border);
@@ -481,12 +430,13 @@
     margin: 2px;
   }
   .badge.admin  { background: #fef3c7; color: #92400e; }
+  .badge.super  { background: #fde68a; color: #78350f; border: 1px solid #f59e0b; }
   .badge.staff  { background: #e0f2fe; color: #075985; }
   .badge.both   { background: #f0fdf4; color: #166534; }
   .badge.check  { background: #dcfce7; color: #166534; }
   .badge.cross  { background: #fee2e2; color: #991b1b; }
+  .badge.test   { background: #fef3c7; color: #92400e; }
 
-  /* ── 機能カード ── */
   .feature-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -500,15 +450,11 @@
     padding: 16px;
     transition: transform 0.2s, box-shadow 0.2s;
   }
-  .feature-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-  }
+  .feature-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
   .feature-card-icon { font-size: 28px; margin-bottom: 8px; }
   .feature-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
   .feature-card p { font-size: 12px; color: var(--text-sub); }
 
-  /* ── LINE フロー ── */
   .line-flow {
     display: flex;
     align-items: center;
@@ -527,16 +473,9 @@
     text-align: center;
     min-width: 90px;
   }
-  .line-arrow {
-    color: #16a34a;
-    font-size: 20px;
-    font-weight: 700;
-  }
+  .line-arrow { color: #16a34a; font-size: 20px; font-weight: 700; }
 
-  /* ── ダッシュボードモック ── */
-  .dash-mock {
-    padding: 16px;
-  }
+  .dash-mock { padding: 16px; }
   .dash-kpi {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -551,11 +490,7 @@
   }
   .dash-kpi-label { font-size: 10px; color: #6b7280; margin-bottom: 4px; }
   .dash-kpi-value { font-size: 20px; font-weight: 700; color: #1e40af; }
-  .dash-charts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
+  .dash-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .dash-chart-box {
     background: #f9fafb;
     border-radius: 8px;
@@ -567,17 +502,9 @@
     gap: 4px;
     overflow: hidden;
   }
-  .dash-bar {
-    flex: 1;
-    background: #3b82f6;
-    border-radius: 3px 3px 0 0;
-    opacity: 0.8;
-  }
+  .dash-bar { flex: 1; background: #3b82f6; border-radius: 3px 3px 0 0; opacity: 0.8; }
 
-  /* ── 患者管理モック ── */
-  .patient-mock {
-    padding: 16px;
-  }
+  .patient-mock { padding: 16px; }
   .patient-search {
     background: #f8fafc;
     border: 1px solid #e5e7eb;
@@ -590,10 +517,7 @@
     align-items: center;
     gap: 6px;
   }
-  .patient-table-mock {
-    font-size: 11px;
-    width: 100%;
-  }
+  .patient-table-mock { font-size: 11px; width: 100%; }
   .patient-table-mock th {
     background: #f1f5f9;
     padding: 6px 8px;
@@ -616,12 +540,111 @@
     font-weight: 600;
   }
 
-  /* ── 区切り ── */
-  .divider {
-    border: none;
-    border-top: 2px dashed var(--border);
-    margin: 32px 0;
+  /* テストモードモック */
+  .test-mode-mock {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 6px 8px;
+    border: 1px solid #f59e0b;
   }
+  .test-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .test-toggle-label { color: #fbbf24; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .toggle-pill {
+    width: 32px; height: 18px;
+    background: #f59e0b;
+    border-radius: 9px;
+    position: relative;
+  }
+  .toggle-dot {
+    position: absolute;
+    right: 2px; top: 2px;
+    width: 14px; height: 14px;
+    background: #fff;
+    border-radius: 50%;
+  }
+
+  /* LINEデバッグモック */
+  .line-debug-mock {
+    display: flex;
+    gap: 8px;
+    height: 180px;
+  }
+  .line-chat-area {
+    flex: 1;
+    background: #86CEAC;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .line-bubble-bot {
+    background: #fff;
+    border-radius: 2px 10px 10px 10px;
+    padding: 6px 10px;
+    font-size: 10px;
+    max-width: 70%;
+    color: #374151;
+  }
+  .line-bubble-user {
+    background: #06C755;
+    border-radius: 10px 2px 10px 10px;
+    padding: 6px 10px;
+    font-size: 10px;
+    max-width: 60%;
+    align-self: flex-end;
+    color: #fff;
+  }
+  .line-user-list {
+    width: 110px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    overflow: hidden;
+  }
+  .line-user-item {
+    font-size: 10px;
+    padding: 5px 6px;
+    border-radius: 6px;
+    margin-bottom: 3px;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+  }
+  .line-user-item.active { border-color: #06C755; background: #f0fdf4; color: #065f46; }
+
+  /* リマインダーモック */
+  .reminder-mock {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+  }
+  .reminder-mock-header {
+    background: #06C755;
+    padding: 8px 14px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .reminder-mock-body { padding: 12px 14px; }
+  .reminder-card {
+    background: #f0fdf4;
+    border-left: 4px solid #06C755;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  .divider { border: none; border-top: 2px dashed var(--border); margin: 32px 0; }
 
   h3 {
     font-size: 17px;
@@ -635,7 +658,6 @@
   ul, ol { padding-left: 20px; }
   li { margin-bottom: 6px; font-size: 14px; }
 
-  /* ── フッター ── */
   .footer {
     background: #1e293b;
     color: rgba(255,255,255,0.6);
@@ -645,6 +667,19 @@
     margin-top: 60px;
   }
   .footer strong { color: #fff; }
+
+  /* 新機能バッジ */
+  .new-badge {
+    display: inline-block;
+    background: #dc2626;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
 
   @media (max-width: 640px) {
     .cover h1 { font-size: 26px; }
@@ -657,7 +692,7 @@
 </head>
 <body>
 
-<!-- ══ カバー ══ -->
+<!-- カバー -->
 <div class="cover">
   <div class="cover-tooth">🦷</div>
   <h1>スマイル歯科<br>管理システム</h1>
@@ -666,6 +701,7 @@
     <span class="cover-badge">👑 管理者向け</span>
     <span class="cover-badge">👩‍⚕️ スタッフ向け</span>
     <span class="cover-badge">📱 LINE連携対応</span>
+    <span class="cover-badge">🧪 テストモード搭載</span>
   </div>
   <div class="cover-toc">
     <h3>目次</h3>
@@ -674,13 +710,15 @@
       <div class="cover-toc-item"><span>📅</span> 予約カレンダー</div>
       <div class="cover-toc-item"><span>👥</span> 患者管理</div>
       <div class="cover-toc-item"><span>📊</span> 経営ダッシュボード</div>
-      <div class="cover-toc-item"><span>⚙️</span> システム設定</div>
+      <div class="cover-toc-item"><span>⚙️</span> システム設定・リマインダー</div>
       <div class="cover-toc-item"><span>📱</span> LINE連携</div>
+      <div class="cover-toc-item"><span>🔔</span> リマインダー自動送信</div>
+      <div class="cover-toc-item"><span>🧪</span> テストモード（開発者向け）</div>
     </div>
   </div>
 </div>
 
-<!-- ══ ナビ ══ -->
+<!-- ナビ -->
 <nav class="nav">
   <div class="nav-inner">
     <div class="nav-logo">🦷 操作マニュアル</div>
@@ -690,12 +728,14 @@
     <a href="#dashboard">📊 ダッシュボード</a>
     <a href="#settings">⚙️ 設定</a>
     <a href="#line">📱 LINE</a>
+    <a href="#reminder">🔔 リマインダー</a>
+    <a href="#testmode">🧪 テストモード</a>
   </div>
 </nav>
 
 <div class="main">
 
-<!-- ══ 第1章: ログイン ══ -->
+<!-- 第1章: ログイン -->
 <div class="section" id="login">
   <div class="section-header">
     <div class="section-icon" style="background:#eff6ff;">🔐</div>
@@ -710,9 +750,7 @@
     <h3>1-1　ログイン方法</h3>
     <div class="illust-block blue">
       <div class="screen-mock">
-        <div class="screen-mock-bar">
-          <span></span><span></span><span></span>
-        </div>
+        <div class="screen-mock-bar"><span></span><span></span><span></span></div>
         <div class="screen-content">
           <div class="login-mock">
             <div class="login-card">
@@ -729,36 +767,30 @@
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>URLにアクセス</h4>
-          <p>ブラウザで管理システムのURLを開きます。</p>
-        </div>
+        <div class="step-content"><h4>URLにアクセス</h4><p>ブラウザで管理システムのURLを開きます。</p></div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>ユーザー名とパスワードを入力</h4>
-          <p>担当者から配布されたログイン情報を入力します。</p>
-        </div>
+        <div class="step-content"><h4>ユーザー名とパスワードを入力</h4><p>担当者から配布されたログイン情報を入力します。</p></div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <div class="step-content">
-          <h4>「ログイン」ボタンをクリック</h4>
-          <p>ロールに応じた画面が表示されます。</p>
-        </div>
+        <div class="step-content"><h4>「ログイン」ボタンをクリック</h4><p>ロールに応じた画面が表示されます。</p></div>
       </div>
     </div>
 
     <table class="role-table">
-      <thead>
-        <tr><th>アカウント</th><th>ロール</th><th>利用できる機能</th></tr>
-      </thead>
+      <thead><tr><th>アカウント</th><th>ロール</th><th>利用できる機能</th></tr></thead>
       <tbody>
+        <tr>
+          <td><strong>superadmin</strong></td>
+          <td><span class="badge super">スーパー管理者</span></td>
+          <td>全機能 ＋ テストモード・LINEデバッグ・テスト患者管理</td>
+        </tr>
         <tr>
           <td><strong>admin</strong></td>
           <td><span class="badge admin">管理者</span></td>
-          <td>全機能（カレンダー・患者・ダッシュボード・設定）</td>
+          <td>カレンダー・患者・ダッシュボード・システム設定・リマインダー</td>
         </tr>
         <tr>
           <td><strong>staff</strong></td>
@@ -778,23 +810,24 @@
           <div class="sidebar-mock">
             <div class="sidebar-left">
               <div class="sidebar-logo">🦷 スマイル歯科</div>
+              <div class="test-mode-mock">
+                <div class="test-toggle">
+                  <div class="test-toggle-label">🧪 テストモード</div>
+                  <div class="toggle-pill"><div class="toggle-dot"></div></div>
+                </div>
+              </div>
               <div class="sidebar-item active">📅 カレンダー</div>
               <div class="sidebar-item">👥 患者管理</div>
               <div class="sidebar-item">📊 ダッシュボード</div>
               <div class="sidebar-item">⚙️ システム設定</div>
-              <div style="margin-top:auto; padding: 8px 10px; color:rgba(255,255,255,0.4); font-size:10px;">🌙 ダークモード</div>
+              <div class="sidebar-item test-item">🔬 LINEデバッグ</div>
+              <div class="sidebar-item test-item">🧪 テスト患者管理</div>
             </div>
             <div class="sidebar-right">
               <div style="font-size:12px; font-weight:700; color:#374151; margin-bottom:8px;">予約カレンダー</div>
               <div style="font-size:11px; color:#9ca3af;">← サイドバーでページを切替</div>
               <div style="margin-top:12px; background:#eff6ff; border-radius:8px; padding:8px; font-size:10px; color:#1e40af;">
-                📅 ミニカレンダー<br>
-                <div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap;">
-                  <span style="background:#3b82f6;color:#fff;border-radius:4px;padding:2px 5px;">今</span>
-                  <span style="color:#374151;padding:2px 5px;">月</span>
-                  <span style="color:#374151;padding:2px 5px;">火</span>
-                  <span style="color:#374151;padding:2px 5px;">水</span>
-                </div>
+                📅 ミニカレンダー
               </div>
             </div>
           </div>
@@ -814,9 +847,9 @@
         <p>サイドバーの日付選択で週表示と連動します。</p>
       </div>
       <div class="feature-card">
-        <div class="feature-card-icon">🔔</div>
-        <h4>今日の日付表示</h4>
-        <p>ヘッダーに今日の日付・曜日が常時表示されます。</p>
+        <div class="feature-card-icon">🧪</div>
+        <h4>テストモードトグル</h4>
+        <p>スーパー管理者専用。ONにするとテストデータのみ表示されます。</p>
       </div>
       <div class="feature-card">
         <div class="feature-card-icon">🚪</div>
@@ -825,15 +858,10 @@
       </div>
     </div>
 
-    <div class="tip info">
-      <span class="tip-icon">💡</span>
-      <div><strong>ポイント</strong>複数のスタッフが同時にログインして使用できます。予約の変更は即座に反映されます。</div>
-    </div>
-
   </div>
 </div>
 
-<!-- ══ 第2章: 予約カレンダー ══ -->
+<!-- 第2章: 予約カレンダー -->
 <div class="section" id="calendar">
   <div class="section-header">
     <div class="section-icon" style="background:#ecfeff;">📅</div>
@@ -901,24 +929,15 @@
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>空きスロットをクリック</h4>
-          <p>カレンダーの空いている時間帯をクリックすると予約追加モーダルが開きます。</p>
-        </div>
+        <div class="step-content"><h4>空きスロットをクリック</h4><p>カレンダーの空いている時間帯をクリックすると予約追加モーダルが開きます。</p></div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>患者・治療・チェアを選択</h4>
-          <p>患者名で検索し、治療内容とチェア番号を選択します。</p>
-        </div>
+        <div class="step-content"><h4>患者・治療・チェアを選択</h4><p>患者名で検索し、治療内容とチェア番号を選択します。</p></div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <div class="step-content">
-          <h4>「予約を保存」をクリック</h4>
-          <p>カレンダーにすぐ反映されます。</p>
-        </div>
+        <div class="step-content"><h4>「予約を保存」をクリック</h4><p>カレンダーにすぐ反映されます。</p></div>
       </div>
     </div>
 
@@ -930,7 +949,6 @@
     <hr class="divider">
 
     <h3>2-3　予約の変更・キャンセル</h3>
-
     <div class="feature-grid">
       <div class="feature-card">
         <div class="feature-card-icon">🖱️</div>
@@ -945,7 +963,7 @@
       <div class="feature-card">
         <div class="feature-card-icon">🗑️</div>
         <h4>予約キャンセル</h4>
-        <p>詳細モーダルの「予約キャンセル」ボタンから取消できます。誤操作防止のため確認ダイアログが出ます。</p>
+        <p>詳細モーダルの「予約キャンセル」ボタンから取消できます。確認ダイアログが出ます。</p>
       </div>
       <div class="feature-card">
         <div class="feature-card-icon">✏️</div>
@@ -959,40 +977,10 @@
       <div><strong>注意</strong>キャンセルした予約は元に戻せません。操作前に必ず確認してください。</div>
     </div>
 
-    <hr class="divider">
-
-    <h3>2-4　休診日・時間外の設定</h3>
-    <div class="illust-block amber">
-      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:center;">
-        <div style="text-align:center;">
-          <div style="background:#fee2e2; border:2px solid #fca5a5; border-radius:12px; padding:20px 32px; margin-bottom:8px;">
-            <div style="font-size:32px;">🚫</div>
-            <div style="font-size:14px; font-weight:700; color:#991b1b;">休診日</div>
-            <div style="font-size:11px; color:#b91c1c;">グレーオーバーレイで表示</div>
-          </div>
-        </div>
-        <div style="text-align:center;">
-          <div style="background:#fef9c3; border:2px solid #fde047; border-radius:12px; padding:20px 32px; margin-bottom:8px;">
-            <div style="font-size:32px;">⏰</div>
-            <div style="font-size:14px; font-weight:700; color:#854d0e;">診療時間外</div>
-            <div style="font-size:11px; color:#a16207;">スロットがグレーアウト</div>
-          </div>
-        </div>
-        <div style="text-align:center;">
-          <div style="background:#dcfce7; border:2px solid #86efac; border-radius:12px; padding:20px 32px; margin-bottom:8px;">
-            <div style="font-size:32px;">🌸</div>
-            <div style="font-size:14px; font-weight:700; color:#166534;">祝日表示</div>
-            <div style="font-size:11px; color:#15803d;">日本の祝日に自動対応</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <p style="font-size:14px; color:var(--text-sub);">休診日の設定は「システム設定」から行います。カレンダーには自動的に反映されます。</p>
-
   </div>
 </div>
 
-<!-- ══ 第3章: 患者管理 ══ -->
+<!-- 第3章: 患者管理 -->
 <div class="section" id="patients">
   <div class="section-header">
     <div class="section-icon" style="background:#f0fdf4;">👥</div>
@@ -1010,12 +998,10 @@
         <div class="screen-mock-bar"><span></span><span></span><span></span></div>
         <div class="screen-content">
           <div class="patient-mock">
-            <div class="patient-search">🔍 氏名・カナ・電話番号・患者番号で検索...</div>
+            <div class="patient-search">🔍 氏名・カナ・患者番号・電話番号で検索...</div>
             <table class="patient-table-mock">
               <thead>
-                <tr>
-                  <th>患者番号</th><th>氏名</th><th>カナ</th><th>年代</th><th>電話</th><th>来院回数</th><th>LINE</th>
-                </tr>
+                <tr><th>患者番号</th><th>氏名</th><th>カナ</th><th>年代</th><th>電話</th><th>来院回数</th><th>LINE</th></tr>
               </thead>
               <tbody>
                 <tr>
@@ -1028,11 +1014,6 @@
                   <td>40代</td><td>090-2345-6789</td><td>2回</td>
                   <td><span style="color:#9ca3af;font-size:11px;">未連携</span></td>
                 </tr>
-                <tr>
-                  <td>P-00003</td><td><strong>佐藤 由美</strong></td><td>サトウ ユミ</td>
-                  <td>50代</td><td>090-3456-7890</td><td>8回</td>
-                  <td><span class="line-linked">✓ 連携済</span></td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -1040,68 +1021,21 @@
       </div>
     </div>
 
-    <p style="font-size:14px; margin-bottom:12px;">患者一覧では以下の情報が一目で確認できます：</p>
-    <ul>
-      <li>患者番号・氏名・フリガナ・年代・電話番号</li>
-      <li>郵便番号・来院きっかけ（インターネット検索/SNS・Instagram/ご紹介/看板・チラシ/TVCM/公式HP）</li>
-      <li>来院回数・LINE連携状況</li>
-    </ul>
-
     <hr class="divider">
 
-    <h3>3-2　リアルタイム検索</h3>
-    <div class="illust-block">
-      <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
-        <div style="flex:1; min-width:200px;">
-          <div style="background:#fff; border:2px solid #3b82f6; border-radius:10px; padding:12px 16px; font-size:14px; color:#374151; box-shadow:0 0 0 4px rgba(59,130,246,0.1);">
-            🔍 タナカ
-          </div>
-          <div style="font-size:12px; color:#6b7280; margin-top:6px; padding-left:4px;">入力と同時に絞り込まれます</div>
-        </div>
-        <div style="font-size:28px; color:#3b82f6;">→</div>
-        <div style="flex:1; min-width:200px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 14px;">
-          <div style="font-size:12px; border-bottom:1px solid #f3f4f6; padding-bottom:6px; margin-bottom:6px; display:flex; gap:8px;">
-            <strong>P-00001</strong> 田中 美咲 <span style="color:#6b7280;">タナカ ミサキ</span>
-          </div>
-          <div style="font-size:12px; display:flex; gap:8px;">
-            <strong>P-00045</strong> 田中 雄一 <span style="color:#6b7280;">タナカ ユウイチ</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <p style="font-size:14px; color:var(--text-sub);">氏名・フリガナ・電話番号・患者番号のどれでも検索できます。入力するたびにリアルタイムで絞り込まれます。</p>
-
-    <hr class="divider">
-
-    <h3>3-3　新規患者の登録</h3>
+    <h3>3-2　新規患者の登録</h3>
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>「＋ 新規患者登録」ボタンをクリック</h4>
-          <p>患者一覧ページ右上のボタンから登録フォームを開きます。</p>
-        </div>
+        <div class="step-content"><h4>「＋ 新規患者登録」ボタンをクリック</h4><p>患者一覧ページ右上のボタンから登録フォームを開きます。</p></div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>必須項目を入力</h4>
-          <p>氏名（必須）・フリガナ（カタカナ必須）・電話番号を入力します。フリガナはカタカナでないとエラーが表示されます。</p>
-        </div>
+        <div class="step-content"><h4>必須項目を入力</h4><p>氏名（必須）・フリガナ（カタカナ必須）・電話番号を入力します。</p></div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <div class="step-content">
-          <h4>年代を設定</h4>
-          <p>生年月日を入力すると自動計算されます。未入力の場合はボタンで10代〜90代を選択できます。</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <h4>任意項目を入力して保存</h4>
-          <p>郵便番号・来院きっかけ・備考・アレルギーを入力して「登録」ボタンを押します。</p>
-        </div>
+        <div class="step-content"><h4>任意項目を入力して保存</h4><p>郵便番号・来院きっかけ・備考などを入力して「登録」ボタンを押します。</p></div>
       </div>
     </div>
 
@@ -1112,44 +1046,26 @@
 
     <hr class="divider">
 
-    <h3>3-4　LINE QRコードの発行</h3>
-    <div class="illust-block cyan">
-      <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap; justify-content:center;">
-        <div style="text-align:center;">
-          <div style="background:#fff; border:3px solid #22c55e; border-radius:12px; padding:20px; width:120px; margin:0 auto 8px;">
-            <div style="background:#000; width:80px; height:80px; margin:0 auto; border-radius:4px; display:grid; grid-template-columns:repeat(5,1fr); gap:2px; padding:6px;">
-              <div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div>
-              <div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div>
-              <div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div>
-              <div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div>
-              <div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div><div style="background:#000;border-radius:1px;"></div><div style="background:#fff;border-radius:1px;"></div>
-            </div>
-          </div>
-          <div style="font-size:12px; color:#166534; font-weight:600;">患者専用QRコード</div>
-        </div>
-        <div style="flex:1; min-width:200px;">
-          <div class="steps">
-            <div class="step">
-              <div class="step-num" style="background:#22c55e;">1</div>
-              <div class="step-content"><h4>患者行の「QR」ボタンをクリック</h4><p>患者ごとに固有のQRコードが表示されます。</p></div>
-            </div>
-            <div class="step">
-              <div class="step-num" style="background:#22c55e;">2</div>
-              <div class="step-content"><h4>患者にスマホでQRを読み取ってもらう</h4><p>LINEが自動的に開きます。</p></div>
-            </div>
-            <div class="step">
-              <div class="step-num" style="background:#22c55e;">3</div>
-              <div class="step-content"><h4>LINE連携が完了</h4><p>患者一覧に「✓ 連携済」が表示されます。</p></div>
-            </div>
-          </div>
-        </div>
+    <h3>3-3　LINE QRコードの発行</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num" style="background:#22c55e;">1</div>
+        <div class="step-content"><h4>患者行の「QR」ボタンをクリック</h4><p>患者ごとに固有のQRコードが表示されます。</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#22c55e;">2</div>
+        <div class="step-content"><h4>患者にスマホでQRを読み取ってもらう</h4><p>LINEが自動的に開きます。</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#22c55e;">3</div>
+        <div class="step-content"><h4>LINE連携が完了</h4><p>患者一覧に「✓ 連携済」が表示されます。</p></div>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- ══ 第4章: 経営ダッシュボード ══ -->
+<!-- 第4章: 経営ダッシュボード -->
 <div class="section" id="dashboard">
   <div class="section-header">
     <div class="section-icon" style="background:#fef9c3;">📊</div>
@@ -1163,65 +1079,7 @@
 
     <div class="tip info">
       <span class="tip-icon">👑</span>
-      <div><strong>管理者専用機能</strong>経営ダッシュボードはadminアカウントでのみ表示されます。</div>
-    </div>
-
-    <h3>4-1　月次概要タブ</h3>
-    <div class="illust-block amber">
-      <div class="screen-mock">
-        <div class="screen-mock-bar"><span></span><span></span><span></span></div>
-        <div class="screen-content">
-          <div class="dash-mock">
-            <div style="display:flex; gap:8px; margin-bottom:12px; font-size:12px; border-bottom:2px solid #e5e7eb; padding-bottom:0;">
-              <div style="padding:6px 14px; background:#1e40af; color:#fff; border-radius:6px 6px 0 0; font-weight:600;">📋 月次概要</div>
-              <div style="padding:6px 14px; color:#6b7280; font-weight:600;">📊 年代分析</div>
-              <div style="padding:6px 14px; color:#6b7280; font-weight:600;">🗺️ 地域・流入分析</div>
-            </div>
-            <div class="dash-kpi">
-              <div class="dash-kpi-card">
-                <div class="dash-kpi-label">総予約数</div>
-                <div class="dash-kpi-value">142</div>
-              </div>
-              <div class="dash-kpi-card" style="background:#f0fdf4; border-color:#a7f3d0;">
-                <div class="dash-kpi-label">完了・確定</div>
-                <div class="dash-kpi-value" style="color:#059669;">128</div>
-              </div>
-              <div class="dash-kpi-card" style="background:#fef2f2; border-color:#fecaca;">
-                <div class="dash-kpi-label">キャンセル数</div>
-                <div class="dash-kpi-value" style="color:#dc2626;">14</div>
-              </div>
-              <div class="dash-kpi-card" style="background:#fffbeb; border-color:#fde68a;">
-                <div class="dash-kpi-label">キャンセル率</div>
-                <div class="dash-kpi-value" style="color:#d97706;">9.8%</div>
-              </div>
-            </div>
-            <div class="dash-charts">
-              <div>
-                <div style="font-size:10px; color:#6b7280; margin-bottom:4px;">治療別件数</div>
-                <div class="dash-chart-box">
-                  <div class="dash-bar" style="height:80%;"></div>
-                  <div class="dash-bar" style="height:60%; background:#059669;"></div>
-                  <div class="dash-bar" style="height:45%; background:#7c3aed;"></div>
-                  <div class="dash-bar" style="height:70%; background:#d97706;"></div>
-                  <div class="dash-bar" style="height:30%; background:#dc2626;"></div>
-                </div>
-              </div>
-              <div>
-                <div style="font-size:10px; color:#6b7280; margin-bottom:4px;">日別予約数</div>
-                <div class="dash-chart-box">
-                  <div class="dash-bar" style="height:40%;"></div>
-                  <div class="dash-bar" style="height:70%;"></div>
-                  <div class="dash-bar" style="height:55%;"></div>
-                  <div class="dash-bar" style="height:90%;"></div>
-                  <div class="dash-bar" style="height:65%;"></div>
-                  <div class="dash-bar" style="height:50%;"></div>
-                  <div class="dash-bar" style="height:75%;"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div><strong>管理者専用機能</strong>経営ダッシュボードはadminアカウント以上でのみ表示されます。テストモードON時はテストデータの集計が表示されます。</div>
     </div>
 
     <div class="feature-grid">
@@ -1233,12 +1091,12 @@
       <div class="feature-card">
         <div class="feature-card-icon">📊</div>
         <h4>年代分析</h4>
-        <p>年代別ドーナツグラフ・性別横棒グラフ・月別予約数・曜日/時間帯傾向・クロス集計</p>
+        <p>年代別グラフ・性別分布・月別予約数・曜日/時間帯傾向</p>
       </div>
       <div class="feature-card">
         <div class="feature-card-icon">🗺️</div>
         <h4>地域・流入分析</h4>
-        <p>来院チャネルのツリーマップ・バブルマップ（医院マーカー付き）・エリア別ランキング</p>
+        <p>来院チャネルのツリーマップ・エリア別ランキング</p>
       </div>
       <div class="feature-card">
         <div class="feature-card-icon">📥</div>
@@ -1247,46 +1105,44 @@
       </div>
     </div>
 
-    <hr class="divider">
-
-    <h3>4-2　CSVエクスポートの手順</h3>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>月を選択</h4>
-          <p>ページ右上の月選択フォームで対象月を選びます。</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>「予約CSV」または「患者CSV」をクリック</h4>
-          <p>ファイルが自動的にダウンロードされます。</p>
-        </div>
-      </div>
+    <div class="tip test">
+      <span class="tip-icon">🧪</span>
+      <div><strong>テストモード連動</strong>テストモードをONにするとテストデータのみ集計されます。デモ営業時はテストモードをONにして使用してください。</div>
     </div>
 
   </div>
 </div>
 
-<!-- ══ 第5章: システム設定 ══ -->
+<!-- 第5章: システム設定 -->
 <div class="section" id="settings">
   <div class="section-header">
     <div class="section-icon" style="background:#faf5ff;">⚙️</div>
     <div>
       <div class="chapter-num">第 5 章</div>
       <h2>システム設定</h2>
-      <p>管理者専用。診療時間・休診日・患者操作制限などの設定</p>
+      <p>管理者専用。診療時間・休診日・リマインダー・ライセンス設定</p>
     </div>
   </div>
   <div class="section-body">
 
     <div class="tip info">
       <span class="tip-icon">👑</span>
-      <div><strong>管理者専用機能</strong>システム設定はadminアカウントでのみ操作できます。</div>
+      <div><strong>管理者専用機能</strong>システム設定はadminアカウント以上でのみ操作できます。</div>
     </div>
 
+    <h3>5-1　設定タブの構成</h3>
+    <table class="role-table">
+      <thead><tr><th>タブ</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>⚙️ システム設定</td><td>クリニック基本情報・診療時間・曜日・患者操作制限・スタッフ管理</td></tr>
+        <tr><td>🔔 リマインダー</td><td>LINE自動送信の設定・送信履歴確認・今すぐ送信テスト</td></tr>
+        <tr><td>🔑 ライセンス</td><td>現在のプランの確認・プランのアップグレード</td></tr>
+      </tbody>
+    </table>
+
+    <hr class="divider">
+
+    <h3>5-2　主要な設定項目</h3>
     <table class="role-table">
       <thead><tr><th>設定項目</th><th>内容</th></tr></thead>
       <tbody>
@@ -1301,32 +1157,7 @@
 
     <hr class="divider">
 
-    <h3>5-1　住所変更時の注意</h3>
-    <div class="illust-block cyan">
-      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-        <div style="font-size:48px; text-align:center; min-width:80px;">📍</div>
-        <div style="flex:1;">
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div class="step-content"><h4>「クリニック基本情報」の住所を変更</h4></div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div class="step-content"><h4>「保存」ボタンをクリック</h4><p>自動でジオコーディング（住所→座標変換）が実行されます。</p></div>
-            </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div class="step-content"><h4>地域マップを再読み込み</h4><p>新しい住所に🦷マーカーが移動します。</p></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <h3>5-2　スタッフ管理</h3>
+    <h3>5-3　スタッフ管理</h3>
     <div class="feature-grid">
       <div class="feature-card">
         <div class="feature-card-icon">➕</div>
@@ -1348,7 +1179,7 @@
   </div>
 </div>
 
-<!-- ══ 第6章: LINE連携 ══ -->
+<!-- 第6章: LINE連携 -->
 <div class="section" id="line">
   <div class="section-header">
     <div class="section-icon" style="background:#dcfce7;">📱</div>
@@ -1395,74 +1226,7 @@
 
     <hr class="divider">
 
-    <h3>6-2　来院きっかけの選択方式（2段階）</h3>
-    <div class="illust-block cyan">
-      <div style="display:flex; gap:24px; flex-wrap:wrap;">
-        <div style="flex:1; min-width:200px;">
-          <div style="font-size:13px; font-weight:700; color:#0e7490; margin-bottom:10px;">1回目：カテゴリ選択</div>
-          <div style="background:#fff; border-radius:12px; padding:14px; border:2px solid #67e8f9;">
-            <div style="font-size:12px; color:#374151; margin-bottom:8px; font-weight:600;">当クリニックをどこでお知りになりましたか？</div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="background:#0891b2; color:#fff; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600;">🌐 Web・デジタル系</div>
-              <div style="background:#0891b2; color:#fff; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600;">📢 口コミ・広告系</div>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; font-size:28px; color:#0891b2;">→</div>
-        <div style="flex:1; min-width:200px;">
-          <div style="font-size:13px; font-weight:700; color:#0e7490; margin-bottom:10px;">2回目：詳細選択</div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <div style="background:#fff; border-radius:12px; padding:12px; border:2px solid #67e8f9; flex:1; min-width:130px;">
-              <div style="font-size:11px; color:#6b7280; margin-bottom:6px;">Web系を選んだ場合</div>
-              <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
-                <div style="background:#eff6ff; color:#1e40af; border-radius:6px; padding:5px 10px; font-weight:600;">インターネット検索</div>
-                <div style="background:#eff6ff; color:#1e40af; border-radius:6px; padding:5px 10px; font-weight:600;">SNS・Instagram</div>
-                <div style="background:#eff6ff; color:#1e40af; border-radius:6px; padding:5px 10px; font-weight:600;">公式HP</div>
-              </div>
-            </div>
-            <div style="background:#fff; border-radius:12px; padding:12px; border:2px solid #67e8f9; flex:1; min-width:130px;">
-              <div style="font-size:11px; color:#6b7280; margin-bottom:6px;">広告系を選んだ場合</div>
-              <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
-                <div style="background:#f0fdf4; color:#166534; border-radius:6px; padding:5px 10px; font-weight:600;">ご紹介</div>
-                <div style="background:#f0fdf4; color:#166534; border-radius:6px; padding:5px 10px; font-weight:600;">看板・チラシ</div>
-                <div style="background:#f0fdf4; color:#166534; border-radius:6px; padding:5px 10px; font-weight:600;">TVCM</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <h3>6-3　既存患者のLINE連携</h3>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>患者管理から対象患者の「QR」ボタンをクリック</h4>
-          <p>患者専用のQRコードが表示されます。</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>患者にスマホでQRを読み取ってもらう</h4>
-          <p>LINEが自動で開き、友だち追加が完了します。</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <h4>年代未登録の場合は自動で確認メッセージが届く</h4>
-          <p>患者がLINEで年代を選択すると自動でDBに反映されます。</p>
-        </div>
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <h3>6-4　患者が LINE でできること</h3>
+    <h3>6-2　患者がLINEでできること</h3>
     <div class="feature-grid">
       <div class="feature-card">
         <div class="feature-card-icon">📅</div>
@@ -1477,12 +1241,12 @@
       <div class="feature-card">
         <div class="feature-card-icon">❌</div>
         <h4>予約のキャンセル</h4>
-        <p>設定で許可されている場合、患者自身がキャンセルできます（期限あり）。</p>
+        <p>設定で許可されている場合、患者自身がキャンセルできます。</p>
       </div>
       <div class="feature-card">
-        <div class="feature-card-icon">⏰</div>
+        <div class="feature-card-icon">🔔</div>
         <h4>リマインダー受信</h4>
-        <p>予約前日などに自動でリマインダーメッセージが届きます。</p>
+        <p>予約前日・当日に自動でリマインダーメッセージが届きます。</p>
       </div>
     </div>
 
@@ -1494,20 +1258,328 @@
   </div>
 </div>
 
+<!-- 第7章: リマインダー自動送信 -->
+<div class="section" id="reminder">
+  <div class="section-header">
+    <div class="section-icon" style="background:#f0fdf4;">🔔</div>
+    <div>
+      <div class="chapter-num">第 7 章</div>
+      <h2>リマインダー自動送信 <span class="new-badge">NEW</span></h2>
+      <p>LINE連携済みの患者に予約リマインダーを自動送信する機能</p>
+    </div>
+  </div>
+  <div class="section-body">
+
+    <h3>7-1　リマインダーの種類</h3>
+
+    <div class="illust-block green">
+      <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+        <div style="flex:1; min-width:200px;">
+          <div class="reminder-mock">
+            <div class="reminder-mock-header">🔔 前日リマインダー</div>
+            <div class="reminder-mock-body">
+              <div class="reminder-card">
+                <div style="font-weight:700; margin-bottom:4px;">田中 美咲 様</div>
+                <div>明日のご予約リマインダーです。</div>
+                <div style="margin-top:4px;">🕐 時間: 10:00</div>
+                <div>🦷 内容: クリーニング(PMTC)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <div class="reminder-mock">
+            <div class="reminder-mock-header" style="background:#0891b2;">🔔 当日リマインダー</div>
+            <div class="reminder-mock-body">
+              <div class="reminder-card" style="border-color:#0891b2;">
+                <div style="font-weight:700; margin-bottom:4px;">田中 美咲 様</div>
+                <div>本日のご予約リマインダーです。</div>
+                <div style="margin-top:4px;">🕐 時間: 10:00</div>
+                <div>🦷 内容: クリーニング(PMTC)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <div class="reminder-mock">
+            <div class="reminder-mock-header" style="background:#d97706;">🏥 定期検診リマインド</div>
+            <div class="reminder-mock-body">
+              <div class="reminder-card" style="border-color:#d97706;">
+                <div style="font-weight:700; margin-bottom:4px;">田中 美咲 様</div>
+                <div>前回の来院から6ヶ月が経過しました。</div>
+                <div>定期検診はお済みでしょうか？</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <table class="role-table">
+      <thead><tr><th>種類</th><th>送信タイミング</th><th>対象プラン</th></tr></thead>
+      <tbody>
+        <tr><td>🔔 前日リマインダー</td><td>予約前日の朝9時</td><td>Basic・Standard・Pro 全プラン</td></tr>
+        <tr><td>🔔 当日リマインダー</td><td>予約当日の朝9時</td><td>Standard・Pro のみ</td></tr>
+        <tr><td>🏥 定期検診リマインド</td><td>最終来院から3・6ヶ月後</td><td>Standard・Pro のみ</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip info">
+      <span class="tip-icon">💡</span>
+      <div><strong>送信条件</strong>LINE連携済みの患者にのみ送信されます。未連携の患者はスキップされます。</div>
+    </div>
+
+    <hr class="divider">
+
+    <h3>7-2　リマインダーの設定方法</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content"><h4>「システム設定」→「🔔 リマインダー」タブを開く</h4></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>送信の ON/OFF を設定</h4>
+          <p>予約リマインダー・当日リマインダー・定期検診リマインドのトグルを設定します。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>メッセージ文言を編集（任意）</h4>
+          <p>前日・当日・定期検診のメッセージを自由に編集できます。<br>
+          使えるタグ：<code>{time}</code>（時間）・<code>{treatment}</code>（治療内容）・<code>{months}</code>（ヶ月数）</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content"><h4>「設定を保存」をクリック</h4></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <h3>7-3　今すぐ送信テスト</h3>
+    <div class="illust-block amber">
+      <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap;">
+        <div style="font-size:48px; text-align:center;">▶</div>
+        <div style="flex:1;">
+          <div class="steps">
+            <div class="step">
+              <div class="step-num" style="background:#d97706;">1</div>
+              <div class="step-content">
+                <h4>「▶ 今すぐ送信テスト」ボタンをクリック</h4>
+                <p>テストモードON時：テスト患者にのみ送信<br>
+                テストモードOFF時：本番患者に実際に送信</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num" style="background:#d97706;">2</div>
+              <div class="step-content">
+                <h4>結果を確認</h4>
+                <p>「実行完了 — 予約リマインダー: X件送信 / 定期検診: X件送信」と表示されます。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num" style="background:#d97706;">3</div>
+              <div class="step-content">
+                <h4>送信履歴を確認</h4>
+                <p>「📋 送信履歴」タブで送信結果を確認できます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip warn">
+      <span class="tip-icon">⚠️</span>
+      <div><strong>重複送信防止</strong>同じ予約への同じ種類のリマインダーは1回しか送信されません。2回押しても重複しません。</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 第8章: テストモード -->
+<div class="section" id="testmode">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fffbeb;">🧪</div>
+    <div>
+      <div class="chapter-num">第 8 章</div>
+      <h2>テストモード <span class="new-badge">NEW</span></h2>
+      <p>スーパー管理者専用。デモ・開発用のテストデータ環境</p>
+    </div>
+  </div>
+  <div class="section-body">
+
+    <div class="tip test">
+      <span class="tip-icon">🔒</span>
+      <div><strong>スーパー管理者専用機能</strong>テストモードはsuperadminアカウントでのみ利用できます。</div>
+    </div>
+
+    <h3>8-1　テストモードとは</h3>
+    <div class="illust-block test">
+      <div style="display:flex; gap:24px; align-items:center; flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px;">
+          <div style="background:#fff; border-radius:12px; padding:16px; border:2px solid #f59e0b;">
+            <div style="font-size:13px; font-weight:700; color:#92400e; margin-bottom:12px;">🧪 テストモード ON</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ テスト患者のみ表示</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ テスト予約のみ表示</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ ダッシュボードはテストデータ集計</div>
+            <div style="font-size:12px; color:#374151;">✅ リマインダーはテスト患者に送信</div>
+          </div>
+        </div>
+        <div style="font-size:32px; color:#d97706;">↔️</div>
+        <div style="flex:1; min-width:200px;">
+          <div style="background:#fff; border-radius:12px; padding:16px; border:2px solid #e5e7eb;">
+            <div style="font-size:13px; font-weight:700; color:#374151; margin-bottom:12px;">🏥 本番モード（通常）</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ 本番患者のみ表示</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ 実際の予約のみ表示</div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">✅ ダッシュボードは実データ集計</div>
+            <div style="font-size:12px; color:#374151;">✅ リマインダーは本番患者に送信</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:14px; margin-top:12px;">テストモードと本番モードのデータは<strong>完全に分離</strong>されています。テストモードで操作しても本番データには一切影響しません。</p>
+
+    <hr class="divider">
+
+    <h3>8-2　テストモードの切り替え方法</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num" style="background:#d97706;">1</div>
+        <div class="step-content">
+          <h4>サイドバーの「テストモード」トグルをONにする</h4>
+          <p>スーパー管理者としてログインすると、サイドバー上部にトグルが表示されます。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#d97706;">2</div>
+        <div class="step-content">
+          <h4>画面上部にオレンジのバナーが表示される</h4>
+          <p>「テストモード有効 — テストデータのみ表示されています。本番データには影響しません。」</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#d97706;">3</div>
+        <div class="step-content">
+          <h4>テストデータで自由に操作できる</h4>
+          <p>カレンダー・患者管理・ダッシュボードすべてがテストデータで表示されます。</p>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <h3>8-3　テスト患者管理</h3>
+    <div class="illust-block test">
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="font-size:48px;">🧪</div>
+        <div style="flex:1;">
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-card-icon">➕</div>
+              <h4>デモデータ一括登録</h4>
+              <p>「デモデータ一括登録」ボタンで5件のデモ患者を素早く追加できます。</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-card-icon">✏️</div>
+              <h4>個別追加・編集</h4>
+              <p>「新規追加」ボタンで1件ずつ手動で追加・編集できます。</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-card-icon">🗑️</div>
+              <h4>削除・全件削除</h4>
+              <p>個別削除または「全て削除」ボタンで一括削除できます。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip info">
+      <span class="tip-icon">💡</span>
+      <div><strong>デモ営業での活用</strong>医院への営業・デモ時には、テストモードをONにしてテストデータで各機能を実演できます。本番の患者データは一切表示されないため、個人情報保護の観点からも安全です。</div>
+    </div>
+
+    <hr class="divider">
+
+    <h3>8-4　LINEデバッグ（開発者向け）</h3>
+    <div class="illust-block">
+      <div class="screen-mock">
+        <div class="screen-mock-bar"><span></span><span></span><span></span></div>
+        <div class="screen-content">
+          <div style="padding:12px;">
+            <div style="font-size:12px; font-weight:700; color:#111827; margin-bottom:8px;">🔬 LINEデバッグ</div>
+            <div class="line-debug-mock">
+              <div class="line-chat-area">
+                <div class="line-bubble-bot">スマイル歯科クリニックへようこそ！<br>ご予約はメニューからどうぞ。</div>
+                <div class="line-bubble-user">予約する</div>
+                <div class="line-bubble-bot">
+                  <div style="font-weight:600; margin-bottom:2px;">定期検診</div>
+                  <div style="color:#06C755; font-size:9px;">選択する</div>
+                </div>
+              </div>
+              <div class="line-user-list">
+                <div style="font-size:9px; color:#6b7280; margin-bottom:4px; font-weight:600;">テストユーザー</div>
+                <div class="line-user-item active">テスト 太郎<br><span style="color:#06C755;">LINE連携済</span></div>
+                <div class="line-user-item">テスト 花子<br><span style="color:#9ca3af;">未連携</span></div>
+                <div class="line-user-item">山田 太郎<br><span style="color:#06C755;">LINE連携済</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <table class="role-table">
+      <thead><tr><th>機能</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>テストユーザー選択</td>
+          <td>テストモードON時はテスト患者、OFF時は本番患者が表示されます</td>
+        </tr>
+        <tr>
+          <td>シミュレーションモード</td>
+          <td>LINEのBot動作をブラウザ上でテスト。DBには保存されません</td>
+        </tr>
+        <tr>
+          <td>本番モード</td>
+          <td>DBに実際に予約が保存されます。source: line_debug として記録されます</td>
+        </tr>
+        <tr>
+          <td>テスト予約を削除</td>
+          <td>本番モードで作成したテスト予約（line_debug）を一括削除できます</td>
+        </tr>
+        <tr>
+          <td>APIログ</td>
+          <td>LINEへの送信ログをリアルタイムで確認できます</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip warn">
+      <span class="tip-icon">⚠️</span>
+      <div><strong>本番モードの注意</strong>LINEデバッグの「本番モード」をONにすると実際のDBに予約が保存されます。デモ後は「テスト予約を削除」ボタンで必ず削除してください。</div>
+    </div>
+
+  </div>
+</div>
+
 </div><!-- /main -->
 
-<!-- ══ フッター ══ -->
 <div class="footer">
   <div style="font-size:28px; margin-bottom:8px;">🦷</div>
-  <strong>スマイル歯科 管理システム 操作マニュアル</strong><br>
+  <strong>スマイル歯科 管理システム 操作マニュアル v2.0</strong><br>
   <span>ご不明な点はシステム管理者にお問い合わせください。</span>
 </div>
 
 <script>
-// ナビのアクティブ状態
 const sections = document.querySelectorAll('.section');
 const navLinks = document.querySelectorAll('.nav a');
-
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
@@ -1524,7 +1596,6 @@ const observer = new IntersectionObserver((entries) => {
     }
   });
 }, { threshold: 0.3 });
-
 sections.forEach(s => observer.observe(s));
 </script>
 </body>
