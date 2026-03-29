@@ -1,6 +1,6 @@
 // routes/appointments.js （Supabase移行版）
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 
@@ -9,7 +9,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// chairs と treatments はまだRender側を使用
 const pool = require('../config/database');
 
 // =============================================
@@ -75,10 +74,10 @@ function toTimeStr(minutes) {
 function generateSlots(settings) {
   const { openTime, closeTime, lunchStart, lunchEnd, slotDuration } = settings;
   const slots = [];
-  let cur = toMinutes(openTime);
-  const end = toMinutes(closeTime);
-  const ls  = toMinutes(lunchStart);
-  const le  = toMinutes(lunchEnd);
+  let cur     = toMinutes(openTime);
+  const end   = toMinutes(closeTime);
+  const ls    = toMinutes(lunchStart);
+  const le    = toMinutes(lunchEnd);
   while (cur + slotDuration <= end) {
     if (!(cur >= ls && cur < le)) slots.push(toTimeStr(cur));
     cur += slotDuration;
@@ -93,37 +92,37 @@ async function getChairs() {
   return result.rows;
 }
 
-async function getBookedSlots(dateStr) {
+async function getBookedSlots(dateStr, isTestMode = false) {
   const { data, error } = await supabase
     .from('appointments')
     .select(`
       id, patient_id, staff_id, chair_id, treatment_id,
-      appointment_date, start_time, end_time, status, notes,
+      appointment_date, start_time, end_time, status, notes, is_test,
       patients(name, name_kana),
       staff(name)
     `)
     .eq('appointment_date', dateStr)
+    .eq('is_test', isTestMode ? true : false)
     .neq('status', 'cancelled')
     .order('start_time');
 
   if (error) throw error;
 
-  // chairs と treatments はRender側から取得
-  const chairs = await pool.query('SELECT id, name FROM chairs');
+  const chairs     = await pool.query('SELECT id, name FROM chairs');
   const treatments = await pool.query('SELECT id, name, color FROM treatments');
-  const chairMap = Object.fromEntries(chairs.rows.map(c => [c.id, c.name]));
-  const treatMap = Object.fromEntries(treatments.rows.map(t => [t.id, { name: t.name, color: t.color }]));
+  const chairMap   = Object.fromEntries(chairs.rows.map(c => [c.id, c.name]));
+  const treatMap   = Object.fromEntries(treatments.rows.map(t => [t.id, { name: t.name, color: t.color }]));
 
   return data.map(a => ({
     ...a,
-    patient_name:     a.patients?.name,
-    name_kana:        a.patients?.name_kana,
-    doctor_name:      a.staff?.name,
-    chair_name:       chairMap[a.chair_id] || '',
-    treatment_type:   treatMap[a.treatment_id]?.name || '',
-    treatment_color:  treatMap[a.treatment_id]?.color || '#dbeafe',
-    patients:         undefined,
-    staff:            undefined,
+    patient_name:    a.patients?.name,
+    name_kana:       a.patients?.name_kana,
+    doctor_name:     a.staff?.name,
+    chair_name:      chairMap[a.chair_id]  || '',
+    treatment_type:  treatMap[a.treatment_id]?.name  || '',
+    treatment_color: treatMap[a.treatment_id]?.color || '#dbeafe',
+    patients:        undefined,
+    staff:           undefined,
   }));
 }
 
@@ -156,7 +155,8 @@ router.get('/available-slots/:date', async (req, res) => {
     }
 
     const allSlots = generateSlots(settings);
-    const booked   = await getBookedSlots(date);
+    // available-slots は LINE予約用なので常に本番データ
+    const booked   = await getBookedSlots(date, false);
 
     const slotDetails = allSlots.map(slot => {
       const slotMin    = toMinutes(slot);
@@ -180,7 +180,7 @@ router.get('/available-slots/:date', async (req, res) => {
         available:       !isBlocked && (maxChairs - bookedCount) > 0,
         availableChairs: isBlocked ? 0 : Math.max(0, maxChairs - bookedCount),
         bookedCount,
-        isBlocked
+        isBlocked,
       };
     });
 
@@ -196,30 +196,29 @@ router.get('/available-slots/:date', async (req, res) => {
 // =============================================
 router.get('/available-dates/:yearMonth', async (req, res) => {
   try {
-    const { yearMonth } = req.params;
-    const [year, month] = yearMonth.split('-').map(Number);
-    const settings  = await getClinicSettings();
-    const chairs    = await getChairs();
-    const maxChairs = chairs.length;
-
+    const { yearMonth }  = req.params;
+    const [year, month]  = yearMonth.split('-').map(Number);
+    const settings       = await getClinicSettings();
+    const chairs         = await getChairs();
+    const maxChairs      = chairs.length;
     const daysInMonth    = new Date(year, month, 0).getDate();
     const availableDates = [];
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const today   = new Date().toISOString().split('T')[0];
-      if (dateStr < today) continue;
+      if (dateStr < today)                    continue;
       if (!isOpenDay(dateStr, settings.openDays)) continue;
 
       const blocks = await getBlockedSlots(dateStr);
       if (blocks.find(b => b.affects_all && !b.start_time)) continue;
 
-      const booked   = await getBookedSlots(dateStr);
+      const booked   = await getBookedSlots(dateStr, false);
       const allSlots = generateSlots(settings);
 
       const hasAvailable = allSlots.some(slot => {
-        const slotMin    = toMinutes(slot);
-        const slotEndMin = slotMin + settings.slotDuration;
+        const slotMin     = toMinutes(slot);
+        const slotEndMin  = slotMin + settings.slotDuration;
         const bookedCount = booked.filter(b => {
           const bStart = toMinutes(b.start_time);
           const bEnd   = toMinutes(b.end_time);
@@ -243,12 +242,12 @@ router.get('/available-dates/:yearMonth', async (req, res) => {
 // =============================================
 router.get('/calendar/:date', requireAuth, async (req, res) => {
   try {
-    const { date }   = req.params;
-    const settings   = await getClinicSettings();
-    const chairs     = await getChairs();
-    const booked     = await getBookedSlots(date);
-    const blocks     = await getBlockedSlots(date);
-    const allSlots   = generateSlots(settings);
+    const { date } = req.params;
+    const settings = await getClinicSettings();
+    const chairs   = await getChairs();
+    const booked   = await getBookedSlots(date, req.isTestMode);
+    const blocks   = await getBlockedSlots(date);
+    const allSlots = generateSlots(settings);
 
     res.json({
       date,
@@ -267,7 +266,7 @@ router.get('/calendar/:date', requireAuth, async (req, res) => {
       chairs,
       slots:        allSlots,
       appointments: booked,
-      blocks
+      blocks,
     });
   } catch (err) {
     console.error('calendar error:', err);
@@ -284,10 +283,8 @@ router.get('/', requireAuth, async (req, res) => {
 
     let query = supabase
       .from('appointments')
-      .select(`
-        *,
-        patients(name, name_kana, phone)
-      `)
+      .select('*, patients(name, name_kana, phone)')
+      .eq('is_test', req.isTestMode ? true : false)
       .order('appointment_date')
       .order('start_time');
 
@@ -298,22 +295,21 @@ router.get('/', requireAuth, async (req, res) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    // chairs と treatments はRender側から取得
-    const chairs = await pool.query('SELECT id, name FROM chairs');
+    const chairs     = await pool.query('SELECT id, name FROM chairs');
     const treatments = await pool.query('SELECT id, name, color FROM treatments');
-    const chairMap = Object.fromEntries(chairs.rows.map(c => [c.id, c.name]));
-    const treatMap = Object.fromEntries(treatments.rows.map(t => [t.id, { name: t.name, color: t.color }]));
-    const staffRes = await pool.query('SELECT id, name FROM staff');
-    const staffMap = Object.fromEntries(staffRes.rows.map(s => [s.id, s.name]));
+    const staffRes   = await pool.query('SELECT id, name FROM staff');
+    const chairMap   = Object.fromEntries(chairs.rows.map(c => [c.id, c.name]));
+    const treatMap   = Object.fromEntries(treatments.rows.map(t => [t.id, { name: t.name, color: t.color }]));
+    const staffMap   = Object.fromEntries(staffRes.rows.map(s => [s.id, s.name]));
 
     const result = data.map(a => ({
       ...a,
       patient_name:    a.patients?.name,
       name_kana:       a.patients?.name_kana,
       phone:           a.patients?.phone,
-      chair_name:      chairMap[a.chair_id] || '',
-      doctor_name:     staffMap[a.staff_id] || '',
-      treatment_type:  treatMap[a.treatment_id]?.name || '',
+      chair_name:      chairMap[a.chair_id]  || '',
+      doctor_name:     staffMap[a.staff_id]  || '',
+      treatment_type:  treatMap[a.treatment_id]?.name  || '',
       treatment_color: treatMap[a.treatment_id]?.color || '#dbeafe',
       patients:        undefined,
     }));
@@ -333,12 +329,12 @@ router.post('/', requireAuth, async (req, res) => {
     const { patient_id, appointment_date, start_time, end_time,
             treatment_id, chair_id, staff_id, notes, source } = req.body;
 
-    // 重複チェック
     const { data: conflict } = await supabase
       .from('appointments')
       .select('id')
       .eq('appointment_date', appointment_date)
       .eq('chair_id', chair_id)
+      .eq('is_test', req.isTestMode ? true : false)
       .neq('status', 'cancelled')
       .lt('start_time', end_time)
       .gt('end_time', start_time);
@@ -352,7 +348,9 @@ router.post('/', requireAuth, async (req, res) => {
       .insert({
         patient_id, appointment_date, start_time, end_time,
         treatment_id, chair_id, staff_id, notes,
-        source: source || 'staff', status: 'confirmed'
+        source:  source || 'staff',
+        status:  'confirmed',
+        is_test: req.isTestMode ? true : false,
       })
       .select()
       .single();
@@ -374,13 +372,13 @@ router.put('/:id', requireAuth, async (req, res) => {
     const { appointment_date, start_time, end_time,
             treatment_id, chair_id, staff_id, notes, status } = req.body;
 
-    // 重複チェック
     if (appointment_date && start_time && end_time && chair_id) {
       const { data: conflict } = await supabase
         .from('appointments')
         .select('id')
         .eq('appointment_date', appointment_date)
         .eq('chair_id', chair_id)
+        .eq('is_test', req.isTestMode ? true : false)
         .neq('id', id)
         .neq('status', 'cancelled')
         .lt('start_time', end_time)
@@ -424,9 +422,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
     const { error } = await supabase
       .from('appointments')
       .update({
-        status: 'cancelled',
+        status:       'cancelled',
         cancelled_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at:   new Date().toISOString(),
       })
       .eq('id', req.params.id);
 

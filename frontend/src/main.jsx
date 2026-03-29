@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import axios from 'axios'
+import { TestModeProvider } from './context/TestModeContext'
 
-// 本番環境ではRenderのAPIのURLを使う
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || ''
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <TestModeProvider>
+      <App />
+    </TestModeProvider>
   </StrictMode>,
 )

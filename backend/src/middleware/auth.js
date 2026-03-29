@@ -10,6 +10,9 @@ function requireAuth(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.admin = decoded;
+    // テストモードフラグをリクエストに付与
+    req.isTestMode = req.headers['x-test-mode'] === 'true'
+      && decoded.role === 'superadmin';
     next();
   } catch (err) {
     return res.status(401).json({ error: 'トークンが無効または期限切れです' });

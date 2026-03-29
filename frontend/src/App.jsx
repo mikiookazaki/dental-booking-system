@@ -1,18 +1,19 @@
 // frontend/src/App.jsx
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import CalendarPage   from './pages/CalendarPage'
-import PatientsPage   from './pages/PatientsPage'
-import StaffPage      from './pages/StaffPage'
-import Sidebar        from './components/common/Sidebar'
-import AdminLogin     from './pages/admin/AdminLogin'
-import AdminLayout    from './pages/admin/AdminLayout'
-import AdminSettings  from './pages/admin/AdminSettings'
-import AdminBlocks    from './pages/admin/AdminBlocks'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import LineDebugPage  from './pages/admin/LineDebugPage'
+import CalendarPage      from './pages/CalendarPage'
+import PatientsPage      from './pages/PatientsPage'
+import StaffPage         from './pages/StaffPage'
+import Sidebar           from './components/common/Sidebar'
+import AdminLogin        from './pages/admin/AdminLogin'
+import AdminLayout       from './pages/admin/AdminLayout'
+import AdminSettings     from './pages/admin/AdminSettings'
+import AdminBlocks       from './pages/admin/AdminBlocks'
+import AdminDashboard    from './pages/admin/AdminDashboard'
+import LineDebugPage     from './pages/admin/LineDebugPage'
+import TestPatientsPage  from './pages/admin/TestPatientsPage'
 
-// ── 管理者認証ガード ────────────────────────────────────────
+// ── 管理者認証ガード ──────────────────────────────────────
 function AdminGuard({ children }) {
   const token = localStorage.getItem('admin_token')
   const role  = localStorage.getItem('admin_role')
@@ -22,7 +23,7 @@ function AdminGuard({ children }) {
   return children
 }
 
-// ── スーパー管理者専用ガード ────────────────────────────────
+// ── スーパー管理者専用ガード ──────────────────────────────
 function SuperAdminGuard({ children }) {
   const token = localStorage.getItem('admin_token')
   const role  = localStorage.getItem('admin_role')
@@ -89,9 +90,10 @@ function App() {
 
           {/* スーパー管理者専用 */}
           <Route path="line-debug" element={
-            <SuperAdminGuard>
-              <LineDebugPage />
-            </SuperAdminGuard>
+            <SuperAdminGuard><LineDebugPage /></SuperAdminGuard>
+          } />
+          <Route path="test-patients" element={
+            <SuperAdminGuard><TestPatientsPage /></SuperAdminGuard>
           } />
         </Route>
       </Routes>

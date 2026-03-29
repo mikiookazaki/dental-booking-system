@@ -1,6 +1,6 @@
 // routes/patients.js （Supabase移行版）
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 
@@ -15,7 +15,7 @@ function isValidKana(str) {
 
 function calcAgeGroup(birthDate) {
   if (!birthDate) return null;
-  const age = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
+  const age    = Math.floor((new Date() - new Date(birthDate)) / (1000 * 60 * 60 * 24 * 365.25));
   const decade = Math.floor(age / 10) * 10;
   return decade >= 90 ? '90代以上' : `${decade}代`;
 }
@@ -27,8 +27,9 @@ router.get('/', requireAuth, async (req, res) => {
 
     let query = supabase
       .from('patients')
-      .select('id, patient_code, name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source, line_user_id, total_visits, created_at')
+      .select('id, patient_code, name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source, line_user_id, total_visits, created_at, is_test')
       .eq('is_active', true)
+      .eq('is_test', req.isTestMode ? true : false)
       .order('created_at', { ascending: false });
 
     if (search) {
@@ -37,7 +38,6 @@ router.get('/', requireAuth, async (req, res) => {
 
     const { data, error } = await query;
     if (error) throw error;
-
     res.json({ patients: data });
   } catch (err) {
     console.error('GET patients error:', err);
@@ -72,8 +72,8 @@ router.get('/:id/qr', requireAuth, async (req, res) => {
 
     if (error) return res.status(404).json({ error: '患者が見つかりません' });
 
-    const lineId = process.env.LINE_BOT_BASIC_ID || '@210vmmzk';
-    const qr_url = `https://line.me/R/ti/p/${lineId}?patientCode=${data.patient_code}`;
+    const lineId  = process.env.LINE_BOT_BASIC_ID || '@210vmmzk';
+    const qr_url  = `https://line.me/R/ti/p/${lineId}?patientCode=${data.patient_code}`;
     res.json({
       id: data.id, patient_code: data.patient_code,
       name: data.name, name_kana: data.name_kana,
@@ -88,8 +88,8 @@ router.get('/:id/qr', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source } = req.body;
-    if (!name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
-    if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
+    if (!name?.trim())       return res.status(400).json({ error: '氏名は必須です' });
+    if (!name_kana?.trim())  return res.status(400).json({ error: 'フリガナは必須です' });
     if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
 
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : (age_group || null);
@@ -100,8 +100,9 @@ router.post('/', requireAuth, async (req, res) => {
         name: name.trim(), name_kana: name_kana.trim(),
         phone, email, birth_date, gender, address, notes,
         age_group: finalAgeGroup,
-        postal_code: postal_code || null,
+        postal_code:     postal_code     || null,
         referral_source: referral_source || null,
+        is_test: req.isTestMode ? true : false,
       })
       .select()
       .single();
@@ -120,8 +121,8 @@ router.put('/:id', requireAuth, async (req, res) => {
     const { name, name_kana, phone, email, birth_date, gender, address, notes, age_group, postal_code, referral_source } = req.body;
     if (name !== undefined && !name?.trim()) return res.status(400).json({ error: '氏名は必須です' });
     if (name_kana !== undefined) {
-      if (!name_kana?.trim()) return res.status(400).json({ error: 'フリガナは必須です' });
-      if (!isValidKana(name_kana.trim())) return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
+      if (!name_kana?.trim())              return res.status(400).json({ error: 'フリガナは必須です' });
+      if (!isValidKana(name_kana.trim()))  return res.status(400).json({ error: 'フリガナはカタカナで入力してください' });
     }
 
     const finalAgeGroup = birth_date ? calcAgeGroup(birth_date) : age_group;
@@ -148,6 +149,21 @@ router.put('/:id', requireAuth, async (req, res) => {
 
     if (error) return res.status(404).json({ error: '患者が見つかりません' });
     res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
+// DELETE /api/patients/:id（論理削除）
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('patients')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id);
+
+    if (error) throw error;
+    res.json({ message: '削除しました' });
   } catch (err) {
     res.status(500).json({ error: 'サーバーエラー' });
   }
