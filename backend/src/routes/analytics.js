@@ -11,6 +11,7 @@ const supabase = createClient(
 
 router.get('/age', requireAuth, async (req, res) => {
   try {
+    const isTest = req.isTestMode;
     const now = new Date();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const lastMonthDate = new Date(now); lastMonthDate.setMonth(now.getMonth()-1);
@@ -20,7 +21,8 @@ router.get('/age', requireAuth, async (req, res) => {
     const { data: patients } = await supabase
       .from('patients')
       .select('age_group, birth_date, gender, line_user_id, referral_source, postal_code, created_at')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .eq('is_test', isTest);
 
     // 年代別集計
     const ageMap = {};
@@ -43,7 +45,7 @@ router.get('/age', requireAuth, async (req, res) => {
       linked: patients.filter(p => p.line_user_id).length,
     };
 
-    // 今月・先月の新規患者
+    // 今月の新規患者
     const newPatientsMonth = patients.filter(p =>
       p.created_at && p.created_at.startsWith(thisMonth)
     ).length;
@@ -75,6 +77,7 @@ router.get('/age', requireAuth, async (req, res) => {
       .from('appointments')
       .select('appointment_date, start_time, source, status, patient_id, treatment_id')
       .eq('status', 'confirmed')
+      .eq('is_test', isTest)
       .gte('appointment_date', twelveMonthsAgoStr);
 
     // 月別予約数
@@ -127,6 +130,7 @@ router.get('/age', requireAuth, async (req, res) => {
       .from('appointments')
       .select('patient_id, treatment_id, appointment_date, patients(age_group, birth_date), treatments(name)')
       .eq('status', 'confirmed')
+      .eq('is_test', isTest)
       .gte('appointment_date', sixMonthsAgoStr);
 
     const crossMap = {};
@@ -166,21 +170,84 @@ router.get('/age', requireAuth, async (req, res) => {
     }
 
     res.json({
-      ageGroups,
-      monthly,
-      dowStats,
-      hourStats,
-      crossTab,
-      referralSources,
-      postalCounts,
-      lineStats,
-      thisMonthAppts,
-      lastMonthAppts,
-      newPatientsMonth,
+      ageGroups, monthly, dowStats, hourStats, crossTab,
+      referralSources, postalCounts, lineStats,
+      thisMonthAppts, lastMonthAppts, newPatientsMonth,
       clinicLocation,
     });
   } catch (err) {
     console.error('analytics/age error:', err);
+    res.status(500).json({ error: 'サーバーエラー' });
+  }
+});
+
+// ダッシュボード用サマリー
+router.get('/summary', requireAuth, async (req, res) => {
+  try {
+    const isTest = req.isTestMode;
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const lastMonthDate = new Date(now); lastMonthDate.setMonth(now.getMonth()-1);
+    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,'0')}`;
+
+    const { data: appts } = await supabase
+      .from('appointments')
+      .select('appointment_date, status, source, treatment_id, staff_id, chair_id, treatments(name), staff(name)')
+      .eq('is_test', isTest)
+      .gte('appointment_date', `${lastMonth}-01`);
+
+    const thisMonthAppts  = appts.filter(a => a.appointment_date.startsWith(thisMonth));
+    const lastMonthAppts  = appts.filter(a => a.appointment_date.startsWith(lastMonth));
+    const confirmed       = thisMonthAppts.filter(a => a.status === 'confirmed');
+    const cancelled       = thisMonthAppts.filter(a => a.status === 'cancelled');
+
+    // 治療別集計
+    const treatMap = {};
+    confirmed.forEach(a => {
+      const name = a.treatments?.name || '不明';
+      treatMap[name] = (treatMap[name] || 0) + 1;
+    });
+    const byTreatment = Object.entries(treatMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // スタッフ別集計
+    const staffMap = {};
+    confirmed.forEach(a => {
+      const name = a.staff?.name || '不明';
+      if (!staffMap[name]) staffMap[name] = { name, count: 0, cancelled: 0 };
+      staffMap[name].count++;
+    });
+    cancelled.forEach(a => {
+      const name = a.staff?.name || '不明';
+      if (!staffMap[name]) staffMap[name] = { name, count: 0, cancelled: 0 };
+      staffMap[name].cancelled++;
+    });
+    const byStaff = Object.values(staffMap).sort((a, b) => b.count - a.count);
+
+    // 日別予約数（今月）
+    const dayMap = {};
+    thisMonthAppts.forEach(a => {
+      const day = parseInt(a.appointment_date.substring(8, 10));
+      if (!dayMap[day]) dayMap[day] = { day, count: 0 };
+      if (a.status !== 'cancelled') dayMap[day].count++;
+    });
+    const byDay = Object.values(dayMap).sort((a, b) => a.day - b.day);
+
+    res.json({
+      total:        thisMonthAppts.length,
+      confirmed:    confirmed.length,
+      cancelled:    cancelled.length,
+      cancelRate:   thisMonthAppts.length > 0
+        ? Math.round(cancelled.length / thisMonthAppts.length * 100)
+        : 0,
+      lastMonthTotal: lastMonthAppts.filter(a => a.status !== 'cancelled').length,
+      byTreatment,
+      byStaff,
+      byDay,
+    });
+  } catch (err) {
+    console.error('analytics/summary error:', err);
     res.status(500).json({ error: 'サーバーエラー' });
   }
 });

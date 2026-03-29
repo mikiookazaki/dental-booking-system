@@ -1,5 +1,4 @@
 // backend/src/routes/lineDebug.js
-// LINEデバッグ用API（superadmin専用）
 const express = require('express');
 const router  = express.Router();
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
@@ -15,15 +14,18 @@ router.use(requireSuperAdmin);
 
 // ============================================================
 // GET /api/line-debug/patients
+// テストモードON → テスト患者、OFF → 本番患者
 // ============================================================
 router.get('/patients', async (req, res) => {
   try {
+    const isTest = req.isTestMode;
     const { data, error } = await supabase
       .from('patients')
-      .select('id, name, name_kana, patient_code, line_user_id, age_group, phone')
+      .select('id, name, name_kana, patient_code, line_user_id, age_group, phone, is_test')
       .eq('is_active', true)
+      .eq('is_test', isTest)
       .order('id')
-      .limit(30);
+      .limit(50);
 
     if (error) throw error;
     res.json({ patients: data });
@@ -34,12 +36,11 @@ router.get('/patients', async (req, res) => {
 
 // ============================================================
 // POST /api/line-debug/simulate
-// productionMode: true の場合は実際にDBに保存する
 // ============================================================
 router.post('/simulate', async (req, res) => {
   const { type = 'message', text, patientId, productionMode = false } = req.body;
 
-  let lineUserId = `debug_user_${Date.now()}`;
+  let lineUserId   = `debug_user_${Date.now()}`;
   let debugPatient = null;
 
   if (patientId) {
@@ -51,12 +52,12 @@ router.post('/simulate', async (req, res) => {
 
     if (patient) {
       debugPatient = patient;
-      lineUserId = patient.line_user_id || `debug_${patient.id}`;
+      lineUserId   = patient.line_user_id || `debug_${patient.id}`;
     }
   }
 
   const responses = [];
-  const logs = [];
+  const logs      = [];
 
   async function mockReply(replyToken, messages) {
     logs.push({ type: 'reply', time: new Date().toISOString(), messages });
@@ -77,11 +78,12 @@ router.post('/simulate', async (req, res) => {
     await lineModule.handleEventDebug(
       {
         type,
-        message: { type: 'text', text },
-        source: { userId: lineUserId },
-        replyToken: 'debug_token',
-        _debugPatient: debugPatient,
-        _productionMode: productionMode, // 本番モードフラグ
+        message:     { type: 'text', text },
+        source:      { userId: lineUserId },
+        replyToken:  'debug_token',
+        _debugPatient:   debugPatient,
+        _productionMode: productionMode,
+        _isTestMode:     req.isTestMode,
       },
       mockReply,
       mockPush
@@ -100,7 +102,7 @@ router.post('/simulate', async (req, res) => {
 router.post('/postback', async (req, res) => {
   const { data: postbackData, patientId, productionMode = false } = req.body;
 
-  let lineUserId = `debug_user_${Date.now()}`;
+  let lineUserId   = `debug_user_${Date.now()}`;
   let debugPatient = null;
 
   if (patientId) {
@@ -112,12 +114,12 @@ router.post('/postback', async (req, res) => {
 
     if (patient) {
       debugPatient = patient;
-      lineUserId = patient.line_user_id || `debug_${patient.id}`;
+      lineUserId   = patient.line_user_id || `debug_${patient.id}`;
     }
   }
 
   const responses = [];
-  const logs = [];
+  const logs      = [];
 
   async function mockReply(replyToken, messages) {
     logs.push({ type: 'reply', time: new Date().toISOString(), messages });
@@ -137,12 +139,13 @@ router.post('/postback', async (req, res) => {
 
     await lineModule.handleEventDebug(
       {
-        type: 'postback',
-        postback: { data: postbackData },
-        source: { userId: lineUserId },
+        type:       'postback',
+        postback:   { data: postbackData },
+        source:     { userId: lineUserId },
         replyToken: 'debug_token',
-        _debugPatient: debugPatient,
+        _debugPatient:   debugPatient,
         _productionMode: productionMode,
+        _isTestMode:     req.isTestMode,
       },
       mockReply,
       mockPush
@@ -156,7 +159,6 @@ router.post('/postback', async (req, res) => {
 
 // ============================================================
 // DELETE /api/line-debug/test-appointments
-// デバッグで作成したテスト予約を削除
 // ============================================================
 router.delete('/test-appointments', async (req, res) => {
   try {

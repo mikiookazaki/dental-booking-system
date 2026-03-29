@@ -1,11 +1,19 @@
 // frontend/src/pages/admin/LineDebugPage.jsx
 import { useState, useEffect, useRef } from 'react'
+import { useTestMode } from '../../context/TestModeContext'
+import { FlaskConical } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || ''
 
 function authHeader() {
-  const token = localStorage.getItem('admin_token')
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const token      = localStorage.getItem('admin_token')
+  const isTestMode = localStorage.getItem('test_mode') === 'true'
+  const role       = localStorage.getItem('admin_role') || ''
+  return {
+    Authorization:  `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    ...(isTestMode && role === 'superadmin' ? { 'x-test-mode': 'true' } : {}),
+  }
 }
 
 function ChatBubble({ message, isUser, onPostback }) {
@@ -24,6 +32,26 @@ function ChatBubble({ message, isUser, onPostback }) {
       return (
         <div style={{ background: '#fff', padding: '10px 14px', borderRadius: '2px 14px 14px 14px', fontSize: 13, maxWidth: 280, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', border: '1px solid #e5e7eb' }}>
           {msg.text}
+        </div>
+      )
+    }
+    if (msg.type === 'flex') {
+      const bubble = msg.contents
+      const header = bubble?.header?.contents?.[0]?.text
+      const bgColor = bubble?.header?.backgroundColor || '#06C755'
+      const bodyItems = bubble?.body?.contents || []
+      return (
+        <div style={{ maxWidth: 280, borderRadius: '2px 14px 14px 14px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+          {header && (
+            <div style={{ background: bgColor, padding: '10px 14px' }}>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{header}</div>
+            </div>
+          )}
+          <div style={{ background: '#fff', padding: '10px 14px' }}>
+            {bodyItems.filter(item => item.type === 'text').map((item, i) => (
+              <div key={i} style={{ fontSize: 12, color: item.color || '#333', marginBottom: 4, whiteSpace: 'pre-wrap' }}>{item.text}</div>
+            ))}
+          </div>
         </div>
       )
     }
@@ -78,6 +106,7 @@ function ChatBubble({ message, isUser, onPostback }) {
 }
 
 export default function LineDebugPage() {
+  const { isTestMode } = useTestMode()
   const [patients, setPatients]               = useState([])
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [messages, setMessages]               = useState([])
@@ -98,16 +127,16 @@ export default function LineDebugPage() {
   useEffect(() => {
     fetchPatients()
     setMessages([{ type: 'bot', message: { type: 'text', text: 'スマイル歯科クリニックへようこそ！\n\nご予約・変更・キャンセルはメニューからどうぞ。' } }])
-  }, [])
+  }, [isTestMode]) // テストモード切替時に患者一覧を再取得
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   async function fetchPatients() {
     try {
-      const res = await fetch(`${API}/api/line-debug/patients`, { headers: authHeader() })
+      const res  = await fetch(`${API}/api/line-debug/patients`, { headers: authHeader() })
       const data = await res.json()
       setPatients(data.patients || [])
-      if (data.patients?.length > 0) setSelectedPatient(data.patients[0])
+      setSelectedPatient(data.patients?.[0] || null)
     } catch (err) { console.error(err) }
   }
 
@@ -127,11 +156,11 @@ export default function LineDebugPage() {
         endpoint = '/api/line-debug/simulate'
         body = { type: text === 'follow' ? 'follow' : 'message', text, patientId: selectedPatient?.id, productionMode }
       }
-      const res = await fetch(`${API}${endpoint}`, { method: 'POST', headers: authHeader(), body: JSON.stringify(body) })
+      const res  = await fetch(`${API}${endpoint}`, { method: 'POST', headers: authHeader(), body: JSON.stringify(body) })
       const data = await res.json()
       if (data.responses) data.responses.forEach(msg => setMessages(prev => [...prev, { type: 'bot', message: msg }]))
-      if (data.logs) setLogs(prev => [...data.logs.map(l => ({ ...l, timeStr: new Date(l.time).toLocaleTimeString('ja-JP') })), ...prev].slice(0, 50))
-      if (data.error) setMessages(prev => [...prev, { type: 'bot', message: { type: 'text', text: `エラー: ${data.error}` } }])
+      if (data.logs)      setLogs(prev => [...data.logs.map(l => ({ ...l, timeStr: new Date(l.time).toLocaleTimeString('ja-JP') })), ...prev].slice(0, 50))
+      if (data.error)     setMessages(prev => [...prev, { type: 'bot', message: { type: 'text', text: `エラー: ${data.error}` } }])
     } catch (err) {
       setMessages(prev => [...prev, { type: 'bot', message: { type: 'text', text: `通信エラー: ${err.message}` } }])
     }
@@ -151,14 +180,14 @@ export default function LineDebugPage() {
 
   async function deleteTestAppointments() {
     try {
-      const url = selectedPatient
+      const url  = selectedPatient
         ? `${API}/api/line-debug/test-appointments?patientId=${selectedPatient.id}`
         : `${API}/api/line-debug/test-appointments`
-      const res = await fetch(url, { method: 'DELETE', headers: authHeader() })
+      const res  = await fetch(url, { method: 'DELETE', headers: authHeader() })
       const data = await res.json()
       setDeleteMsg(data.message || 'テスト予約を削除しました')
       setTimeout(() => setDeleteMsg(''), 3000)
-    } catch (err) {
+    } catch {
       setDeleteMsg('削除に失敗しました')
       setTimeout(() => setDeleteMsg(''), 3000)
     }
@@ -175,6 +204,12 @@ export default function LineDebugPage() {
             <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>スーパー管理者専用 — 実際のLINE Bot動作をシミュレート</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* テストモードバッジ */}
+            {isTestMode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: '#fef3c7', border: '1px solid #f59e0b', fontSize: 11, color: '#92400e', fontWeight: 600 }}>
+                <FlaskConical size={12} />テストモード
+              </div>
+            )}
             {/* 本番モードトグル */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: productionMode ? '#FEF3C7' : '#F3F4F6', border: `1px solid ${productionMode ? '#F59E0B' : '#E5E7EB'}` }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: productionMode ? '#92400E' : '#6B7280' }}>
@@ -185,7 +220,8 @@ export default function LineDebugPage() {
                 <span style={{ position: 'absolute', top: 2, left: productionMode ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </button>
             </div>
-            <button onClick={clearChat} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#6b7280' }}>
+            <button onClick={clearChat}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#6b7280' }}>
               リセット
             </button>
           </div>
@@ -213,7 +249,10 @@ export default function LineDebugPage() {
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: '#06C755', fontWeight: 700 }}>S</div>
             <div>
               <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>スマイル歯科</div>
-              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>テスト中: {selectedPatient ? selectedPatient.name : '未登録ユーザー'}</div>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>
+                テスト中: {selectedPatient ? selectedPatient.name : '未登録ユーザー'}
+                {isTestMode && <span style={{ marginLeft: 6, background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>🧪 テスト</span>}
+              </div>
             </div>
           </div>
           <div style={{ flex: 1, background: '#86CEAC', padding: 16, overflowY: 'auto', minHeight: 0 }}>
@@ -254,7 +293,14 @@ export default function LineDebugPage() {
       {/* 右: コントロールパネル */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937', marginBottom: 10 }}>テストユーザー</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937' }}>テストユーザー</div>
+            {isTestMode && (
+              <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>
+                🧪 テストデータ
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
             <div onClick={() => setSelectedPatient(null)}
               style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, border: `1px solid ${!selectedPatient ? '#06C755' : '#e5e7eb'}`, background: !selectedPatient ? '#f0fdf4' : '#f9fafb', color: !selectedPatient ? '#065f46' : '#374151' }}>
@@ -264,7 +310,9 @@ export default function LineDebugPage() {
               <div key={p.id} onClick={() => setSelectedPatient(p)}
                 style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, border: `1px solid ${selectedPatient?.id === p.id ? '#06C755' : '#e5e7eb'}`, background: selectedPatient?.id === p.id ? '#f0fdf4' : '#f9fafb', color: selectedPatient?.id === p.id ? '#065f46' : '#374151' }}>
                 <div style={{ fontWeight: 500 }}>{p.name}</div>
-                <div style={{ color: '#6b7280', fontSize: 11 }}>{p.patient_code} / {p.line_user_id ? 'LINE連携済' : '未連携'}</div>
+                <div style={{ color: '#6b7280', fontSize: 11 }}>
+                  {p.patient_code} / {p.line_user_id ? 'LINE連携済' : '未連携'}
+                </div>
               </div>
             ))}
           </div>
@@ -281,7 +329,8 @@ export default function LineDebugPage() {
                   <span style={{ color: log.type === 'reply' ? '#34d399' : '#60a5fa' }}>{log.type === 'reply' ? 'REPLY' : 'PUSH'}</span>
                   <span style={{ color: '#d1d5db' }}> {log.messages?.length}件</span>
                 </div>
-              ))}
+              ))
+            }
           </div>
         </div>
       </div>
