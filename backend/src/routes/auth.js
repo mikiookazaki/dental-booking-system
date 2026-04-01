@@ -38,21 +38,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/fix-superadmin?secret=smile-dental-cron-2026
-// 一時的なロール修正エンドポイント（使用後に削除すること）
-router.get('/fix-superadmin', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
-  try {
-    await db.query("UPDATE admin_users SET role='superadmin' WHERE username='admin'");
-    const result = await db.query("SELECT id, username, role FROM admin_users");
-    res.json({ message: 'updated', users: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // POST /api/auth/setup
 router.post('/setup', async (req, res) => {
   const { username, password } = req.body;
