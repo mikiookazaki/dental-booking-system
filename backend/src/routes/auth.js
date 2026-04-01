@@ -1,16 +1,9 @@
-// ============================================================
-// routes/auth.js （Supabase移行版）
-// ============================================================
+// backend/src/routes/auth.js
 const express  = require('express');
 const router   = express.Router();
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
-const { createClient } = require('@supabase/supabase-js');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const db       = require('../config/database');
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -19,35 +12,28 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'ユーザー名とパスワードは必須です' });
   }
   try {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('username', username)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !data) {
+    const result = await db.query(
+      'SELECT * FROM admin_users WHERE username = $1 AND is_active = TRUE',
+      [username]
+    );
+    if (!result.rows.length) {
       return res.status(401).json({ error: 'ユーザー名またはパスワードが違います' });
     }
-
-    const ok = await bcrypt.compare(password, data.password_hash);
+    const user = result.rows[0];
+    const ok   = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
       return res.status(401).json({ error: 'ユーザー名またはパスワードが違います' });
     }
 
-    // JWTトークン発行（24時間有効）
+    // JWTトークン発行（7日間有効に延長）
     const token = jwt.sign(
-      { id: data.id, username: data.username, role: data.role },
+      { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     );
 
-    await supabase
-      .from('admin_users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', data.id);
-
-    res.json({ token, role: data.role, username: data.username });
+    await db.query('UPDATE admin_users SET last_login=NOW() WHERE id=$1', [user.id]);
+    res.json({ token, role: user.role, username: user.username });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -58,14 +44,11 @@ router.post('/setup', async (req, res) => {
   const { username, password } = req.body;
   try {
     const hash = await bcrypt.hash(password, 10);
-    const { data, error } = await supabase
-      .from('admin_users')
-      .insert({ username, password_hash: hash, role: 'admin' })
-      .select('id, username')
-      .single();
-
-    if (error) throw error;
-    res.status(201).json({ message: '管理者ユーザーを作成しました', user: data });
+    const result = await db.query(
+      "INSERT INTO admin_users (username, password_hash, role) VALUES ($1,$2,'admin') RETURNING id, username",
+      [username, hash]
+    );
+    res.status(201).json({ message: '管理者ユーザーを作成しました', user: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

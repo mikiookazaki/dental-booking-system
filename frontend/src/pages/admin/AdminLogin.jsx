@@ -17,7 +17,8 @@ export default function AdminLogin({ onLogin }) {
       const res = await axios.post('/api/auth/login', { username, password })
 
       if (mode === 'admin') {
-        if (!['admin', 'superadmin'].includes(res.data.role)) {
+        // admin と superadmin 両方を管理者ログインとして許可
+        if (res.data.role !== 'admin' && res.data.role !== 'superadmin') {
           setError('管理者権限がありません')
           setLoading(false)
           return
@@ -57,7 +58,7 @@ export default function AdminLogin({ onLogin }) {
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>管理システム</div>
         </div>
 
-        {/* モード切替【2】 */}
+        {/* モード切替 */}
         <div style={{
           display: 'flex', borderRadius: 10, overflow: 'hidden',
           border: '1px solid #e5e7eb', marginBottom: 20,
