@@ -11,13 +11,15 @@ const NAV_LINE      = '/admin/line-debug'
 const NAV_TEST_PAT  = '/admin/test-patients'
 
 export default function AdminLayout({ onLogout }) {
-  const navigate     = useNavigate()
-  const location     = useLocation()
-  const adminName    = localStorage.getItem('admin_name') || ''
-  const adminRole    = localStorage.getItem('admin_role') || ''
+  const navigate    = useNavigate()
+  const location    = useLocation()
+  const adminName   = localStorage.getItem('admin_name') || ''
+  const adminRole   = localStorage.getItem('admin_role') || ''
   const isSuperAdmin = adminRole === 'superadmin'
   const [showManual, setShowManual] = useState(false)
-  const { testMode, setTestMode } = useTestMode()
+
+  // TestModeContextの正しい名前で取得
+  const { isTestMode, toggleTestMode } = useTestMode()
 
   function openManual() {
     const mode = localStorage.getItem('manual_display_mode') || 'newtab'
@@ -58,7 +60,8 @@ export default function AdminLayout({ onLogout }) {
   return (
     <div style={{ display:'flex', minHeight:'100vh', fontFamily:'"Noto Sans JP",sans-serif', background:'#f8fafc' }}>
 
-      {isSuperAdmin && testMode && (
+      {/* テストモードバナー */}
+      {isSuperAdmin && isTestMode && (
         <div style={{
           position:'fixed', top:0, left:0, right:0, zIndex:9999,
           background:'linear-gradient(90deg,#f59e0b,#d97706)',
@@ -68,7 +71,7 @@ export default function AdminLayout({ onLogout }) {
           <FlaskConical size={14} />
           {'テストモード有効中 — 表示データはすべてテスト用です'}
           <button
-            onClick={() => setTestMode(false)}
+            onClick={toggleTestMode}
             style={{
               marginLeft:12, background:'rgba(255,255,255,0.25)', border:'none',
               color:'#fff', fontSize:11, padding:'2px 8px', borderRadius:4, cursor:'pointer',
@@ -77,9 +80,10 @@ export default function AdminLayout({ onLogout }) {
         </div>
       )}
 
+      {/* サイドバー */}
       <div style={{
         width:220, background:'#1e3a5f', display:'flex', flexDirection:'column', flexShrink:0,
-        marginTop: (isSuperAdmin && testMode) ? 29 : 0,
+        marginTop: (isSuperAdmin && isTestMode) ? 29 : 0,
       }}>
         <div style={{ padding:'24px 16px 16px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>{'スマイル歯科'}</div>
@@ -98,6 +102,7 @@ export default function AdminLayout({ onLogout }) {
           <NavBtn path={NAV_SETTINGS}  label={'システム設定'}   icon={<Settings size={18}/>} />
           <NavBtn path={NAV_BLOCKS}    label={'予約制限管理'}   icon={<CalendarOff size={18}/>} />
 
+          {/* スーパー管理者専用 */}
           {isSuperAdmin && (
             <>
               <div style={{
@@ -108,37 +113,38 @@ export default function AdminLayout({ onLogout }) {
                 {'スーパー管理者'}
               </div>
 
+              {/* テストモードトグル */}
               <div style={{
                 margin:'0 4px 6px', borderRadius:8,
-                background: testMode ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)',
-                border: testMode ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                background: isTestMode ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)',
+                border: isTestMode ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)',
                 padding:'8px 10px',
               }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <FlaskConical size={13} color={testMode ? '#fbbf24' : 'rgba(255,255,255,0.5)'} />
-                    <span style={{ fontSize:12, color: testMode ? '#fbbf24' : 'rgba(255,255,255,0.6)', fontWeight:600 }}>
+                    <FlaskConical size={13} color={isTestMode ? '#fbbf24' : 'rgba(255,255,255,0.5)'} />
+                    <span style={{ fontSize:12, color: isTestMode ? '#fbbf24' : 'rgba(255,255,255,0.6)', fontWeight:600 }}>
                       {'テストモード'}
                     </span>
                   </div>
                   <button
-                    onClick={() => setTestMode(!testMode)}
+                    onClick={toggleTestMode}
                     style={{
                       position:'relative', width:36, height:20,
                       borderRadius:10, border:'none', cursor:'pointer',
-                      background: testMode ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+                      background: isTestMode ? '#f59e0b' : 'rgba(255,255,255,0.2)',
                       transition:'background 0.2s',
                     }}
                   >
                     <span style={{
                       position:'absolute', top:3,
-                      left: testMode ? 18 : 3,
+                      left: isTestMode ? 18 : 3,
                       width:14, height:14, borderRadius:'50%', background:'#fff',
                       transition:'left 0.2s',
                     }} />
                   </button>
                 </div>
-                {testMode && (
+                {isTestMode && (
                   <p style={{ fontSize:10, color:'#fbbf24', margin:'5px 0 0', opacity:0.8 }}>
                     {'テストデータ表示中'}
                   </p>
@@ -197,9 +203,10 @@ export default function AdminLayout({ onLogout }) {
         </div>
       </div>
 
+      {/* メインコンテンツ */}
       <div style={{
         flex:1, display:'flex', overflow:'hidden',
-        marginTop: (isSuperAdmin && testMode) ? 29 : 0,
+        marginTop: (isSuperAdmin && isTestMode) ? 29 : 0,
       }}>
         <main style={{ flex:1, overflow:'auto' }}>
           <Outlet />
