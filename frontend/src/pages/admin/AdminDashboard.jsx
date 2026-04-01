@@ -604,8 +604,17 @@ export default function AdminDashboard() {
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/admin/dashboard?month=${month}`, { headers: authHeader() })
-      setData(await res.json())
-    } catch (err) { console.error(err) }
+      const json = await res.json()
+      if (!res.ok) {
+        console.error('dashboard API error:', json)
+        setData(null)
+      } else {
+        setData(json)
+      }
+    } catch (err) {
+      console.error('fetchData error:', err)
+      setData(null)
+    }
     setLoading(false)
   }
 
@@ -616,8 +625,17 @@ export default function AdminDashboard() {
       const res = await fetch(`${API}/api/analytics/age`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setAgeData(await res.json())
-    } catch (err) { console.error(err) }
+      const json = await res.json()
+      if (!res.ok) {
+        console.error('analytics/age API error:', json)
+        setAgeData(null)
+      } else {
+        setAgeData(json)
+      }
+    } catch (err) {
+      console.error('fetchAgeData error:', err)
+      setAgeData(null)
+    }
     setAgeLoading(false)
   }
 
