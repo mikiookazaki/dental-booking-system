@@ -55,9 +55,6 @@ const MANUAL_MODES = [
   { value: 'window', label: '別ウィンドウで開く', desc: '画面を並べて確認できる' },
 ]
 
-// ─────────────────────────────────────────────
-// プラン定義
-// ─────────────────────────────────────────────
 const PLAN_LABELS = { basic: 'ベーシック', standard: 'スタンダード', pro: 'プロ' }
 const PLAN_PRICES = { basic: '¥9,800 / 月', standard: '¥19,800 / 月', pro: '¥29,800〜 / 月' }
 const PLAN_RANK   = { basic: 1, standard: 2, pro: 3 }
@@ -116,6 +113,374 @@ const FEATURE_GROUPS = [
     ],
   },
 ]
+
+// ─────────────────────────────────────────────
+// キャンペーン配信タブ
+// ─────────────────────────────────────────────
+function CampaignTab() {
+  const AGE_GROUP_OPTIONS = ['10代','20代','30代','40代','50代','60代','70代','80代','90代以上']
+
+  const [filters, setFilters] = useState({
+    age_groups:        [],
+    gender:            'all',
+    last_visit_before: '',
+    last_visit_after:  '',
+    min_visits:        '',
+    max_visits:        '',
+  })
+  const [messageName,    setMessageName]    = useState('')
+  const [messageText,    setMessageText]    = useState('')
+  const [imageUrl,       setImageUrl]       = useState('')
+  const [preview,        setPreview]        = useState(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [sending,        setSending]        = useState(false)
+  const [sendResult,     setSendResult]     = useState(null)
+  const [logs,           setLogs]           = useState([])
+  const [activeSection,  setActiveSection]  = useState('compose')
+  const [showConfirm,    setShowConfirm]    = useState(false)
+
+  const isTest = localStorage.getItem('test_mode') === 'true'
+
+  useEffect(() => { fetchLogs() }, [])
+
+  function updateFilter(key, val) {
+    setFilters(prev => ({ ...prev, [key]: val }))
+    setPreview(null)
+  }
+
+  function toggleAgeGroup(ag) {
+    setFilters(prev => ({
+      ...prev,
+      age_groups: prev.age_groups.includes(ag)
+        ? prev.age_groups.filter(x => x !== ag)
+        : [...prev.age_groups, ag],
+    }))
+    setPreview(null)
+  }
+
+  async function handlePreview() {
+    setPreviewLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filters.age_groups.length) params.set('age_groups', filters.age_groups.join(','))
+      if (filters.gender !== 'all')  params.set('gender', filters.gender)
+      if (filters.last_visit_before) params.set('last_visit_before', filters.last_visit_before)
+      if (filters.last_visit_after)  params.set('last_visit_after',  filters.last_visit_after)
+      if (filters.min_visits)        params.set('min_visits', filters.min_visits)
+      if (filters.max_visits)        params.set('max_visits', filters.max_visits)
+      params.set('is_test', String(isTest))
+
+      const res  = await fetch(`${API}/api/campaigns/preview?${params}`, { headers: authHeader() })
+      const data = await res.json()
+      setPreview(data)
+    } catch (e) {
+      setPreview({ error: e.message })
+    }
+    setPreviewLoading(false)
+  }
+
+  async function handleSend() {
+    if (!preview?.patients?.length) return
+    setSending(true)
+    setSendResult(null)
+    try {
+      const res = await fetch(`${API}/api/campaigns/send`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({
+          patient_ids:   preview.patients.map(p => p.id),
+          message_text:  messageText,
+          image_url:     imageUrl || undefined,
+          campaign_name: messageName,
+          is_test:       isTest,
+        }),
+      })
+      const data = await res.json()
+      setSendResult(data)
+      fetchLogs()
+    } catch (e) {
+      setSendResult({ error: e.message })
+    }
+    setSending(false)
+    setShowConfirm(false)
+  }
+
+  async function fetchLogs() {
+    try {
+      const res  = await fetch(`${API}/api/campaigns/logs?limit=50`, { headers: authHeader() })
+      const data = await res.json()
+      setLogs(Array.isArray(data) ? data : [])
+    } catch {}
+  }
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      {isTest && (
+        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#92400e' }}>
+          🧪 テストモード有効中 — テスト患者にのみ送信されます
+        </div>
+      )}
+
+      {/* セクション切替 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        {[['compose','✉️ メッセージ作成'],['logs','📋 送信履歴']].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveSection(id)}
+            style={{
+              padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: activeSection === id ? '#2563eb' : '#f3f4f6',
+              color: activeSection === id ? '#fff' : '#6b7280',
+              fontSize: 13, fontWeight: 600,
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeSection === 'compose' && (
+        <>
+          {/* ① 絞り込み条件 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 20px' }}>
+              ① 配信対象の絞り込み
+              <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>LINE連携済み患者のみ対象</span>
+            </h2>
+
+            {/* 年代 */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>年代</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <button onClick={() => setFilters(prev => ({ ...prev, age_groups: [] }))}
+                  style={{ padding: '5px 12px', borderRadius: 20, border: '1px solid', fontSize: 12, cursor: 'pointer', background: filters.age_groups.length === 0 ? '#2563eb' : '#f9fafb', color: filters.age_groups.length === 0 ? '#fff' : '#6b7280', borderColor: filters.age_groups.length === 0 ? '#2563eb' : '#e5e7eb' }}>
+                  すべて
+                </button>
+                {AGE_GROUP_OPTIONS.map(ag => (
+                  <button key={ag} onClick={() => toggleAgeGroup(ag)}
+                    style={{ padding: '5px 12px', borderRadius: 20, border: '1px solid', fontSize: 12, cursor: 'pointer', background: filters.age_groups.includes(ag) ? '#2563eb' : '#f9fafb', color: filters.age_groups.includes(ag) ? '#fff' : '#6b7280', borderColor: filters.age_groups.includes(ag) ? '#2563eb' : '#e5e7eb' }}>
+                    {ag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 性別 */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>性別</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['all','指定なし'],['male','男性'],['female','女性']].map(([val, label]) => (
+                  <button key={val} onClick={() => updateFilter('gender', val)}
+                    style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid', fontSize: 13, cursor: 'pointer', background: filters.gender === val ? '#2563eb' : '#f9fafb', color: filters.gender === val ? '#fff' : '#6b7280', borderColor: filters.gender === val ? '#2563eb' : '#e5e7eb' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 最終来院日 */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>最終来院日</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>以降</span>
+                  <input type="date" value={filters.last_visit_after} onChange={e => updateFilter('last_visit_after', e.target.value)}
+                    style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13 }} />
+                </div>
+                <span style={{ color: '#9ca3af' }}>〜</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>以前</span>
+                  <input type="date" value={filters.last_visit_before} onChange={e => updateFilter('last_visit_before', e.target.value)}
+                    style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[['3ヶ月未来院', 90], ['6ヶ月未来院', 180], ['1年未来院', 365]].map(([label, days]) => {
+                    const d = new Date(); d.setDate(d.getDate() - days)
+                    const dateStr = d.toISOString().slice(0, 10)
+                    return (
+                      <button key={days} onClick={() => { updateFilter('last_visit_before', dateStr); updateFilter('last_visit_after', '') }}
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 11, cursor: 'pointer', background: '#f9fafb', color: '#6b7280' }}>
+                        {label}
+                      </button>
+                    )
+                  })}
+                  <button onClick={() => { updateFilter('last_visit_before', ''); updateFilter('last_visit_after', '') }}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 11, cursor: 'pointer', background: '#f9fafb', color: '#9ca3af' }}>
+                    クリア
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 来院回数 */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>来院回数</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min="0" value={filters.min_visits} onChange={e => updateFilter('min_visits', e.target.value)} placeholder="最小"
+                  style={{ width: 80, padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13 }} />
+                <span style={{ color: '#9ca3af' }}>〜</span>
+                <input type="number" min="0" value={filters.max_visits} onChange={e => updateFilter('max_visits', e.target.value)} placeholder="最大"
+                  style={{ width: 80, padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13 }} />
+                <span style={{ fontSize: 12, color: '#6b7280' }}>回</span>
+              </div>
+            </div>
+
+            <button onClick={handlePreview} disabled={previewLoading}
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: previewLoading ? '#93c5fd' : '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              {previewLoading ? '検索中...' : '🔍 対象者を確認する'}
+            </button>
+
+            {preview && !preview.error && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: preview.count > 0 ? '#f0fdf4' : '#fef2f2', border: `1px solid ${preview.count > 0 ? '#a7f3d0' : '#fca5a5'}`, borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: preview.count > 0 ? '#059669' : '#dc2626' }}>{preview.count}名</span>
+                  <span style={{ fontSize: 13, color: '#374151' }}>が配信対象です（LINE連携済み）</span>
+                </div>
+                {preview.count > 0 && (
+                  <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                    {preview.patients.slice(0, 50).map(p => (
+                      <div key={p.id} style={{ display: 'flex', gap: 12, padding: '8px 14px', borderBottom: '1px solid #f3f4f6', fontSize: 12 }}>
+                        <span style={{ fontWeight: 600, color: '#374151', width: 120 }}>{p.name}</span>
+                        <span style={{ color: '#9ca3af' }}>{p.age_group || '年代不明'}</span>
+                        <span style={{ color: '#9ca3af' }}>{p.gender === 'male' ? '男性' : p.gender === 'female' ? '女性' : '不明'}</span>
+                        <span style={{ color: '#9ca3af' }}>来院{p.total_visits || 0}回</span>
+                        {p.last_visit_date && <span style={{ color: '#9ca3af' }}>最終: {p.last_visit_date}</span>}
+                      </div>
+                    ))}
+                    {preview.count > 50 && <div style={{ padding: '8px 14px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>...他 {preview.count - 50}名</div>}
+                  </div>
+                )}
+              </div>
+            )}
+            {preview?.error && <div style={{ marginTop: 12, color: '#dc2626', fontSize: 13 }}>❌ {preview.error}</div>}
+          </div>
+
+          {/* ② メッセージ作成 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 20px' }}>② メッセージ作成</h2>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>キャンペーン名（管理用）</label>
+              <input type="text" value={messageName} onChange={e => setMessageName(e.target.value)} placeholder="例: 春のクリーニングキャンペーン"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>画像URL（任意）</label>
+              <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+              {imageUrl && (
+                <div style={{ marginTop: 8 }}>
+                  <img src={imageUrl} alt="プレビュー" onError={e => { e.target.style.display = 'none' }}
+                    style={{ maxWidth: 200, maxHeight: 120, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                メッセージ本文 <span style={{ color: '#dc2626' }}>*</span>
+              </label>
+              <textarea value={messageText} onChange={e => setMessageText(e.target.value)} rows={6}
+                placeholder={'例：春のホワイトニングキャンペーン開催中！\n今なら初回20%オフです。\n\nご予約はLINEからどうぞ 🦷'}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>{messageText.length} 文字</div>
+            </div>
+
+            {messageText && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#065f46', marginBottom: 10 }}>📱 LINEプレビュー</div>
+                <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #e5e7eb', maxWidth: 280 }}>
+                  {imageUrl && <img src={imageUrl} alt="" onError={e => { e.target.style.display = 'none' }} style={{ width: '100%', height: 140, objectFit: 'cover' }} />}
+                  <div style={{ background: '#2563eb', padding: '10px 14px' }}>
+                    <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>スマイル歯科からのお知らせ</div>
+                  </div>
+                  <div style={{ padding: '12px 14px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>〇〇 様</div>
+                    <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{messageText}</div>
+                  </div>
+                  <div style={{ padding: '8px 14px', background: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>スマイル歯科</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ③ 送信 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 16px' }}>③ 配信実行</h2>
+
+            {!preview && <div style={{ color: '#9ca3af', fontSize: 13 }}>まず「対象者を確認する」を実行してください</div>}
+            {preview && preview.count === 0 && <div style={{ color: '#d97706', fontSize: 13 }}>条件に合う患者がいません。絞り込み条件を変更してください。</div>}
+
+            {preview && preview.count > 0 && !showConfirm && (
+              <button onClick={() => { if (!messageText.trim()) { alert('メッセージ本文を入力してください'); return; } setShowConfirm(true) }}
+                style={{ padding: '12px 32px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+                📣 {preview.count}名に送信する
+              </button>
+            )}
+
+            {showConfirm && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '16px 20px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#991b1b', marginBottom: 8 }}>⚠️ 本当に送信しますか？</div>
+                <div style={{ fontSize: 13, color: '#374151', marginBottom: 16 }}>
+                  <strong>{preview.count}名</strong>のLINEに「{messageName || 'キャンペーンメッセージ'}」を送信します。
+                  {isTest && <span style={{ color: '#d97706', marginLeft: 8 }}>（テストモード）</span>}
+                  <br />この操作は取り消せません。
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleSend} disabled={sending}
+                    style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: sending ? '#fca5a5' : '#dc2626', color: '#fff', fontSize: 14, fontWeight: 600, cursor: sending ? 'wait' : 'pointer' }}>
+                    {sending ? `送信中...` : '送信する'}
+                  </button>
+                  <button onClick={() => setShowConfirm(false)} disabled={sending}
+                    style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 14, cursor: 'pointer' }}>
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {sendResult && (
+              <div style={{ marginTop: 16, background: sendResult.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${sendResult.error ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 10, padding: '14px 18px', fontSize: 13 }}>
+                {sendResult.error
+                  ? <span style={{ color: '#dc2626' }}>❌ エラー: {sendResult.error}</span>
+                  : <div style={{ color: '#166534', fontWeight: 600 }}>
+                      ✅ 配信完了 — 送信: <strong>{sendResult.results?.sent}件</strong>
+                      {sendResult.results?.failed > 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>失敗: {sendResult.results.failed}件</span>}
+                    </div>
+                }
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeSection === 'logs' && (
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>キャンペーン送信履歴</h2>
+            <button onClick={fetchLogs} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 12, cursor: 'pointer', color: '#374151' }}>🔄 更新</button>
+          </div>
+          {logs.length === 0
+            ? <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 13 }}>まだ送信履歴がありません</div>
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {logs.map(log => (
+                  <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8, background: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{log.status === 'sent' ? '✅' : '❌'}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap' }}>キャンペーン</span>
+                    <span style={{ fontSize: 13, color: '#374151', flex: 1 }}>{log.patients?.name || `患者ID: ${log.patient_id}`}</span>
+                    {log.error_message && log.status === 'sent' && <span style={{ fontSize: 11, color: '#6b7280', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error_message}</span>}
+                    <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      {new Date(log.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─────────────────────────────────────────────
 // リマインダータブ
@@ -182,26 +547,26 @@ function ReminderTab() {
   }
 
   async function handleRunNow() {
-  　setRunning(true)
-  　setRunResult(null)
-  　try {
-    　const isTestMode = localStorage.getItem('test_mode') === 'true'
-    　const role       = localStorage.getItem('admin_role') || ''
-    　const endpoint   = (isTestMode && role === 'superadmin')
-    　  ? `${API}/api/reminders/run-test`
-    　  : `${API}/api/reminders/run`
-    　const res  = await fetch(endpoint, {
-      　method: 'POST',
-      　headers: { ...authHeader(), 'x-cron-secret': 'smile-dental-cron-2026' },
-    　})
-    　const data = await res.json()
-    　setRunResult(data)
-    　fetchLogs()
-  　} catch (e) {
-    　setRunResult({ error: e.message })
-  　}
-  　setRunning(false)
-　}
+    setRunning(true)
+    setRunResult(null)
+    try {
+      const isTestMode = localStorage.getItem('test_mode') === 'true'
+      const role       = localStorage.getItem('admin_role') || ''
+      const endpoint   = (isTestMode && role === 'superadmin')
+        ? `${API}/api/reminders/run-test`
+        : `${API}/api/reminders/run`
+      const res  = await fetch(endpoint, {
+        method: 'POST',
+        headers: { ...authHeader(), 'x-cron-secret': 'smile-dental-cron-2026' },
+      })
+      const data = await res.json()
+      setRunResult(data)
+      fetchLogs()
+    } catch (e) {
+      setRunResult({ error: e.message })
+    }
+    setRunning(false)
+  }
 
   function update(key, val) { setSettings(prev => ({ ...prev, [key]: val })) }
 
@@ -209,11 +574,8 @@ function ReminderTab() {
     const on = settings[keyName] === 'true'
     return (
       <div onClick={() => update(keyName, on ? 'false' : 'true')}
-        style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
-          background: on ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
-        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff',
-          position: 'absolute', top: 3, left: on ? 23 : 3,
-          transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+        style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: on ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: on ? 23 : 3, transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
       </div>
     )
   }
@@ -235,27 +597,19 @@ function ReminderTab() {
 
   return (
     <div style={{ maxWidth: 720 }}>
-      {/* セクション切替 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {[['settings', '⚙️ 設定'], ['logs', '📋 送信履歴']].map(([id, label]) => (
           <button key={id} onClick={() => setActiveSection(id)}
-            style={{
-              padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeSection === id ? '#2563eb' : '#f3f4f6',
-              color: activeSection === id ? '#fff' : '#6b7280',
-              fontSize: 13, fontWeight: 600,
-            }}>
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: activeSection === id ? '#2563eb' : '#f3f4f6', color: activeSection === id ? '#fff' : '#6b7280', fontSize: 13, fontWeight: 600 }}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* 設定セクション */}
       {activeSection === 'settings' && (
         <>
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 20px' }}>基本設定</h2>
-
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>予約リマインダー</div>
@@ -263,29 +617,21 @@ function ReminderTab() {
               </div>
               <Toggle keyName="reminder_enabled" />
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20,
-              opacity: settings.reminder_enabled === 'true' ? 1 : 0.4,
-              pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, opacity: settings.reminder_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>当日リマインダー</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Standard / Pro プランのみ有効</div>
               </div>
               <Toggle keyName="reminder_same_day" />
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              opacity: settings.reminder_enabled === 'true' ? 1 : 0.4,
-              pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: settings.reminder_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>送信時刻</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>毎日この時刻に自動送信されます</div>
               </div>
-              <input type="time" value={settings.reminder_send_time || '09:00'}
-                onChange={e => update('reminder_send_time', e.target.value)}
+              <input type="time" value={settings.reminder_send_time || '09:00'} onChange={e => update('reminder_send_time', e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15 }} />
             </div>
-
             <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 16, fontSize: 12, color: '#92400e' }}>
               💡 送信時刻を変更した場合は開発者に連絡してください（サーバー側の cron 設定も変更が必要です）
             </div>
@@ -317,99 +663,64 @@ function ReminderTab() {
               <div key={key} style={{ marginBottom: 20 }}>
                 <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>{label}</label>
                 <textarea value={settings[key] || ''} onChange={e => update(key, e.target.value)} rows={4}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db',
-                    fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               </div>
             ))}
           </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
             <button onClick={handleSave} disabled={saving}
-              style={{
-                padding: '10px 24px', borderRadius: 8, border: 'none',
-                background: saved ? '#059669' : '#2563eb', color: '#fff',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}>
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 設定を保存'}
             </button>
             <button onClick={handleRunNow} disabled={running}
-              style={{
-                padding: '10px 24px', borderRadius: 8,
-                border: '1px solid #d1d5db', background: '#fff',
-                color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}>
+              style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               {running ? '送信中...' : '▶ 今すぐ送信テスト'}
             </button>
           </div>
 
           {runResult && (
-            <div style={{
-              background: runResult.error ? '#fef2f2' : '#f0fdf4',
-              border: `1px solid ${runResult.error ? '#fca5a5' : '#a7f3d0'}`,
-              borderRadius: 10, padding: '14px 18px', fontSize: 13,
-            }}>
-              {runResult.error ? (
-                <span style={{ color: '#dc2626' }}>❌ エラー: {runResult.error}</span>
-              ) : (
-                <div style={{ color: '#166534' }}>
-                  ✅ 実行完了 — 予約リマインダー: <strong>{runResult.summary?.appt_sent}件</strong>送信 /
-                  定期検診: <strong>{runResult.summary?.recall_sent}件</strong>送信
-                  {runResult.summary?.appt_failed > 0 && (
-                    <span style={{ color: '#dc2626', marginLeft: 8 }}>（失敗: {runResult.summary.appt_failed}件）</span>
-                  )}
-                </div>
-              )}
+            <div style={{ background: runResult.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${runResult.error ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 10, padding: '14px 18px', fontSize: 13 }}>
+              {runResult.error
+                ? <span style={{ color: '#dc2626' }}>❌ エラー: {runResult.error}</span>
+                : <div style={{ color: '#166534' }}>
+                    ✅ 実行完了 — 予約リマインダー: <strong>{runResult.summary?.appt_sent}件</strong>送信 /
+                    定期検診: <strong>{runResult.summary?.recall_sent}件</strong>送信
+                    {runResult.summary?.appt_failed > 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>（失敗: {runResult.summary.appt_failed}件）</span>}
+                  </div>
+              }
             </div>
           )}
         </>
       )}
 
-      {/* 送信履歴セクション */}
       {activeSection === 'logs' && (
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>送信履歴（直近30件）</h2>
-            <button onClick={fetchLogs}
-              style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 12, cursor: 'pointer', color: '#374151' }}>
-              🔄 更新
-            </button>
+            <button onClick={fetchLogs} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 12, cursor: 'pointer', color: '#374151' }}>🔄 更新</button>
           </div>
-          {logs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 13 }}>まだ送信履歴がありません</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {logs.map(log => {
-                const typeColor = TYPE_COLORS[log.reminder_type] || { bg: '#f3f4f6', text: '#6b7280' }
-                return (
-                  <div key={log.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 8, background: '#f9fafb', border: '1px solid #f3f4f6',
-                  }}>
-                    <div style={{ fontSize: 16, flexShrink: 0 }}>
-                      {log.status === 'sent' ? '✅' : log.status === 'failed' ? '❌' : '⏭️'}
-                    </div>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20,
-                      background: typeColor.bg, color: typeColor.text, whiteSpace: 'nowrap',
-                    }}>
-                      {TYPE_LABELS[log.reminder_type] || log.reminder_type}
-                    </span>
-                    <span style={{ fontSize: 13, color: '#374151', flex: 1 }}>
-                      {log.patients?.name || `患者ID: ${log.patient_id}`}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                      {new Date(log.sent_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {log.error_message && (
-                      <span style={{ fontSize: 11, color: '#dc2626', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {log.error_message}
+          {logs.length === 0
+            ? <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 13 }}>まだ送信履歴がありません</div>
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {logs.map(log => {
+                  const typeColor = TYPE_COLORS[log.reminder_type] || { bg: '#f3f4f6', text: '#6b7280' }
+                  return (
+                    <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8, background: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                      <div style={{ fontSize: 16, flexShrink: 0 }}>{log.status === 'sent' ? '✅' : log.status === 'failed' ? '❌' : '⏭️'}</div>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text, whiteSpace: 'nowrap' }}>
+                        {TYPE_LABELS[log.reminder_type] || log.reminder_type}
                       </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                      <span style={{ fontSize: 13, color: '#374151', flex: 1 }}>{log.patients?.name || `患者ID: ${log.patient_id}`}</span>
+                      <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                        {new Date(log.sent_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {log.error_message && <span style={{ fontSize: 11, color: '#dc2626', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error_message}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+          }
         </div>
       )}
     </div>
@@ -491,12 +802,7 @@ function LicenseTab() {
             const isSelected = selectedPlan === plan
             return (
               <button key={plan} onClick={() => setSelectedPlan(plan)}
-                style={{
-                  border: `2px solid ${isSelected ? t.border : '#e5e7eb'}`,
-                  borderRadius: 10, padding: '14px 12px',
-                  background: isSelected ? t.bg : '#f9fafb',
-                  cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
-                }}>
+                style={{ border: `2px solid ${isSelected ? t.border : '#e5e7eb'}`, borderRadius: 10, padding: '14px 12px', background: isSelected ? t.bg : '#f9fafb', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? t.text : '#6b7280', marginBottom: 2 }}>{PLAN_LABELS[plan]}</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: isSelected ? t.text : '#1f2937' }}>
                   {plan === 'pro' ? '¥29,800〜' : plan === 'standard' ? '¥19,800' : '¥9,800'}
@@ -571,6 +877,7 @@ function LicenseTab() {
 const TABS = [
   { id: 'general',  label: 'システム設定' },
   { id: 'reminder', label: '🔔 リマインダー' },
+  { id: 'campaign', label: '📣 キャンペーン' },
   { id: 'license',  label: '🔑 ライセンス' },
 ]
 
@@ -635,29 +942,19 @@ export default function AdminSettings() {
 
   return (
     <div style={{ padding: 32, maxWidth: 760 }}>
-      {/* タブ切替 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '2px solid #e5e7eb' }}>
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px', border: 'none', background: 'none',
-              fontSize: 14, fontWeight: activeTab === tab.id ? 700 : 400,
-              color: activeTab === tab.id ? '#2563eb' : '#6b7280',
-              borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent',
-              marginBottom: -2, cursor: 'pointer', transition: 'all .15s',
-            }}>
+            style={{ padding: '10px 20px', border: 'none', background: 'none', fontSize: 14, fontWeight: activeTab === tab.id ? 700 : 400, color: activeTab === tab.id ? '#2563eb' : '#6b7280', borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent', marginBottom: -2, cursor: 'pointer', transition: 'all .15s' }}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* リマインダータブ */}
       {activeTab === 'reminder' && <ReminderTab />}
+      {activeTab === 'campaign' && <CampaignTab />}
+      {activeTab === 'license'  && <LicenseTab />}
 
-      {/* ライセンスタブ */}
-      {activeTab === 'license' && <LicenseTab />}
-
-      {/* システム設定タブ */}
       {activeTab === 'general' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
@@ -673,7 +970,6 @@ export default function AdminSettings() {
 
           {error && <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-          {/* 診療時間・休診日 */}
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>診療時間・休診日</h2>
@@ -806,12 +1102,8 @@ export default function AdminSettings() {
                   style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
               </div>
             </div>
-            <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 12, color: '#92400e' }}>
-              💡 例: 診療時間が 09:00〜18:30 でも、表示を 07:00〜21:00 にすると時間外予約が可能になります
-            </div>
           </div>
 
-          {/* その他の設定グループ */}
           {SETTING_GROUPS.map(group => (
             <div key={group.title} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
               <div style={{ marginBottom: 16 }}>

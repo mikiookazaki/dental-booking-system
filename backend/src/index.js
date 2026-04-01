@@ -31,8 +31,9 @@ app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/admin',        require('./routes/admin'));
 app.use('/api/analytics',    require('./routes/analytics'));
 app.use('/api/line-debug',   require('./routes/lineDebug'));
-app.use('/api/licenses',     require('./routes/licenses')); // ← 追加
+app.use('/api/licenses',     require('./routes/licenses'));
 app.use('/api/reminders',    require('./routes/reminders'));
+app.use('/api/campaigns',    require('./routes/campaigns')); // ← キャンペーン一斉配信
 
 // ── ヘルスチェック ────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -181,7 +182,7 @@ const runMigrations = async () => {
       console.log('  ✅ スタッフユーザー作成 (staff / dental2026)');
     }
 
-    // ── clinic_licenses（ライセンス管理）── 追加 ──────────
+    // ── clinic_licenses（ライセンス管理）────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clinic_licenses (
         id                  SERIAL PRIMARY KEY,
@@ -204,7 +205,7 @@ const runMigrations = async () => {
     );
     console.log('  ✅ clinic_licenses');
 
-    // ── license_history（変更履歴）── 追加 ────────────────
+    // ── license_history（変更履歴）───────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS license_history (
         id          SERIAL PRIMARY KEY,
@@ -217,6 +218,7 @@ const runMigrations = async () => {
       )
     `);
     console.log('  ✅ license_history');
+
     // ── reminder_logs・patients リコール用カラム（Supabaseで作成済み）──
     console.log('  ✅ reminder_logs / recall columns（Supabase作成済み）');
 
