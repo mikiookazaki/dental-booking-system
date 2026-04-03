@@ -33,7 +33,8 @@ app.use('/api/analytics',    require('./routes/analytics'));
 app.use('/api/line-debug',   require('./routes/lineDebug'));
 app.use('/api/licenses',     require('./routes/licenses'));
 app.use('/api/reminders',    require('./routes/reminders'));
-app.use('/api/campaigns',    require('./routes/campaigns')); // ← キャンペーン一斉配信
+app.use('/api/campaigns',      require('./routes/campaigns'));      // ← キャンペーン一斉配信
+app.use('/api/followup-messages', require('./routes/followupMessages')); // ← 治療後フォローメッセージ設定
 
 // ── ヘルスチェック ────────────────────────────────────────
 app.get('/health', (req, res) => {

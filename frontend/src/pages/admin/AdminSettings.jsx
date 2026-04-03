@@ -483,6 +483,219 @@ function CampaignTab() {
 }
 
 // ─────────────────────────────────────────────
+// 治療後フォロー設定コンポーネント
+// ─────────────────────────────────────────────
+const TREATMENTS = [
+  { id: 1, name: '定期検診' },
+  { id: 2, name: 'クリーニング(PMTC)' },
+  { id: 3, name: '虫歯治療' },
+  { id: 4, name: '抜歯' },
+  { id: 5, name: 'クラウン・補綴' },
+  { id: 6, name: 'ホワイトニング' },
+  { id: 7, name: 'インプラント相談' },
+  { id: 8, name: '歯周病治療' },
+]
+
+const DEFAULT_FOLLOWUP_MESSAGES = {
+  1: { same_day: { text: '本日は定期検診にお越しいただきありがとうございました。\n気になる点などがございましたら、お気軽にご連絡ください。', button: '次回の定期検診を予約する' }, day3: { text: '定期検診から3日が経ちました。\nその後、お口の状態はいかがでしょうか？\n次回の定期検診もお早めにご予約ください。', button: '次回予約はこちら' } },
+  2: { same_day: { text: '本日はクリーニングにお越しいただきありがとうございました。\nつるつるの歯をキープするために、定期的なクリーニングをおすすめします。', button: '次回のクリーニングを予約する' }, day3: { text: 'クリーニングから3日が経ちました。\nお口の中はいかがでしょうか？\n次回もお気軽にご予約ください。', button: '次回予約はこちら' } },
+  3: { same_day: { text: '本日は虫歯治療にお越しいただきありがとうございました。\n治療後、痛みや違和感がある場合はお早めにご連絡ください。', button: '続きの治療を予約する' }, day3: { text: '虫歯治療から3日が経ちました。\n痛みや違和感はございませんか？\n気になる症状がある場合はお早めにご相談ください。', button: '相談・予約はこちら' } },
+  4: { same_day: { text: '本日は抜歯にお越しいただきありがとうございました。\n\n【抜歯後の注意事項】\n・当日は激しい運動・飲酒はお控えください\n・強くうがいはしないでください\n・痛みが強い場合はご連絡ください', button: '経過確認の予約をする' }, day3: { text: '抜歯から3日が経ちました。\n傷口の回復はいかがでしょうか？\n\n痛み・腫れ・出血が続く場合は、お早めにご来院ください。', button: '経過確認の予約をする' } },
+  5: { same_day: { text: '本日はクラウン・補綴治療にお越しいただきありがとうございました。\n新しい被せ物に違和感がある場合はお気軽にご連絡ください。', button: '調整・確認の予約をする' }, day3: { text: 'クラウン・補綴治療から3日が経ちました。\n噛み合わせや違和感はいかがでしょうか？\n気になる点があればお早めにご相談ください。', button: '相談・予約はこちら' } },
+  6: { same_day: { text: '本日はホワイトニングにお越しいただきありがとうございました。\n\n【ホワイトニング後の注意事項】\n・24時間は着色しやすい食べ物・飲み物をお控えください\n・歯の白さをキープするため、定期的なケアをおすすめします', button: '次回のホワイトニングを予約する' }, day3: { text: 'ホワイトニングから3日が経ちました。\n歯の白さはいかがでしょうか？\n\n白さをキープするための定期ケアもご用意しています。', button: '次回予約はこちら' } },
+  7: { same_day: { text: '本日はインプラントのご相談にお越しいただきありがとうございました。\nご不明な点やご質問がございましたら、お気軽にご連絡ください。', button: '詳しい検査・治療の予約をする' }, day3: { text: 'インプラント相談から3日が経ちました。\nご検討はいかがでしょうか？\n\nいつでもお気軽にご相談ください。', button: '再相談・予約はこちら' } },
+  8: { same_day: { text: '本日は歯周病治療にお越しいただきありがとうございました。\n毎日の丁寧なブラッシングが回復の鍵です。\n気になる症状があればお気軽にご連絡ください。', button: '続きの治療を予約する' }, day3: { text: '歯周病治療から3日が経ちました。\n歯ぐきの状態はいかがでしょうか？\n\n継続的な治療が大切です。次回のご来院もお早めに。', button: '次回予約はこちら' } },
+}
+
+function FollowUpMessageSettings({ enabled, onToggle }) {
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('followup_messages')
+    if (saved) { try { return JSON.parse(saved) } catch {} }
+    return DEFAULT_FOLLOWUP_MESSAGES
+  })
+  const [selectedTreatment, setSelectedTreatment] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  // Supabaseからカスタムメッセージ読み込み
+  useEffect(() => {
+    async function loadMessages() {
+      try {
+        const res = await fetch(`${API}/api/followup-messages`, { headers: authHeader() })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.messages) {
+            const merged = { ...DEFAULT_FOLLOWUP_MESSAGES }
+            Object.entries(data.messages).forEach(([id, msg]) => {
+              merged[parseInt(id)] = msg
+            })
+            setMessages(merged)
+          }
+        }
+      } catch {}
+    }
+    loadMessages()
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await fetch(`${API}/api/followup-messages`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ messages }),
+      })
+      localStorage.setItem('followup_messages', JSON.stringify(messages))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {}
+    setSaving(false)
+  }
+
+  function updateMsg(treatmentId, timing, field, value) {
+    setMessages(prev => ({
+      ...prev,
+      [treatmentId]: {
+        ...prev[treatmentId],
+        [timing]: {
+          ...prev[treatmentId]?.[timing],
+          [field]: value,
+        }
+      }
+    }))
+  }
+
+  function resetToDefault(treatmentId) {
+    setMessages(prev => ({
+      ...prev,
+      [treatmentId]: JSON.parse(JSON.stringify(DEFAULT_FOLLOWUP_MESSAGES[treatmentId]))
+    }))
+  }
+
+  const current = messages[selectedTreatment] || DEFAULT_FOLLOWUP_MESSAGES[selectedTreatment]
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{'💌 治療後フォローメッセージ'}</h2>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{'治療当日18:00と3日後9:00に自動送信（Standard / Pro）'}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: expanded ? '#eff6ff' : '#f9fafb', color: expanded ? '#2563eb' : '#6b7280', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {expanded ? '▲ 閉じる' : '✏️ メッセージ編集'}
+          </button>
+          <div onClick={onToggle}
+            style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: enabled ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: enabled ? 23 : 3, transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af', marginBottom: expanded ? 16 : 0 }}>
+          {'📱 当日18:00：ありがとうメッセージ＋注意事項　／　3日後9:00：経過確認メッセージ　／　各メッセージに「次回予約する」ボタン付き'}
+        </div>
+
+        {expanded && (
+          <>
+            {/* 治療選択タブ */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+              {TREATMENTS.map(t => (
+                <button key={t.id} onClick={() => setSelectedTreatment(t.id)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, border: '1px solid',
+                    fontSize: 12, cursor: 'pointer', transition: 'all .15s',
+                    background: selectedTreatment === t.id ? '#2563eb' : '#f9fafb',
+                    color: selectedTreatment === t.id ? '#fff' : '#374151',
+                    borderColor: selectedTreatment === t.id ? '#2563eb' : '#e5e7eb',
+                    fontWeight: selectedTreatment === t.id ? 600 : 400,
+                  }}>
+                  {t.name}
+                </button>
+              ))}
+            </div>
+
+            {/* 選択中の治療のメッセージ編集 */}
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+              {/* 当日フォロー */}
+              <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>当日18:00</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>ありがとうメッセージ</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                  <textarea
+                    value={current?.same_day?.text || ''}
+                    onChange={e => updateMsg(selectedTreatment, 'same_day', 'text', e.target.value)}
+                    rows={4}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                  <input
+                    type="text"
+                    value={current?.same_day?.button || ''}
+                    onChange={e => updateMsg(selectedTreatment, 'same_day', 'button', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* 3日後フォロー */}
+              <div style={{ padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>3日後9:00</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>経過確認メッセージ</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                  <textarea
+                    value={current?.day3?.text || ''}
+                    onChange={e => updateMsg(selectedTreatment, 'day3', 'text', e.target.value)}
+                    rows={4}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                  <input
+                    type="text"
+                    value={current?.day3?.button || ''}
+                    onChange={e => updateMsg(selectedTreatment, 'day3', 'button', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 操作ボタン */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
+              <button onClick={handleSave} disabled={saving}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 メッセージを保存'}
+              </button>
+              <button onClick={() => resetToDefault(selectedTreatment)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
+                🔄 デフォルトに戻す
+              </button>
+              <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                {TREATMENTS.find(t => t.id === selectedTreatment)?.name} のメッセージを編集中
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // リマインダータブ
 // ─────────────────────────────────────────────
 function ReminderTab() {
@@ -691,27 +904,10 @@ function ReminderTab() {
           </div>
 
           {/* 治療後フォローメッセージ */}
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div>
-                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{'💌 治療後フォローメッセージ'}</h2>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{'治療当日18:00と3日後9:00に自動送信（Standard / Pro）'}</div>
-              </div>
-              <Toggle keyName="followup_message_enabled" />
-            </div>
-            <div style={{ opacity: settings.followup_message_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.followup_message_enabled === 'true' ? 'auto' : 'none' }}>
-              <div style={{ background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#065f46', marginBottom: 8 }}>
-                {'✅ 治療種別ごとにメッセージが自動選択されます。'}<br/>
-                {'　定期検診・クリーニング・虫歯治療・抜歯・クラウン補綴・ホワイトニング・インプラント・歯周病治療'}
-              </div>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af' }}>
-                {'📱 送信タイミング：'}<br/>
-                {'・当日フォロー：治療当日の18:00にありがとうメッセージ＋注意事項'}<br/>
-                {'・3日後フォロー：治療3日後の9:00に経過確認メッセージ'}<br/>
-                {'各メッセージには「次回予約する」ボタンが付きます'}
-              </div>
-            </div>
-          </div>
+          <FollowUpMessageSettings
+            enabled={settings.followup_message_enabled === 'true'}
+            onToggle={() => update('followup_message_enabled', settings.followup_message_enabled === 'true' ? 'false' : 'true')}
+          />
 
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 6px' }}>メッセージ文言</h2>
