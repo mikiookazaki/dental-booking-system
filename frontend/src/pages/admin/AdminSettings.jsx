@@ -496,6 +496,7 @@ function ReminderTab() {
     recall_message:          '前回の来院から{months}ヶ月が経過しました。\n定期検診はお済みでしょうか？\n\nお口の健康を守るために、定期的な検診をおすすめします。',
     birthday_message_enabled: 'true',
     birthday_message_text:    'お誕生日おめでとうございます！\nスマイル歯科スタッフ一同より、心よりお祝い申し上げます。\n\n素敵な一日をお過ごしください 🎂',
+    followup_message_enabled: 'true',
   })
   const [logs, setLogs]           = useState([])
   const [loading, setLoading]     = useState(true)
@@ -524,6 +525,7 @@ function ReminderTab() {
         ...(flat.recall_message              !== undefined && { recall_message:              flat.recall_message }),
         ...(flat.birthday_message_enabled    !== undefined && { birthday_message_enabled:    flat.birthday_message_enabled }),
         ...(flat.birthday_message_text       !== undefined && { birthday_message_text:       flat.birthday_message_text }),
+        ...(flat.followup_message_enabled    !== undefined && { followup_message_enabled:    flat.followup_message_enabled }),
       }))
     } catch {}
     setLoading(false)
@@ -590,6 +592,8 @@ function ReminderTab() {
     recall_3month:          '定期検診（3ヶ月）',
     recall_6month:          '定期検診（6ヶ月）',
     birthday:               '🎂 誕生日メッセージ',
+    followup_same_day:      '💌 フォロー（当日）',
+    followup_day3:          '💌 フォロー（3日後）',
   }
   const TYPE_COLORS = {
     appointment_day_before: { bg: '#dbeafe', text: '#1e40af' },
@@ -597,6 +601,8 @@ function ReminderTab() {
     recall_3month:          { bg: '#fef9c3', text: '#854d0e' },
     recall_6month:          { bg: '#ffedd5', text: '#9a3412' },
     birthday:               { bg: '#ffe4e6', text: '#be123c' },
+    followup_same_day:      { bg: '#dcfce7', text: '#166534' },
+    followup_day3:          { bg: '#dbeafe', text: '#1e40af' },
   }
 
   if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>

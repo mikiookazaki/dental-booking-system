@@ -230,10 +230,10 @@ const runMigrations = async () => {
 
 // ── Cron: 毎日 9:00 JST にリマインダー送信 ──────────────
 const cron = require('node-cron');
-const { runAppointmentReminders, runRecallReminders, runBirthdayReminders } = require('./routes/reminders');
+const { runAppointmentReminders, runRecallReminders, runBirthdayReminders, runFollowUpReminders } = require('./routes/reminders');
 
 cron.schedule('0 0 * * *', async () => { // UTC 0:00 = JST 9:00
-  console.log('⏰ [CRON] リマインダー送信開始...');
+  console.log('⏰ [CRON] 朝のリマインダー送信開始...');
   try {
     const [appt, recall, birthday] = await Promise.all([
       runAppointmentReminders(),
@@ -243,6 +243,26 @@ cron.schedule('0 0 * * *', async () => { // UTC 0:00 = JST 9:00
     console.log(`✅ [CRON] 予約:${appt.length}件 リコール:${recall.length}件 誕生日:${birthday.length}件`);
   } catch (err) {
     console.error('❌ [CRON] エラー:', err.message);
+  }
+});
+
+cron.schedule('0 9 * * *', async () => { // UTC 9:00 = JST 18:00
+  console.log('⏰ [CRON] 治療後フォロー送信開始（当日分）...');
+  try {
+    const followup = await runFollowUpReminders('same_day');
+    console.log(`✅ [CRON] 治療後フォロー（当日）:${followup.length}件`);
+  } catch (err) {
+    console.error('❌ [CRON] フォローアップエラー:', err.message);
+  }
+});
+
+cron.schedule('0 0 * * *', async () => { // UTC 0:00 = JST 9:00 (3日後フォロー)
+  console.log('⏰ [CRON] 治療後フォロー送信開始（3日後分）...');
+  try {
+    const followup = await runFollowUpReminders('day3');
+    console.log(`✅ [CRON] 治療後フォロー（3日後）:${followup.length}件`);
+  } catch (err) {
+    console.error('❌ [CRON] フォローアップエラー:', err.message);
   }
 });
 
