@@ -115,7 +115,7 @@ const FEATURE_GROUPS = [
 ]
 
 // ─────────────────────────────────────────────
-// キャンペーン配信タブ 
+// キャンペーン配信タブ
 // ─────────────────────────────────────────────
 function CampaignTab() {
   const AGE_GROUP_OPTIONS = ['10代','20代','30代','40代','50代','60代','70代','80代','90代以上']
@@ -686,6 +686,29 @@ function ReminderTab() {
                     <div style={{ fontSize: 10, color: '#e11d48', fontWeight: 700 }}>スマイル歯科</div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 治療後フォローメッセージ */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{'💌 治療後フォローメッセージ'}</h2>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{'治療当日18:00と3日後9:00に自動送信（Standard / Pro）'}</div>
+              </div>
+              <Toggle keyName="followup_message_enabled" />
+            </div>
+            <div style={{ opacity: settings.followup_message_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.followup_message_enabled === 'true' ? 'auto' : 'none' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#065f46', marginBottom: 8 }}>
+                {'✅ 治療種別ごとにメッセージが自動選択されます。'}<br/>
+                {'　定期検診・クリーニング・虫歯治療・抜歯・クラウン補綴・ホワイトニング・インプラント・歯周病治療'}
+              </div>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af' }}>
+                {'📱 送信タイミング：'}<br/>
+                {'・当日フォロー：治療当日の18:00にありがとうメッセージ＋注意事項'}<br/>
+                {'・3日後フォロー：治療3日後の9:00に経過確認メッセージ'}<br/>
+                {'各メッセージには「次回予約する」ボタンが付きます'}
               </div>
             </div>
           </div>
