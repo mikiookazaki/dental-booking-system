@@ -485,16 +485,31 @@ function CampaignTab() {
 // ─────────────────────────────────────────────
 // 治療後フォロー設定コンポーネント
 // ─────────────────────────────────────────────
-const TREATMENTS = [
-  { id: 1, name: '定期検診' },
-  { id: 2, name: 'クリーニング(PMTC)' },
-  { id: 3, name: '虫歯治療' },
-  { id: 4, name: '抜歯' },
-  { id: 5, name: 'クラウン・補綴' },
-  { id: 6, name: 'ホワイトニング' },
-  { id: 7, name: 'インプラント相談' },
-  { id: 8, name: '歯周病治療' },
-]
+// TREATMENTSは動的取得（useTreatmentsフックで管理）
+function useTreatments() {
+  const [treatments, setTreatments] = useState([
+    { id: 1, name: '定期検診' },
+    { id: 2, name: 'クリーニング(PMTC)' },
+    { id: 3, name: '虫歯治療' },
+    { id: 4, name: '抜歯' },
+    { id: 5, name: 'クラウン・補綴' },
+    { id: 6, name: 'ホワイトニング' },
+    { id: 7, name: 'インプラント相談' },
+    { id: 8, name: '歯周病治療' },
+  ])
+  useEffect(() => {
+    fetch(`${API}/api/treatments`, { headers: authHeader() })
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.treatments || []
+        if (list.length > 0) {
+          setTreatments(list.filter(t => t.is_active !== false).map(t => ({ id: t.id, name: t.name, duration: t.duration, color: t.color, line_visible: t.line_visible, display_order: t.display_order })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+  return treatments
+}
 
 const DEFAULT_FOLLOWUP_MESSAGES = {
   1: { same_day: { text: '本日は定期検診にお越しいただきありがとうございました。\n気になる点などがございましたら、お気軽にご連絡ください。', button: '次回の定期検診を予約する' }, day3: { text: '定期検診から3日が経ちました。\nその後、お口の状態はいかがでしょうか？\n次回の定期検診もお早めにご予約ください。', button: '次回予約はこちら' } },
@@ -508,6 +523,7 @@ const DEFAULT_FOLLOWUP_MESSAGES = {
 }
 
 function FollowUpMessageSettings({ enabled, onToggle }) {
+  const TREATMENTS = useTreatments()
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('followup_messages')
     if (saved) { try { return JSON.parse(saved) } catch {} }
@@ -1098,6 +1114,518 @@ function ReminderTab() {
 }
 
 // ─────────────────────────────────────────────
+// 治療管理タブ
+// ─────────────────────────────────────────────
+function TreatmentsTab() {
+  const [treatments, setTreatments] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [editingId, setEditingId]   = useState(null)
+  const [editForm, setEditForm]     = useState({})
+  const [showAdd, setShowAdd]       = useState(false)
+  const [addForm, setAddForm]       = useState({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+  const [msg, setMsg]               = useState('')
+  const [error, setError]           = useState('')
+
+  const COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#065f46','#9333ea','#0d9488']
+
+  useEffect(() => { fetchTreatments() }, [])
+
+  async function fetchTreatments() {
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API}/api/treatments`, { headers: authHeader() })
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data.treatments || []
+      setTreatments(list.sort((a, b) => (a.display_order || 0) - (b.display_order || 0)))
+    } catch { setError('取得に失敗しました') }
+    setLoading(false)
+  }
+
+  async function handleUpdate(id) {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments/${id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify(editForm),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('更新しました')
+      setEditingId(null)
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('更新に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleAdd() {
+    if (!addForm.name.trim()) { setError('治療名を入力してください'); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments`, {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ ...addForm, display_order: treatments.length + 1 }),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('追加しました')
+      setShowAdd(false)
+      setAddForm({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('追加に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleToggleActive(treatment) {
+    try {
+      await fetch(`${API}/api/treatments/${treatment.id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...treatment, is_active: !treatment.is_active }),
+      })
+      fetchTreatments()
+    } catch { setError('更新に失敗しました') }
+  }
+
+  async function handleMoveOrder(idx, dir) {
+    const newList = [...treatments]
+    const swapIdx = idx + dir
+    if (swapIdx < 0 || swapIdx >= newList.length) return
+    ;[newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]]
+    // display_orderを更新
+    for (let i = 0; i < newList.length; i++) {
+      await fetch(`${API}/api/treatments/${newList[i].id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...newList[i], display_order: i + 1 }),
+      }).catch(() => {})
+    }
+    fetchTreatments()
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditForm({ name: t.name, duration: t.duration, color: t.color || '#2563eb', line_visible: t.line_visible !== false })
+    setError('')
+  }
+
+  if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>🦷 治療管理</h1>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>治療メニューの追加・編集・並び替えができます</p>
+        </div>
+        <button onClick={() => { setShowAdd(true); setError('') }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          ＋ 治療を追加
+        </button>
+      </div>
+
+      {msg   && <div style={{ background: '#f0fdf4', color: '#059669', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, fontWeight: 600 }}>✅ {msg}</div>}
+      {error && <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13 }}>❌ {error}</div>}
+
+      {/* 追加フォーム */}
+      {showAdd && (
+        <div style={{ background: '#eff6ff', border: '2px solid #2563eb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: '0 0 16px' }}>新しい治療を追加</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名 *</label>
+              <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="例: 歯並び相談"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+              <input type="number" min="5" max="180" value={addForm.duration} onChange={e => setAddForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {COLORS.map(c => (
+                <div key={c} onClick={() => setAddForm(p => ({ ...p, color: c }))}
+                  style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: addForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+            <div onClick={() => setAddForm(p => ({ ...p, line_visible: !p.line_visible }))}
+              style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: addForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: addForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleAdd} disabled={saving}
+              style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? '追加中...' : '追加する'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setError('') }}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' }}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 治療一覧 */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        {treatments.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>治療が登録されていません</div>
+        )}
+        {treatments.map((t, idx) => (
+          <div key={t.id} style={{ borderBottom: idx < treatments.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+            {editingId === t.id ? (
+              // 編集モード
+              <div style={{ padding: 16, background: '#fafafa' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名</label>
+                    <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+                    <input type="number" min="5" max="180" value={editForm.duration} onChange={e => setEditForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {COLORS.map(c => (
+                      <div key={c} onClick={() => setEditForm(p => ({ ...p, color: c }))}
+                        style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: editForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+                  <div onClick={() => setEditForm(p => ({ ...p, line_visible: !p.line_visible }))}
+                    style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: editForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: editForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleUpdate(t.id)} disabled={saving}
+                    style={{ padding: '7px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    {saving ? '保存中...' : '保存'}
+                  </button>
+                  <button onClick={() => setEditingId(null)}
+                    style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // 表示モード
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: t.is_active === false ? 0.5 : 1 }}>
+                {/* 並び替えボタン */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button onClick={() => handleMoveOrder(idx, -1)} disabled={idx === 0}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▲
+                  </button>
+                  <button onClick={() => handleMoveOrder(idx, 1)} disabled={idx === treatments.length - 1}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === treatments.length - 1 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▼
+                  </button>
+                </div>
+                {/* カラーバッジ */}
+                <div style={{ width: 12, height: 36, borderRadius: 3, background: t.color || '#2563eb', flexShrink: 0 }} />
+                {/* 治療情報 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {t.duration}分
+                    {t.line_visible !== false && <span style={{ marginLeft: 8, background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>LINE表示</span>}
+                    {t.is_active === false && <span style={{ marginLeft: 8, background: '#f3f4f6', color: '#9ca3af', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>無効</span>}
+                  </div>
+                </div>
+                {/* 操作ボタン */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEdit(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, cursor: 'pointer' }}>
+                    編集
+                  </button>
+                  <button onClick={() => handleToggleActive(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: t.is_active === false ? '#f0fdf4' : '#fef2f2', color: t.is_active === false ? '#059669' : '#dc2626', borderColor: t.is_active === false ? '#a7f3d0' : '#fca5a5' }}>
+                    {t.is_active === false ? '有効化' : '無効化'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginTop: 16, fontSize: 12, color: '#92400e' }}>
+        💡 無効化した治療は予約カレンダーやLINE予約に表示されなくなります。削除ではないため、いつでも有効に戻せます。
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 治療管理タブ
+// ─────────────────────────────────────────────
+function TreatmentsTab() {
+  const [treatments, setTreatments] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [editingId, setEditingId]   = useState(null)
+  const [editForm, setEditForm]     = useState({})
+  const [showAdd, setShowAdd]       = useState(false)
+  const [addForm, setAddForm]       = useState({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+  const [msg, setMsg]               = useState('')
+  const [error, setError]           = useState('')
+
+  const COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#065f46','#9333ea','#0d9488']
+
+  useEffect(() => { fetchTreatments() }, [])
+
+  async function fetchTreatments() {
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API}/api/treatments`, { headers: authHeader() })
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data.treatments || []
+      setTreatments(list.sort((a, b) => (a.display_order || 0) - (b.display_order || 0)))
+    } catch { setError('取得に失敗しました') }
+    setLoading(false)
+  }
+
+  async function handleUpdate(id) {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments/${id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify(editForm),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('更新しました')
+      setEditingId(null)
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('更新に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleAdd() {
+    if (!addForm.name.trim()) { setError('治療名を入力してください'); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments`, {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ ...addForm, display_order: treatments.length + 1 }),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('追加しました')
+      setShowAdd(false)
+      setAddForm({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('追加に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleToggleActive(treatment) {
+    try {
+      await fetch(`${API}/api/treatments/${treatment.id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...treatment, is_active: !treatment.is_active }),
+      })
+      fetchTreatments()
+    } catch { setError('更新に失敗しました') }
+  }
+
+  async function handleMoveOrder(idx, dir) {
+    const newList = [...treatments]
+    const swapIdx = idx + dir
+    if (swapIdx < 0 || swapIdx >= newList.length) return
+    ;[newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]]
+    // display_orderを更新
+    for (let i = 0; i < newList.length; i++) {
+      await fetch(`${API}/api/treatments/${newList[i].id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...newList[i], display_order: i + 1 }),
+      }).catch(() => {})
+    }
+    fetchTreatments()
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditForm({ name: t.name, duration: t.duration, color: t.color || '#2563eb', line_visible: t.line_visible !== false })
+    setError('')
+  }
+
+  if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>🦷 治療管理</h1>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>治療メニューの追加・編集・並び替えができます</p>
+        </div>
+        <button onClick={() => { setShowAdd(true); setError('') }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          ＋ 治療を追加
+        </button>
+      </div>
+
+      {msg   && <div style={{ background: '#f0fdf4', color: '#059669', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, fontWeight: 600 }}>✅ {msg}</div>}
+      {error && <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13 }}>❌ {error}</div>}
+
+      {/* 追加フォーム */}
+      {showAdd && (
+        <div style={{ background: '#eff6ff', border: '2px solid #2563eb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: '0 0 16px' }}>新しい治療を追加</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名 *</label>
+              <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="例: 歯並び相談"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+              <input type="number" min="5" max="180" value={addForm.duration} onChange={e => setAddForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {COLORS.map(c => (
+                <div key={c} onClick={() => setAddForm(p => ({ ...p, color: c }))}
+                  style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: addForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+            <div onClick={() => setAddForm(p => ({ ...p, line_visible: !p.line_visible }))}
+              style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: addForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: addForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleAdd} disabled={saving}
+              style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? '追加中...' : '追加する'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setError('') }}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' }}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 治療一覧 */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        {treatments.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>治療が登録されていません</div>
+        )}
+        {treatments.map((t, idx) => (
+          <div key={t.id} style={{ borderBottom: idx < treatments.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+            {editingId === t.id ? (
+              // 編集モード
+              <div style={{ padding: 16, background: '#fafafa' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名</label>
+                    <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+                    <input type="number" min="5" max="180" value={editForm.duration} onChange={e => setEditForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {COLORS.map(c => (
+                      <div key={c} onClick={() => setEditForm(p => ({ ...p, color: c }))}
+                        style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: editForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+                  <div onClick={() => setEditForm(p => ({ ...p, line_visible: !p.line_visible }))}
+                    style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: editForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: editForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleUpdate(t.id)} disabled={saving}
+                    style={{ padding: '7px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    {saving ? '保存中...' : '保存'}
+                  </button>
+                  <button onClick={() => setEditingId(null)}
+                    style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // 表示モード
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: t.is_active === false ? 0.5 : 1 }}>
+                {/* 並び替えボタン */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button onClick={() => handleMoveOrder(idx, -1)} disabled={idx === 0}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▲
+                  </button>
+                  <button onClick={() => handleMoveOrder(idx, 1)} disabled={idx === treatments.length - 1}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === treatments.length - 1 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▼
+                  </button>
+                </div>
+                {/* カラーバッジ */}
+                <div style={{ width: 12, height: 36, borderRadius: 3, background: t.color || '#2563eb', flexShrink: 0 }} />
+                {/* 治療情報 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {t.duration}分
+                    {t.line_visible !== false && <span style={{ marginLeft: 8, background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>LINE表示</span>}
+                    {t.is_active === false && <span style={{ marginLeft: 8, background: '#f3f4f6', color: '#9ca3af', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>無効</span>}
+                  </div>
+                </div>
+                {/* 操作ボタン */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEdit(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, cursor: 'pointer' }}>
+                    編集
+                  </button>
+                  <button onClick={() => handleToggleActive(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: t.is_active === false ? '#f0fdf4' : '#fef2f2', color: t.is_active === false ? '#059669' : '#dc2626', borderColor: t.is_active === false ? '#a7f3d0' : '#fca5a5' }}>
+                    {t.is_active === false ? '有効化' : '無効化'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginTop: 16, fontSize: 12, color: '#92400e' }}>
+        💡 無効化した治療は予約カレンダーやLINE予約に表示されなくなります。削除ではないため、いつでも有効に戻せます。
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // ライセンスタブ
 // ─────────────────────────────────────────────
 function LicenseTab() {
@@ -1245,10 +1773,11 @@ function LicenseTab() {
 // メインコンポーネント
 // ─────────────────────────────────────────────
 const TABS = [
-  { id: 'general',  label: 'システム設定' },
-  { id: 'reminder', label: '🔔 リマインダー' },
-  { id: 'campaign', label: '📣 キャンペーン' },
-  { id: 'license',  label: '🔑 ライセンス' },
+  { id: 'general',    label: 'システム設定' },
+  { id: 'treatments', label: '🦷 治療管理' },
+  { id: 'reminder',   label: '🔔 リマインダー' },
+  { id: 'campaign',   label: '📣 キャンペーン' },
+  { id: 'license',    label: '🔑 ライセンス' },
 ]
 
 export default function AdminSettings() {
@@ -1321,6 +1850,1335 @@ export default function AdminSettings() {
         ))}
       </div>
 
+      {activeTab === 'treatments' && <TreatmentsTab />}
+      {activeTab === 'treatments' && <TreatmentsTab />}
+      {activeTab === 'reminder' && <ReminderTab />}
+      {activeTab === 'campaign' && <CampaignTab />}
+      {activeTab === 'license'  && <LicenseTab />}
+
+      {activeTab === 'general' && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', margin: 0 }}>システム設定</h1>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>患者操作の制限・診療時間・クリニック情報を管理します</p>
+            </div>
+            <button onClick={handleSave} disabled={saving}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <Save size={15} />{saved ? '保存しました ✓' : saving ? '保存中...' : '保存する'}
+            </button>
+          </div>
+
+          {error && <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>{error}</div>}
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>診療時間・休診日</h2>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>診療曜日・時間・昼休みを設定します</p>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 10 }}>診療曜日</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {DOW_LABELS.map((label, i) => {
+                  const active = openDays.includes(i)
+                  return (
+                    <button key={i} onClick={() => toggleDay(i)}
+                      style={{ width: 44, height: 44, borderRadius: 10, border: active ? 'none' : '1px solid #d1d5db', background: active ? (i===0 ? '#fee2e2' : i===6 ? '#dbeafe' : '#2563eb') : '#f9fafb', color: active ? (i===0 ? '#dc2626' : i===6 ? '#2563eb' : '#fff') : '#9ca3af', fontWeight: active ? 700 : 400, fontSize: 14, cursor: 'pointer', position: 'relative' }}>
+                      {label}
+                      {!active && <div style={{ position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)', fontSize: 8, color: '#dc2626', fontWeight: 700 }}>休</div>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>診療開始時刻</label>
+                <input type="time" value={settings.open_time || '09:00'} onChange={e => update('open_time', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>診療終了時刻</label>
+                <input type="time" value={settings.close_time || '18:30'} onChange={e => update('close_time', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>昼休みあり</label>
+                <div onClick={() => update('has_lunch_break', settings.has_lunch_break === 'false' ? 'true' : 'false')}
+                  style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: settings.has_lunch_break === 'false' ? '#d1d5db' : '#2563eb', position: 'relative' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: settings.has_lunch_break === 'false' ? 3 : 23, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                </div>
+              </div>
+              {settings.has_lunch_break !== 'false' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み開始</label>
+                    <input type="time" value={settings.lunch_start || '13:00'} onChange={e => update('lunch_start', e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 6 }}>昼休み終了</label>
+                    <input type="time" value={settings.lunch_end || '14:00'} onChange={e => update('lunch_end', e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 14px' }}>
+              <span style={{ fontSize: 12, color: '#6b7280' }}>診療日：</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>
+                {openDays.length === 0 ? '未設定' : DOW_LABELS.filter((_, i) => openDays.includes(i)).join('・') + '曜日'}
+              </span>
+              <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 16 }}>{settings.open_time || '09:00'}〜{settings.close_time || '18:30'}</span>
+            </div>
+          </div>
+
+          {/* 曜日別カスタム診療時間 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>曜日別カスタム診療時間</h2>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>通常の診療時間と異なる曜日がある場合に設定します。</p>
+            </div>
+            {['月','火','水','木','金','土','日'].map((day, idx) => {
+              const dow = [1,2,3,4,5,6,0][idx]
+              const key = `custom_hours_${dow}`
+              const isOpen = openDays.includes(dow)
+              return (
+                <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: '10px 12px', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, background: isOpen ? (dow === 0 ? '#fee2e2' : '#dbeafe') : '#f3f4f6', color: isOpen ? (dow === 0 ? '#dc2626' : '#2563eb') : '#9ca3af' }}>
+                    {day}
+                  </div>
+                  <span style={{ fontSize: 13, color: '#6b7280', width: 80 }}>{isOpen ? '通常診療' : '休診日'}</span>
+                  <label style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!settings[key]}
+                      onChange={e => {
+                        if (e.target.checked) { update(key, JSON.stringify({ open: settings.open_time || '09:00', close: settings.close_time || '18:30' })) }
+                        else { update(key, '') }
+                      }} />
+                    カスタム時間を設定
+                  </label>
+                  {settings[key] && (() => {
+                    let parsed = { open: '09:00', close: '18:30' }
+                    try { parsed = JSON.parse(settings[key]) } catch {}
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="time" value={parsed.open} onChange={e => update(key, JSON.stringify({ ...parsed, open: e.target.value }))}
+                          style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }} />
+                        <span style={{ color: '#9ca3af' }}>〜</span>
+                        <input type="time" value={parsed.close} onChange={e => update(key, JSON.stringify({ ...parsed, close: e.target.value }))}
+                          style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }} />
+                        <span style={{ fontSize: 11, color: '#059669' }}>({day}曜のみ適用)</span>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })}
+            <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 4, fontSize: 12, color: '#92400e' }}>
+              💡 設定した曜日はLINE予約・カレンダーの空き枠計算に反映されます
+            </div>
+          </div>
+
+          {/* カレンダー表示時間 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>カレンダー表示時間</h2>
+              <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>診療時間外でもスタッフが予約を入れられるよう、カレンダーの表示範囲を設定します。</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                  表示開始時刻<span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 6 }}>（診療開始より前）</span>
+                </label>
+                <input type="time" value={settings.calendar_display_start || '07:00'} onChange={e => update('calendar_display_start', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                  表示終了時刻<span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280', marginLeft: 6 }}>（診療終了より後）</span>
+                </label>
+                <input type="time" value={settings.calendar_display_end || '21:00'} onChange={e => update('calendar_display_end', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+          </div>
+
+          {SETTING_GROUPS.map(group => (
+            <div key={group.title} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+              <div style={{ marginBottom: 16 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{group.title}</h2>
+                {group.desc && <p style={{ fontSize: 12, color: '#6b7280', margin: '3px 0 0' }}>{group.desc}</p>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {group.keys.map(({ key, label, type }) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                    <label style={{ fontSize: 14, color: '#374151', flex: 1 }}>{label}</label>
+                    {type === 'bool' ? (
+                      <div onClick={() => update(key, settings[key] === 'true' ? 'false' : 'true')}
+                        style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: settings[key] === 'true' ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: settings[key] === 'true' ? 23 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                      </div>
+                    ) : type === 'number' ? (
+                      <input type="number" value={settings[key] || ''} onChange={e => update(key, e.target.value)}
+                        style={{ width: 80, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14, textAlign: 'right' }} />
+                    ) : (
+                      <input type="text" value={settings[key] || ''} onChange={e => update(key, e.target.value)}
+                        style={{ width: 260, padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14 }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* マニュアル表示設定 */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <span style={{ fontSize: 20 }}>📖</span>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>ヘルプマニュアルの表示方法</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>サイドバーの「マニュアル」ボタンを押した時の動作</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {MANUAL_MODES.map(mode => {
+                const current = localStorage.getItem('manual_display_mode') || 'tab'
+                const isSelected = current === mode.value
+                return (
+                  <div key={mode.value}
+                    onClick={() => { localStorage.setItem('manual_display_mode', mode.value); update('_manual_mode_ui', mode.value) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`, background: isSelected ? '#eff6ff' : '#f9fafb', transition: 'all 0.15s' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, border: `2px solid ${isSelected ? '#2563eb' : '#d1d5db'}`, background: isSelected ? '#2563eb' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isSelected && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: isSelected ? '#1e40af' : '#374151' }}>{mode.label}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>{mode.desc}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #a7f3d0' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>📖 マニュアルを今すぐ確認</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { label: '👑 管理者マニュアル', url: '/manual.html' },
+                  { label: '👩‍⚕️ スタッフマニュアル', url: '/manual.html' },
+                  { label: '📱 LINE予約ガイド', url: '/manual.html' },
+                ].map(m => (
+                  <button key={m.url} onClick={() => window.open(m.url, '_blank')}
+                    style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #059669', background: '#fff', color: '#059669', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+
+const DEFAULT_TIMING = { same_day_time: '18:00', follow_days: 3, follow_time: '09:00' }
+
+const DEFAULT_FOLLOWUP_MESSAGES = {
+  1: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日は定期検診にお越しいただきありがとうございました。\n気になる点などがございましたら、お気軽にご連絡ください。', button: '次回の定期検診を予約する' }, day3: { text: '定期検診から3日が経ちました。\nその後、お口の状態はいかがでしょうか？\n次回の定期検診もお早めにご予約ください。', button: '次回予約はこちら' } },
+  2: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日はクリーニングにお越しいただきありがとうございました。\nつるつるの歯をキープするために、定期的なクリーニングをおすすめします。', button: '次回のクリーニングを予約する' }, day3: { text: 'クリーニングから3日が経ちました。\nお口の中はいかがでしょうか？\n次回もお気軽にご予約ください。', button: '次回予約はこちら' } },
+  3: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日は虫歯治療にお越しいただきありがとうございました。\n治療後、痛みや違和感がある場合はお早めにご連絡ください。', button: '続きの治療を予約する' }, day3: { text: '虫歯治療から3日が経ちました。\n痛みや違和感はございませんか？\n気になる症状がある場合はお早めにご相談ください。', button: '相談・予約はこちら' } },
+  4: { timing: { same_day_time: '18:00', follow_days: 3, follow_time: '09:00' }, same_day: { text: '本日は抜歯にお越しいただきありがとうございました。\n\n【抜歯後の注意事項】\n・当日は激しい運動・飲酒はお控えください\n・強くうがいはしないでください\n・痛みが強い場合はご連絡ください', button: '経過確認の予約をする' }, day3: { text: '抜歯から3日が経ちました。\n傷口の回復はいかがでしょうか？\n\n痛み・腫れ・出血が続く場合は、お早めにご来院ください。', button: '経過確認の予約をする' } },
+  5: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日はクラウン・補綴治療にお越しいただきありがとうございました。\n新しい被せ物に違和感がある場合はお気軽にご連絡ください。', button: '調整・確認の予約をする' }, day3: { text: 'クラウン・補綴治療から3日が経ちました。\n噛み合わせや違和感はいかがでしょうか？\n気になる点があればお早めにご相談ください。', button: '相談・予約はこちら' } },
+  6: { timing: { same_day_time: '18:00', follow_days: 3, follow_time: '09:00' }, same_day: { text: '本日はホワイトニングにお越しいただきありがとうございました。\n\n【ホワイトニング後の注意事項】\n・24時間は着色しやすい食べ物・飲み物をお控えください\n・歯の白さをキープするため、定期的なケアをおすすめします', button: '次回のホワイトニングを予約する' }, day3: { text: 'ホワイトニングから3日が経ちました。\n歯の白さはいかがでしょうか？\n\n白さをキープするための定期ケアもご用意しています。', button: '次回予約はこちら' } },
+  7: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日はインプラントのご相談にお越しいただきありがとうございました。\nご不明な点やご質問がございましたら、お気軽にご連絡ください。', button: '詳しい検査・治療の予約をする' }, day3: { text: 'インプラント相談から3日が経ちました。\nご検討はいかがでしょうか？\n\nいつでもお気軽にご相談ください。', button: '再相談・予約はこちら' } },
+  8: { timing: { ...DEFAULT_TIMING }, same_day: { text: '本日は歯周病治療にお越しいただきありがとうございました。\n毎日の丁寧なブラッシングが回復の鍵です。\n気になる症状があればお気軽にご連絡ください。', button: '続きの治療を予約する' }, day3: { text: '歯周病治療から3日が経ちました。\n歯ぐきの状態はいかがでしょうか？\n\n継続的な治療が大切です。次回のご来院もお早めに。', button: '次回予約はこちら' } },
+}
+
+function FollowUpMessageSettings({ enabled, onToggle }) {
+  const TREATMENTS = useTreatments()
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('followup_messages')
+    if (saved) { try { return JSON.parse(saved) } catch {} }
+    return DEFAULT_FOLLOWUP_MESSAGES
+  })
+  const [selectedTreatment, setSelectedTreatment] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    async function loadMessages() {
+      try {
+        const res = await fetch(`${API}/api/followup-messages`, { headers: authHeader() })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.messages && Object.keys(data.messages).length > 0) {
+            const merged = {}
+            TREATMENTS.forEach(t => {
+              merged[t.id] = {
+                timing: { ...DEFAULT_TIMING },
+                same_day: { ...DEFAULT_FOLLOWUP_MESSAGES[t.id].same_day },
+                day3:     { ...DEFAULT_FOLLOWUP_MESSAGES[t.id].day3 },
+              }
+              if (data.messages[t.id]) {
+                merged[t.id] = { ...merged[t.id], ...data.messages[t.id] }
+              }
+            })
+            setMessages(merged)
+          }
+        }
+      } catch {}
+    }
+    loadMessages()
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await fetch(`${API}/api/followup-messages`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ messages }),
+      })
+      localStorage.setItem('followup_messages', JSON.stringify(messages))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {}
+    setSaving(false)
+  }
+
+  function updateMsg(treatmentId, timingKey, field, value) {
+    setMessages(prev => ({
+      ...prev,
+      [treatmentId]: {
+        ...prev[treatmentId],
+        [timingKey]: { ...prev[treatmentId]?.[timingKey], [field]: value }
+      }
+    }))
+  }
+
+  function updateTreatmentTiming(treatmentId, field, value) {
+    setMessages(prev => ({
+      ...prev,
+      [treatmentId]: {
+        ...prev[treatmentId],
+        timing: { ...(prev[treatmentId]?.timing || DEFAULT_TIMING), [field]: value }
+      }
+    }))
+  }
+
+  function toggleMsgEnabled(treatmentId, timingKey) {
+    setMessages(prev => {
+      const cur = prev[treatmentId]?.[timingKey] || {}
+      return {
+        ...prev,
+        [treatmentId]: {
+          ...prev[treatmentId],
+          [timingKey]: { ...cur, enabled: cur.enabled === false ? true : false }
+        }
+      }
+    })
+  }
+
+  function resetToDefault(treatmentId) {
+    setMessages(prev => ({
+      ...prev,
+      [treatmentId]: JSON.parse(JSON.stringify(DEFAULT_FOLLOWUP_MESSAGES[treatmentId]))
+    }))
+  }
+
+  function applyTimingToAll() {
+    const srcTiming = messages[selectedTreatment]?.timing || DEFAULT_TIMING
+    setMessages(prev => {
+      const next = { ...prev }
+      TREATMENTS.forEach(t => {
+        next[t.id] = { ...next[t.id], timing: { ...srcTiming } }
+      })
+      return next
+    })
+  }
+
+  const current     = messages[selectedTreatment] || DEFAULT_FOLLOWUP_MESSAGES[selectedTreatment]
+  const curTiming   = current?.timing || DEFAULT_TIMING
+  const sameDayOn   = current?.same_day?.enabled !== false
+  const followOn    = current?.day3?.enabled !== false
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{'💌 治療後フォローメッセージ'}</h2>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{'治療ごとに送信タイミング・メッセージを個別設定（Standard / Pro）'}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => setExpanded(e => !e)}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: expanded ? '#eff6ff' : '#f9fafb', color: expanded ? '#2563eb' : '#6b7280', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {expanded ? '▲ 閉じる' : '✏️ 編集'}
+          </button>
+          <div onClick={onToggle}
+            style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: enabled ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: enabled ? 23 : 3, transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
+        {!expanded && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af' }}>
+            {'📱 各治療ごとに送信時刻・日数・メッセージを個別設定できます。「✏️ 編集」から設定してください。'}
+          </div>
+        )}
+
+        {expanded && (
+          <>
+            {/* 治療選択タブ */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 10 }}>治療を選択して設定</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+              {TREATMENTS.map(t => {
+                const msg   = messages[t.id]
+                const sdOn  = msg?.same_day?.enabled !== false
+                const flOn  = msg?.day3?.enabled !== false
+                const badge = !sdOn && !flOn ? '✕' : !sdOn ? '当日OFF' : !flOn ? 'フォローOFF' : null
+                return (
+                  <button key={t.id} onClick={() => setSelectedTreatment(t.id)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 8, border: '1px solid',
+                      fontSize: 12, cursor: 'pointer', transition: 'all .15s', position: 'relative',
+                      background: selectedTreatment === t.id ? '#2563eb' : '#f9fafb',
+                      color: selectedTreatment === t.id ? '#fff' : '#374151',
+                      borderColor: selectedTreatment === t.id ? '#2563eb' : '#e5e7eb',
+                      fontWeight: selectedTreatment === t.id ? 600 : 400,
+                    }}>
+                    {t.name}
+                    {badge && (
+                      <span style={{ position: 'absolute', top: -6, right: -6, background: '#f59e0b', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ border: '2px solid #2563eb', borderRadius: 12, overflow: 'hidden' }}>
+              {/* ヘッダー */}
+              <div style={{ background: '#eff6ff', padding: '10px 16px', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>
+                  {TREATMENTS.find(t => t.id === selectedTreatment)?.name} の設定
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { if (window.confirm('この治療のタイミング設定を他の全治療にも適用しますか？')) applyTimingToAll() }}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #bfdbfe', background: '#fff', color: '#2563eb', fontSize: 11, cursor: 'pointer' }}>
+                    📋 タイミングを全治療に適用
+                  </button>
+                  <button onClick={() => resetToDefault(selectedTreatment)}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 11, cursor: 'pointer' }}>
+                    🔄 デフォルトに戻す
+                  </button>
+                </div>
+              </div>
+
+              {/* ── 送信タイミング設定（この治療専用） ── */}
+              <div style={{ padding: 16, background: '#fafafa', borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 12 }}>⏰ 送信タイミング</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                      <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: 20, marginRight: 5, fontSize: 10 }}>当日</span>
+                      送信時刻
+                    </label>
+                    <input type="time" value={curTiming.same_day_time || '18:00'}
+                      onChange={e => updateTreatmentTiming(selectedTreatment, 'same_day_time', e.target.value)}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                      <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 7px', borderRadius: 20, marginRight: 5, fontSize: 10 }}>フォロー</span>
+                      送信日数
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <input type="number" min="1" max="30" value={curTiming.follow_days || 3}
+                        onChange={e => updateTreatmentTiming(selectedTreatment, 'follow_days', parseInt(e.target.value) || 3)}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                      <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>日後</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                      <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 7px', borderRadius: 20, marginRight: 5, fontSize: 10 }}>フォロー</span>
+                      送信時刻
+                    </label>
+                    <input type="time" value={curTiming.follow_time || '09:00'}
+                      onChange={e => updateTreatmentTiming(selectedTreatment, 'follow_time', e.target.value)}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 当日フォロー ── */}
+              <div style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ padding: '10px 16px', background: sameDayOn ? '#f0fdf4' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>
+                      {`当日 ${curTiming.same_day_time || '18:00'}`}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>ありがとうメッセージ</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: sameDayOn ? '#059669' : '#9ca3af' }}>{sameDayOn ? '送信する' : '送信しない'}</span>
+                    <div onClick={() => toggleMsgEnabled(selectedTreatment, 'same_day')}
+                      style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: sameDayOn ? '#059669' : '#d1d5db', position: 'relative' }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: sameDayOn ? 19 : 3, transition: 'left .15s' }} />
+                    </div>
+                  </div>
+                </div>
+                {sameDayOn ? (
+                  <div style={{ padding: 16 }}>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                      <textarea value={current?.same_day?.text || ''} onChange={e => updateMsg(selectedTreatment, 'same_day', 'text', e.target.value)} rows={4}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                      <input type="text" value={current?.same_day?.button || ''} onChange={e => updateMsg(selectedTreatment, 'same_day', 'button', e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 16px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>この治療の当日フォローはOFFです</div>
+                )}
+              </div>
+
+              {/* ── フォローアップ ── */}
+              <div>
+                <div style={{ padding: '10px 16px', background: followOn ? '#eff6ff' : '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#dbeafe', color: '#1e40af', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>
+                      {`${curTiming.follow_days || 3}日後 ${curTiming.follow_time || '09:00'}`}
+                    </span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>経過確認メッセージ</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: followOn ? '#2563eb' : '#9ca3af' }}>{followOn ? '送信する' : '送信しない'}</span>
+                    <div onClick={() => toggleMsgEnabled(selectedTreatment, 'day3')}
+                      style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: followOn ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: followOn ? 19 : 3, transition: 'left .15s' }} />
+                    </div>
+                  </div>
+                </div>
+                {followOn ? (
+                  <div style={{ padding: 16 }}>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                      <textarea value={current?.day3?.text || ''} onChange={e => updateMsg(selectedTreatment, 'day3', 'text', e.target.value)} rows={4}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                      <input type="text" value={current?.day3?.button || ''} onChange={e => updateMsg(selectedTreatment, 'day3', 'button', e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 16px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>この治療のフォローアップはOFFです</div>
+                )}
+              </div>
+            </div>
+
+            {/* 保存ボタン */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
+              <button onClick={handleSave} disabled={saving}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 保存する'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// リマインダータブ
+// ─────────────────────────────────────────────
+function ReminderTab() {
+  const [settings, setSettings] = useState({
+    reminder_enabled:        'true',
+    reminder_same_day:       'true',
+    reminder_send_time:      '09:00',
+    reminder_message_before: '明日のご予約リマインダーです。\n\n時間: {time}\n内容: {treatment}\n\nご不明な点はお気軽にご連絡ください。',
+    reminder_message_same:   '本日のご予約リマインダーです。\n\n時間: {time}\n内容: {treatment}\n\nご来院をお待ちしております。',
+    recall_enabled:          'true',
+    recall_message:          '前回の来院から{months}ヶ月が経過しました。\n定期検診はお済みでしょうか？\n\nお口の健康を守るために、定期的な検診をおすすめします。',
+    birthday_message_enabled: 'true',
+    birthday_message_text:    'お誕生日おめでとうございます！\nスマイル歯科スタッフ一同より、心よりお祝い申し上げます。\n\n素敵な一日をお過ごしください 🎂',
+    followup_message_enabled: 'true',
+  })
+  const [logs, setLogs]           = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
+  const [running, setRunning]     = useState(false)
+  const [runResult, setRunResult] = useState(null)
+  const [activeSection, setActiveSection] = useState('settings')
+
+  useEffect(() => { fetchSettings(); fetchLogs() }, [])
+
+  async function fetchSettings() {
+    try {
+      const res  = await fetch(`${API}/api/admin/settings`, { headers: authHeader() })
+      const data = await res.json()
+      const flat = {}
+      Object.entries(data.settings).forEach(([k, v]) => { flat[k] = v.value })
+      setSettings(prev => ({
+        ...prev,
+        ...(flat.reminder_enabled        !== undefined && { reminder_enabled:        flat.reminder_enabled }),
+        ...(flat.reminder_same_day       !== undefined && { reminder_same_day:       flat.reminder_same_day }),
+        ...(flat.reminder_send_time      !== undefined && { reminder_send_time:      flat.reminder_send_time }),
+        ...(flat.reminder_message_before !== undefined && { reminder_message_before: flat.reminder_message_before }),
+        ...(flat.reminder_message_same   !== undefined && { reminder_message_same:   flat.reminder_message_same }),
+        ...(flat.recall_enabled              !== undefined && { recall_enabled:              flat.recall_enabled }),
+        ...(flat.recall_message              !== undefined && { recall_message:              flat.recall_message }),
+        ...(flat.birthday_message_enabled    !== undefined && { birthday_message_enabled:    flat.birthday_message_enabled }),
+        ...(flat.birthday_message_text       !== undefined && { birthday_message_text:       flat.birthday_message_text }),
+        ...(flat.followup_message_enabled    !== undefined && { followup_message_enabled:    flat.followup_message_enabled }),
+      }))
+    } catch {}
+    setLoading(false)
+  }
+
+  async function fetchLogs() {
+    try {
+      const res  = await fetch(`${API}/api/reminders/logs?limit=30`, { headers: authHeader() })
+      const data = await res.json()
+      setLogs(Array.isArray(data) ? data : [])
+    } catch {}
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await fetch(`${API}/api/admin/settings`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ updates: settings }),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {}
+    setSaving(false)
+  }
+
+  async function handleRunNow() {
+    setRunning(true)
+    setRunResult(null)
+    try {
+      const isTestMode = localStorage.getItem('test_mode') === 'true'
+      const role       = localStorage.getItem('admin_role') || ''
+      const endpoint   = (isTestMode && role === 'superadmin')
+        ? `${API}/api/reminders/run-test`
+        : `${API}/api/reminders/run`
+      const res  = await fetch(endpoint, {
+        method: 'POST',
+        headers: { ...authHeader(), 'x-cron-secret': 'smile-dental-cron-2026' },
+      })
+      const data = await res.json()
+      setRunResult(data)
+      fetchLogs()
+    } catch (e) {
+      setRunResult({ error: e.message })
+    }
+    setRunning(false)
+  }
+
+  function update(key, val) { setSettings(prev => ({ ...prev, [key]: val })) }
+
+  function Toggle({ keyName }) {
+    const on = settings[keyName] === 'true'
+    return (
+      <div onClick={() => update(keyName, on ? 'false' : 'true')}
+        style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: on ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: on ? 23 : 3, transition: 'left .15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+      </div>
+    )
+  }
+
+  const TYPE_LABELS = {
+    appointment_day_before: '前日リマインダー',
+    appointment_same_day:   '当日リマインダー',
+    recall_3month:          '定期検診（3ヶ月）',
+    recall_6month:          '定期検診（6ヶ月）',
+    birthday:               '🎂 誕生日メッセージ',
+    followup_same_day:      '💌 フォロー（当日）',
+    followup_day3:          '💌 フォロー（3日後）',
+  }
+  const TYPE_COLORS = {
+    appointment_day_before: { bg: '#dbeafe', text: '#1e40af' },
+    appointment_same_day:   { bg: '#dcfce7', text: '#166534' },
+    recall_3month:          { bg: '#fef9c3', text: '#854d0e' },
+    recall_6month:          { bg: '#ffedd5', text: '#9a3412' },
+    birthday:               { bg: '#ffe4e6', text: '#be123c' },
+    followup_same_day:      { bg: '#dcfce7', text: '#166534' },
+    followup_day3:          { bg: '#dbeafe', text: '#1e40af' },
+  }
+
+  if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        {[['settings', '⚙️ 設定'], ['logs', '📋 送信履歴']].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveSection(id)}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: activeSection === id ? '#2563eb' : '#f3f4f6', color: activeSection === id ? '#fff' : '#6b7280', fontSize: 13, fontWeight: 600 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeSection === 'settings' && (
+        <>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 20px' }}>基本設定</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>予約リマインダー</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>前日・当日に予約のリマインドをLINE送信します</div>
+              </div>
+              <Toggle keyName="reminder_enabled" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, opacity: settings.reminder_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>当日リマインダー</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Standard / Pro プランのみ有効</div>
+              </div>
+              <Toggle keyName="reminder_same_day" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: settings.reminder_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.reminder_enabled === 'true' ? 'auto' : 'none' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>送信時刻</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>毎日この時刻に自動送信されます</div>
+              </div>
+              <input type="time" value={settings.reminder_send_time || '09:00'} onChange={e => update('reminder_send_time', e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 15 }} />
+            </div>
+            <div style={{ background: '#fff7ed', borderRadius: 8, padding: '10px 14px', marginTop: 16, fontSize: 12, color: '#92400e' }}>
+              💡 送信時刻を変更した場合は開発者に連絡してください（サーバー側の cron 設定も変更が必要です）
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>定期検診リマインド</h2>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>最終来院から3・6ヶ月後に自動送信（Standard / Pro）</div>
+              </div>
+              <Toggle keyName="recall_enabled" />
+            </div>
+          </div>
+
+          {/* 誕生日メッセージ */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>🎂 誕生日メッセージ</h2>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>誕生日当日の患者に自動でLINEメッセージを送信（Standard / Pro）</div>
+              </div>
+              <Toggle keyName="birthday_message_enabled" />
+            </div>
+            <div style={{ opacity: settings.birthday_message_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.birthday_message_enabled === 'true' ? 'auto' : 'none' }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>メッセージ文言</label>
+              <textarea value={settings.birthday_message_text || ''} onChange={e => update('birthday_message_text', e.target.value)} rows={4}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: '10px 14px', marginTop: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#be123c', marginBottom: 6 }}>📱 LINEプレビュー</div>
+                <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #fecdd3', maxWidth: 260 }}>
+                  <div style={{ background: '#e11d48', padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>🎂 Happy Birthday!</div>
+                  </div>
+                  <div style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>〇〇 様</div>
+                    <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{settings.birthday_message_text}</div>
+                  </div>
+                  <div style={{ padding: '8px', background: '#fff1f2', borderTop: '1px solid #fecdd3', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#e11d48', fontWeight: 700 }}>スマイル歯科</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 治療後フォローメッセージ */}
+          <FollowUpMessageSettings
+            enabled={settings.followup_message_enabled === 'true'}
+            onToggle={() => update('followup_message_enabled', settings.followup_message_enabled === 'true' ? 'false' : 'true')}
+          />
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 6px' }}>メッセージ文言</h2>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 20 }}>
+              使えるタグ：
+              <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{'{time}'}</code> 時間　
+              <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{'{treatment}'}</code> 治療内容　
+              <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4 }}>{'{months}'}</code> ヶ月数
+            </div>
+            {[
+              { key: 'reminder_message_before', label: '前日リマインダー' },
+              { key: 'reminder_message_same',   label: '当日リマインダー' },
+              { key: 'recall_message',           label: '定期検診リマインド' },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>{label}</label>
+                <textarea value={settings[key] || ''} onChange={e => update(key, e.target.value)} rows={4}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 設定を保存'}
+            </button>
+            <button onClick={handleRunNow} disabled={running}
+              style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              {running ? '送信中...' : '▶ 今すぐ送信テスト'}
+            </button>
+          </div>
+
+          {runResult && (
+            <div style={{ background: runResult.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${runResult.error ? '#fca5a5' : '#a7f3d0'}`, borderRadius: 10, padding: '14px 18px', fontSize: 13 }}>
+              {runResult.error
+                ? <span style={{ color: '#dc2626' }}>❌ エラー: {runResult.error}</span>
+                : <div style={{ color: '#166534' }}>
+                    ✅ 実行完了 — 予約リマインダー: <strong>{runResult.summary?.appt_sent}件</strong>送信 /
+                    定期検診: <strong>{runResult.summary?.recall_sent}件</strong>送信
+                    {runResult.summary?.appt_failed > 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>（失敗: {runResult.summary.appt_failed}件）</span>}
+                  </div>
+              }
+            </div>
+          )}
+        </>
+      )}
+
+      {activeSection === 'logs' && (
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>送信履歴（直近30件）</h2>
+            <button onClick={fetchLogs} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f9fafb', fontSize: 12, cursor: 'pointer', color: '#374151' }}>🔄 更新</button>
+          </div>
+          {logs.length === 0
+            ? <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 13 }}>まだ送信履歴がありません</div>
+            : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {logs.map(log => {
+                  const typeColor = TYPE_COLORS[log.reminder_type] || { bg: '#f3f4f6', text: '#6b7280' }
+                  return (
+                    <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8, background: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                      <div style={{ fontSize: 16, flexShrink: 0 }}>{log.status === 'sent' ? '✅' : log.status === 'failed' ? '❌' : '⏭️'}</div>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text, whiteSpace: 'nowrap' }}>
+                        {TYPE_LABELS[log.reminder_type] || log.reminder_type}
+                      </span>
+                      <span style={{ fontSize: 13, color: '#374151', flex: 1 }}>{log.patients?.name || `患者ID: ${log.patient_id}`}</span>
+                      <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                        {new Date(log.sent_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {log.error_message && <span style={{ fontSize: 11, color: '#dc2626', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error_message}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 治療管理タブ
+// ─────────────────────────────────────────────
+function TreatmentsTab() {
+  const [treatments, setTreatments] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
+  const [editingId, setEditingId]   = useState(null)
+  const [editForm, setEditForm]     = useState({})
+  const [showAdd, setShowAdd]       = useState(false)
+  const [addForm, setAddForm]       = useState({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+  const [msg, setMsg]               = useState('')
+  const [error, setError]           = useState('')
+
+  const COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#065f46','#9333ea','#0d9488']
+
+  useEffect(() => { fetchTreatments() }, [])
+
+  async function fetchTreatments() {
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API}/api/treatments`, { headers: authHeader() })
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data.treatments || []
+      setTreatments(list.sort((a, b) => (a.display_order || 0) - (b.display_order || 0)))
+    } catch { setError('取得に失敗しました') }
+    setLoading(false)
+  }
+
+  async function handleUpdate(id) {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments/${id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify(editForm),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('更新しました')
+      setEditingId(null)
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('更新に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleAdd() {
+    if (!addForm.name.trim()) { setError('治療名を入力してください'); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/treatments`, {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ ...addForm, display_order: treatments.length + 1 }),
+      })
+      if (!res.ok) throw new Error()
+      setMsg('追加しました')
+      setShowAdd(false)
+      setAddForm({ name: '', duration: 30, color: '#2563eb', line_visible: true })
+      fetchTreatments()
+      setTimeout(() => setMsg(''), 2000)
+    } catch { setError('追加に失敗しました') }
+    setSaving(false)
+  }
+
+  async function handleToggleActive(treatment) {
+    try {
+      await fetch(`${API}/api/treatments/${treatment.id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...treatment, is_active: !treatment.is_active }),
+      })
+      fetchTreatments()
+    } catch { setError('更新に失敗しました') }
+  }
+
+  async function handleMoveOrder(idx, dir) {
+    const newList = [...treatments]
+    const swapIdx = idx + dir
+    if (swapIdx < 0 || swapIdx >= newList.length) return
+    ;[newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]]
+    // display_orderを更新
+    for (let i = 0; i < newList.length; i++) {
+      await fetch(`${API}/api/treatments/${newList[i].id}`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ ...newList[i], display_order: i + 1 }),
+      }).catch(() => {})
+    }
+    fetchTreatments()
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditForm({ name: t.name, duration: t.duration, color: t.color || '#2563eb', line_visible: t.line_visible !== false })
+    setError('')
+  }
+
+  if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>🦷 治療管理</h1>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>治療メニューの追加・編集・並び替えができます</p>
+        </div>
+        <button onClick={() => { setShowAdd(true); setError('') }}
+          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          ＋ 治療を追加
+        </button>
+      </div>
+
+      {msg   && <div style={{ background: '#f0fdf4', color: '#059669', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, fontWeight: 600 }}>✅ {msg}</div>}
+      {error && <div style={{ background: '#fef2f2', color: '#dc2626', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13 }}>❌ {error}</div>}
+
+      {/* 追加フォーム */}
+      {showAdd && (
+        <div style={{ background: '#eff6ff', border: '2px solid #2563eb', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: '0 0 16px' }}>新しい治療を追加</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名 *</label>
+              <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="例: 歯並び相談"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+              <input type="number" min="5" max="180" value={addForm.duration} onChange={e => setAddForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {COLORS.map(c => (
+                <div key={c} onClick={() => setAddForm(p => ({ ...p, color: c }))}
+                  style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: addForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+            <div onClick={() => setAddForm(p => ({ ...p, line_visible: !p.line_visible }))}
+              style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: addForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: addForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleAdd} disabled={saving}
+              style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? '追加中...' : '追加する'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setError('') }}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' }}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 治療一覧 */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        {treatments.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>治療が登録されていません</div>
+        )}
+        {treatments.map((t, idx) => (
+          <div key={t.id} style={{ borderBottom: idx < treatments.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+            {editingId === t.id ? (
+              // 編集モード
+              <div style={{ padding: 16, background: '#fafafa' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>治療名</label>
+                    <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>所要時間(分)</label>
+                    <input type="number" min="5" max="180" value={editForm.duration} onChange={e => setEditForm(p => ({ ...p, duration: parseInt(e.target.value) || 30 }))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>カラー</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {COLORS.map(c => (
+                      <div key={c} onClick={() => setEditForm(p => ({ ...p, color: c }))}
+                        style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: 'pointer', border: editForm.color === c ? '3px solid #1f2937' : '3px solid transparent' }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>LINE予約に表示</label>
+                  <div onClick={() => setEditForm(p => ({ ...p, line_visible: !p.line_visible }))}
+                    style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: editForm.line_visible ? '#2563eb' : '#d1d5db', position: 'relative' }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: editForm.line_visible ? 19 : 3, transition: 'left .15s' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleUpdate(t.id)} disabled={saving}
+                    style={{ padding: '7px 18px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    {saving ? '保存中...' : '保存'}
+                  </button>
+                  <button onClick={() => setEditingId(null)}
+                    style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // 表示モード
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', opacity: t.is_active === false ? 0.5 : 1 }}>
+                {/* 並び替えボタン */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button onClick={() => handleMoveOrder(idx, -1)} disabled={idx === 0}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▲
+                  </button>
+                  <button onClick={() => handleMoveOrder(idx, 1)} disabled={idx === treatments.length - 1}
+                    style={{ width: 20, height: 18, border: '1px solid #e5e7eb', borderRadius: 4, background: '#f9fafb', cursor: idx === treatments.length - 1 ? 'not-allowed' : 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                    ▼
+                  </button>
+                </div>
+                {/* カラーバッジ */}
+                <div style={{ width: 12, height: 36, borderRadius: 3, background: t.color || '#2563eb', flexShrink: 0 }} />
+                {/* 治療情報 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {t.duration}分
+                    {t.line_visible !== false && <span style={{ marginLeft: 8, background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>LINE表示</span>}
+                    {t.is_active === false && <span style={{ marginLeft: 8, background: '#f3f4f6', color: '#9ca3af', padding: '1px 6px', borderRadius: 10, fontSize: 10 }}>無効</span>}
+                  </div>
+                </div>
+                {/* 操作ボタン */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEdit(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, cursor: 'pointer' }}>
+                    編集
+                  </button>
+                  <button onClick={() => handleToggleActive(t)}
+                    style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: t.is_active === false ? '#f0fdf4' : '#fef2f2', color: t.is_active === false ? '#059669' : '#dc2626', borderColor: t.is_active === false ? '#a7f3d0' : '#fca5a5' }}>
+                    {t.is_active === false ? '有効化' : '無効化'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginTop: 16, fontSize: 12, color: '#92400e' }}>
+        💡 無効化した治療は予約カレンダーやLINE予約に表示されなくなります。削除ではないため、いつでも有効に戻せます。
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// ライセンスタブ
+// ─────────────────────────────────────────────
+function LicenseTab() {
+  const [currentPlan, setCurrentPlan]   = useState('basic')
+  const [expiresAt, setExpiresAt]       = useState(null)
+  const [isValid, setIsValid]           = useState(true)
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState('basic')
+  const [showConfirm, setShowConfirm]   = useState(false)
+  const [saveMsg, setSaveMsg]           = useState('')
+
+  useEffect(() => {
+    fetch(`${API}/api/licenses/default`, { headers: authHeader() })
+      .then(r => r.json())
+      .then(data => {
+        setCurrentPlan(data.plan || 'basic')
+        setSelectedPlan(data.plan || 'basic')
+        setExpiresAt(data.expires_at || null)
+        setIsValid(data.is_valid !== false)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  async function handlePlanChange() {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/licenses/default`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ plan: selectedPlan }),
+      })
+      if (res.ok) {
+        setCurrentPlan(selectedPlan)
+        setSaveMsg('プランを変更しました。ページを再読み込みすると完全に反映されます。')
+      } else {
+        setSaveMsg('エラーが発生しました。もう一度お試しください。')
+      }
+    } catch {
+      setSaveMsg('エラーが発生しました。')
+    }
+    setSaving(false)
+    setShowConfirm(false)
+    setTimeout(() => setSaveMsg(''), 5000)
+  }
+
+  if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
+
+  const theme = PLAN_THEME[currentPlan]
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ border: `2px solid ${theme.border}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, background: theme.bg }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: theme.text, marginBottom: 4 }}>現在のプラン</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: theme.text }}>{PLAN_LABELS[currentPlan]}</div>
+            <div style={{ fontSize: 13, color: theme.text, marginTop: 2 }}>{PLAN_PRICES[currentPlan]}</div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: 12, color: theme.text }}>
+            {expiresAt ? `有効期限: ${new Date(expiresAt).toLocaleDateString('ja-JP')}` : '有効期限: 無期限'}
+            {!isValid && <div style={{ color: '#dc2626', marginTop: 4, fontWeight: 600 }}>⚠️ ライセンスの有効期限が切れています</div>}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 16px' }}>プラン変更</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+          {['basic', 'standard', 'pro'].map(plan => {
+            const t = PLAN_THEME[plan]
+            const isSelected = selectedPlan === plan
+            return (
+              <button key={plan} onClick={() => setSelectedPlan(plan)}
+                style={{ border: `2px solid ${isSelected ? t.border : '#e5e7eb'}`, borderRadius: 10, padding: '14px 12px', background: isSelected ? t.bg : '#f9fafb', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? t.text : '#6b7280', marginBottom: 2 }}>{PLAN_LABELS[plan]}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: isSelected ? t.text : '#1f2937' }}>
+                  {plan === 'pro' ? '¥29,800〜' : plan === 'standard' ? '¥19,800' : '¥9,800'}
+                </div>
+                <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>/ 月</div>
+              </button>
+            )
+          })}
+        </div>
+        {selectedPlan !== currentPlan && !showConfirm && (
+          <button onClick={() => setShowConfirm(true)}
+            style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: PLAN_THEME[selectedPlan].border, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {PLAN_LABELS[selectedPlan]}に変更する
+          </button>
+        )}
+        {showConfirm && (
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 18px' }}>
+            <div style={{ marginBottom: 12, fontSize: 13, color: '#1f2937' }}>
+              <strong>{PLAN_LABELS[currentPlan]}</strong> → <strong>{PLAN_LABELS[selectedPlan]}</strong> に変更します。よろしいですか？
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handlePlanChange} disabled={saving}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: PLAN_THEME[selectedPlan].border, color: '#fff', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? '変更中...' : '確定する'}
+              </button>
+              <button onClick={() => setShowConfirm(false)}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' }}>
+                キャンセル
+              </button>
+            </div>
+          </div>
+        )}
+        {saveMsg && <div style={{ marginTop: 12, fontSize: 13, color: '#059669', fontWeight: 600 }}>{saveMsg}</div>}
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: '0 0 16px' }}>現在のプランで使える機能</h2>
+        {FEATURE_GROUPS.map(group => (
+          <div key={group.label} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.04em', padding: '6px 12px', background: '#f9fafb', borderRadius: 6, marginBottom: 4 }}>
+              {group.label}
+            </div>
+            {group.items.map(item => {
+              const enabled = PLAN_RANK[currentPlan] >= PLAN_RANK[item.plan]
+              const t = PLAN_THEME[item.plan]
+              return (
+                <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: enabled ? '#1D9E75' : '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff' }}>
+                      {enabled ? '✓' : ''}
+                    </div>
+                    <span style={{ fontSize: 13, color: enabled ? '#1f2937' : '#9ca3af' }}>{item.label}</span>
+                  </div>
+                  {!enabled && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: t.bg, color: t.text, whiteSpace: 'nowrap' }}>
+                      🔒 {PLAN_LABELS[item.plan]}以上
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// メインコンポーネント
+// ─────────────────────────────────────────────
+const TABS = [
+  { id: 'general',    label: 'システム設定' },
+  { id: 'treatments', label: '🦷 治療管理' },
+  { id: 'reminder',   label: '🔔 リマインダー' },
+  { id: 'campaign',   label: '📣 キャンペーン' },
+  { id: 'license',    label: '🔑 ライセンス' },
+]
+
+export default function AdminSettings() {
+  const [activeTab, setActiveTab] = useState('general')
+  const [settings, setSettings]   = useState({})
+  const [loading, setLoading]     = useState(true)
+  const [saving, setSaving]       = useState(false)
+  const [saved, setSaved]         = useState(false)
+  const [error, setError]         = useState('')
+  const [openDays, setOpenDays]   = useState([1,2,3,4,5,6])
+
+  useEffect(() => { fetchSettings() }, [])
+
+  async function fetchSettings() {
+    setLoading(true)
+    try {
+      const res  = await fetch(`${API}/api/admin/settings`, { headers: authHeader() })
+      const data = await res.json()
+      const flat = {}
+      Object.entries(data.settings).forEach(([k, v]) => { flat[k] = v.value })
+      setSettings(flat)
+      if (flat.open_days) { try { setOpenDays(JSON.parse(flat.open_days)) } catch {} }
+    } catch { setError('設定の取得に失敗しました') }
+    setLoading(false)
+  }
+
+  async function geocodeAddress(address) {
+    try {
+      const url  = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&accept-language=ja`
+      const res  = await fetch(url, { headers: { 'User-Agent': 'SmileDental/1.0' } })
+      const data = await res.json()
+      if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+    } catch {}
+    return null
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError('')
+    try {
+      const updates = { ...settings, open_days: JSON.stringify(openDays) }
+      if (settings.clinic_address) {
+        const coords = await geocodeAddress(settings.clinic_address)
+        if (coords) { updates.clinic_lat = String(coords.lat); updates.clinic_lng = String(coords.lng) }
+      }
+      const res = await fetch(`${API}/api/admin/settings`, {
+        method: 'PUT', headers: authHeader(),
+        body: JSON.stringify({ updates }),
+      })
+      if (!res.ok) throw new Error()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch { setError('保存に失敗しました') }
+    setSaving(false)
+  }
+
+  function update(key, val) { setSettings(prev => ({ ...prev, [key]: val })) }
+  function toggleDay(d) { setOpenDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort()) }
+
+  if (loading) return <div style={{ padding: 40, color: '#9ca3af' }}>読み込み中...</div>
+
+  return (
+    <div style={{ padding: 32, maxWidth: 760 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '2px solid #e5e7eb' }}>
+        {TABS.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            style={{ padding: '10px 20px', border: 'none', background: 'none', fontSize: 14, fontWeight: activeTab === tab.id ? 700 : 400, color: activeTab === tab.id ? '#2563eb' : '#6b7280', borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent', marginBottom: -2, cursor: 'pointer', transition: 'all .15s' }}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'treatments' && <TreatmentsTab />}
       {activeTab === 'reminder' && <ReminderTab />}
       {activeTab === 'campaign' && <CampaignTab />}
       {activeTab === 'license'  && <LicenseTab />}
