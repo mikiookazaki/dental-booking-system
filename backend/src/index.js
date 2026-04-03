@@ -230,16 +230,17 @@ const runMigrations = async () => {
 
 // ── Cron: 毎日 9:00 JST にリマインダー送信 ──────────────
 const cron = require('node-cron');
-const { runAppointmentReminders, runRecallReminders } = require('./routes/reminders');
+const { runAppointmentReminders, runRecallReminders, runBirthdayReminders } = require('./routes/reminders');
 
 cron.schedule('0 0 * * *', async () => { // UTC 0:00 = JST 9:00
   console.log('⏰ [CRON] リマインダー送信開始...');
   try {
-    const [appt, recall] = await Promise.all([
+    const [appt, recall, birthday] = await Promise.all([
       runAppointmentReminders(),
       runRecallReminders(),
+      runBirthdayReminders(),
     ]);
-    console.log(`✅ [CRON] 予約:${appt.length}件 リコール:${recall.length}件`);
+    console.log(`✅ [CRON] 予約:${appt.length}件 リコール:${recall.length}件 誕生日:${birthday.length}件`);
   } catch (err) {
     console.error('❌ [CRON] エラー:', err.message);
   }

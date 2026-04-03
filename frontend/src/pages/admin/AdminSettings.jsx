@@ -494,6 +494,8 @@ function ReminderTab() {
     reminder_message_same:   '本日のご予約リマインダーです。\n\n時間: {time}\n内容: {treatment}\n\nご来院をお待ちしております。',
     recall_enabled:          'true',
     recall_message:          '前回の来院から{months}ヶ月が経過しました。\n定期検診はお済みでしょうか？\n\nお口の健康を守るために、定期的な検診をおすすめします。',
+    birthday_message_enabled: 'true',
+    birthday_message_text:    'お誕生日おめでとうございます！\nスマイル歯科スタッフ一同より、心よりお祝い申し上げます。\n\n素敵な一日をお過ごしください 🎂',
   })
   const [logs, setLogs]           = useState([])
   const [loading, setLoading]     = useState(true)
@@ -518,8 +520,10 @@ function ReminderTab() {
         ...(flat.reminder_send_time      !== undefined && { reminder_send_time:      flat.reminder_send_time }),
         ...(flat.reminder_message_before !== undefined && { reminder_message_before: flat.reminder_message_before }),
         ...(flat.reminder_message_same   !== undefined && { reminder_message_same:   flat.reminder_message_same }),
-        ...(flat.recall_enabled          !== undefined && { recall_enabled:          flat.recall_enabled }),
-        ...(flat.recall_message          !== undefined && { recall_message:          flat.recall_message }),
+        ...(flat.recall_enabled              !== undefined && { recall_enabled:              flat.recall_enabled }),
+        ...(flat.recall_message              !== undefined && { recall_message:              flat.recall_message }),
+        ...(flat.birthday_message_enabled    !== undefined && { birthday_message_enabled:    flat.birthday_message_enabled }),
+        ...(flat.birthday_message_text       !== undefined && { birthday_message_text:       flat.birthday_message_text }),
       }))
     } catch {}
     setLoading(false)
@@ -585,12 +589,14 @@ function ReminderTab() {
     appointment_same_day:   '当日リマインダー',
     recall_3month:          '定期検診（3ヶ月）',
     recall_6month:          '定期検診（6ヶ月）',
+    birthday:               '🎂 誕生日メッセージ',
   }
   const TYPE_COLORS = {
     appointment_day_before: { bg: '#dbeafe', text: '#1e40af' },
     appointment_same_day:   { bg: '#dcfce7', text: '#166534' },
     recall_3month:          { bg: '#fef9c3', text: '#854d0e' },
     recall_6month:          { bg: '#ffedd5', text: '#9a3412' },
+    birthday:               { bg: '#ffe4e6', text: '#be123c' },
   }
 
   if (loading) return <div style={{ padding: 32, color: '#9ca3af' }}>読み込み中...</div>
@@ -644,6 +650,37 @@ function ReminderTab() {
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>最終来院から3・6ヶ月後に自動送信（Standard / Pro）</div>
               </div>
               <Toggle keyName="recall_enabled" />
+            </div>
+          </div>
+
+          {/* 誕生日メッセージ */}
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>🎂 誕生日メッセージ</h2>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>誕生日当日の患者に自動でLINEメッセージを送信（Standard / Pro）</div>
+              </div>
+              <Toggle keyName="birthday_message_enabled" />
+            </div>
+            <div style={{ opacity: settings.birthday_message_enabled === 'true' ? 1 : 0.4, pointerEvents: settings.birthday_message_enabled === 'true' ? 'auto' : 'none' }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>メッセージ文言</label>
+              <textarea value={settings.birthday_message_text || ''} onChange={e => update('birthday_message_text', e.target.value)} rows={4}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: '10px 14px', marginTop: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#be123c', marginBottom: 6 }}>📱 LINEプレビュー</div>
+                <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', border: '1px solid #fecdd3', maxWidth: 260 }}>
+                  <div style={{ background: '#e11d48', padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>🎂 Happy Birthday!</div>
+                  </div>
+                  <div style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>〇〇 様</div>
+                    <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{settings.birthday_message_text}</div>
+                  </div>
+                  <div style={{ padding: '8px', background: '#fff1f2', borderTop: '1px solid #fecdd3', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#e11d48', fontWeight: 700 }}>スマイル歯科</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

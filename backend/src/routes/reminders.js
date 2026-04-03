@@ -1,4 +1,4 @@
-// src/routes/reminders.js
+// backend/src/routes/reminders.js
 const express   = require('express');
 const router    = express.Router();
 const { createClient } = require('@supabase/supabase-js');
@@ -24,7 +24,6 @@ async function runAppointmentReminders(isTest = false) {
     { date: tomorrow, type: 'appointment_day_before', label: '明日' },
   ];
 
-  // ライセンスチェック（テストモードはプラン制限なし）
   let plan = 'standard';
   if (!isTest) {
     const { data: lic } = await supabase
@@ -67,7 +66,6 @@ async function runAppointmentReminders(isTest = false) {
         continue;
       }
 
-      // 重複チェック
       const { data: dup } = await supabase
         .from('reminder_logs')
         .select('id')
@@ -168,6 +166,102 @@ async function runRecallReminders(isTest = false) {
 }
 
 // ─────────────────────────────────────────────────────────
+// ③ 誕生日メッセージ
+// ─────────────────────────────────────────────────────────
+async function runBirthdayReminders(isTest = false) {
+  // ライセンスチェック（standard以上）
+  if (!isTest) {
+    const { data: lic } = await supabase
+      .from('clinic_licenses')
+      .select('plan')
+      .eq('clinic_id', 'default')
+      .eq('is_active', true)
+      .single();
+    const plan = lic?.plan || 'basic';
+    if (plan === 'basic') return [];
+  }
+
+  // 誕生日機能が有効か確認
+  const { data: setting } = await supabase
+    .from('clinic_settings')
+    .select('value')
+    .eq('key', 'birthday_message_enabled')
+    .maybeSingle();
+  if (setting?.value === 'false') return [];
+
+  // 今日の月日を取得（JST）
+  const now   = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day   = String(now.getDate()).padStart(2, '0');
+  const today = now.toISOString().slice(0, 10);
+
+  // 今日が誕生日の患者を取得（月・日が一致）
+  const { data: patients } = await supabase
+    .from('patients')
+    .select('id, name, birth_date, line_user_id')
+    .eq('is_active', true)
+    .eq('is_test', isTest)
+    .not('line_user_id', 'is', null)
+    .not('birth_date', 'is', null);
+
+  const birthdayPatients = (patients || []).filter(p => {
+    if (!p.birth_date) return false;
+    const bd = new Date(p.birth_date);
+    return (
+      String(bd.getMonth() + 1).padStart(2, '0') === month &&
+      String(bd.getDate()).padStart(2, '0') === day
+    );
+  });
+
+  const results = [];
+
+  for (const patient of birthdayPatients) {
+    // 今年すでに送信済みならスキップ
+    const yearStart = `${now.getFullYear()}-01-01`;
+    const { data: dup } = await supabase
+      .from('reminder_logs')
+      .select('id')
+      .eq('patient_id', patient.id)
+      .eq('reminder_type', 'birthday')
+      .eq('status', 'sent')
+      .gte('created_at', yearStart)
+      .maybeSingle();
+    if (dup) continue;
+
+    // メッセージ文言を設定から取得
+    const { data: msgSetting } = await supabase
+      .from('clinic_settings')
+      .select('value')
+      .eq('key', 'birthday_message_text')
+      .maybeSingle();
+    const messageText = msgSetting?.value ||
+      'お誕生日おめでとうございます！\nスマイル歯科スタッフ一同より、心よりお祝い申し上げます。\n\n素敵な一日をお過ごしください 🎂';
+
+    try {
+      await pushMessage(patient.line_user_id, [
+        buildBirthdayMessage(patient.name, messageText)
+      ]);
+      await supabase.from('reminder_logs').insert({
+        patient_id:    patient.id,
+        reminder_type: 'birthday',
+        status:        'sent',
+        error_message: `誕生日メッセージ ${today}`,
+      });
+      results.push({ type: 'birthday', patient: patient.name, status: 'sent' });
+    } catch (err) {
+      await supabase.from('reminder_logs').insert({
+        patient_id:    patient.id,
+        reminder_type: 'birthday',
+        status:        'failed',
+        error_message: err.message,
+      });
+      results.push({ type: 'birthday', patient: patient.name, status: 'failed', error: err.message });
+    }
+  }
+  return results;
+}
+
+// ─────────────────────────────────────────────────────────
 // LINE メッセージテンプレート
 // ─────────────────────────────────────────────────────────
 function buildAppointmentMessage(label, time, treatmentName, patientName) {
@@ -235,66 +329,124 @@ function buildRecallMessage(months, patientName) {
   };
 }
 
+function buildBirthdayMessage(patientName, messageText) {
+  return {
+    type: 'flex',
+    altText: `${patientName}様、お誕生日おめでとうございます！`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: '#e11d48',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'text', text: '🎂 Happy Birthday!',
+            color: '#ffffff', size: 'xl', weight: 'bold', align: 'center',
+          },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'text',
+            text: `${patientName} 様`,
+            size: 'lg', weight: 'bold', color: '#1f2937', align: 'center',
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text',
+            text: messageText,
+            size: 'sm', color: '#374151', wrap: true, align: 'center',
+            margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: '#fff1f2',
+        paddingAll: '12px',
+        contents: [{
+          type: 'text',
+          text: 'スマイル歯科',
+          size: 'xs', color: '#e11d48', align: 'center', weight: 'bold',
+        }],
+      },
+      styles: {
+        header: { separator: false },
+        footer: { separator: true },
+      },
+    },
+  };
+}
+
 // ─────────────────────────────────────────────────────────
 // エンドポイント
 // ─────────────────────────────────────────────────────────
 
-// Cron・手動実行用（本番データ）
+// 本番用（Cron・手動）
 router.post('/run', async (req, res, next) => {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    const [appt, recall] = await Promise.all([
+    const [appt, recall, birthday] = await Promise.all([
       runAppointmentReminders(false),
       runRecallReminders(false),
+      runBirthdayReminders(false),
     ]);
     res.json({
       success: true,
       appointment: appt,
       recall,
+      birthday,
       summary: {
-        appt_sent:    appt.filter(r => r.status === 'sent').length,
-        appt_failed:  appt.filter(r => r.status === 'failed').length,
-        appt_no_line: appt.filter(r => r.status === 'no_line').length,
-        recall_sent:  recall.filter(r => r.status === 'sent').length,
+        appt_sent:     appt.filter(r => r.status === 'sent').length,
+        appt_failed:   appt.filter(r => r.status === 'failed').length,
+        appt_no_line:  appt.filter(r => r.status === 'no_line').length,
+        recall_sent:   recall.filter(r => r.status === 'sent').length,
+        birthday_sent: birthday.filter(r => r.status === 'sent').length,
       },
     });
   } catch (err) { next(err); }
 });
 
-// テストモード用手動実行（管理画面から）
+// テストモード用
 router.post('/run-test', async (req, res, next) => {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    const [appt, recall] = await Promise.all([
+    const [appt, recall, birthday] = await Promise.all([
       runAppointmentReminders(true),
       runRecallReminders(true),
+      runBirthdayReminders(true),
     ]);
     res.json({
       success: true,
       mode: 'test',
       appointment: appt,
       recall,
+      birthday,
       summary: {
-        appt_sent:    appt.filter(r => r.status === 'sent').length,
-        appt_failed:  appt.filter(r => r.status === 'failed').length,
-        appt_no_line: appt.filter(r => r.status === 'no_line').length,
-        recall_sent:  recall.filter(r => r.status === 'sent').length,
+        appt_sent:     appt.filter(r => r.status === 'sent').length,
+        appt_failed:   appt.filter(r => r.status === 'failed').length,
+        appt_no_line:  appt.filter(r => r.status === 'no_line').length,
+        recall_sent:   recall.filter(r => r.status === 'sent').length,
+        birthday_sent: birthday.filter(r => r.status === 'sent').length,
       },
     });
   } catch (err) { next(err); }
 });
 
-// 送信履歴取得（管理画面用）
+// 送信履歴取得
 router.get('/logs', async (req, res, next) => {
   try {
     const limit  = Math.min(Number(req.query.limit) || 50, 200);
     const isTest = req.isTestMode;
 
-    // テストモード時はテスト患者のログ、本番時は本番患者のログを返す
     const { data: testPatientIds } = await supabase
       .from('patients')
       .select('id')
@@ -309,11 +461,9 @@ router.get('/logs', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    // テストモード: テスト患者のログのみ / 本番モード: 本番患者のログのみ
     if (ids.length > 0) {
       query = query.in('patient_id', ids);
     } else {
-      // 該当患者なしの場合は空を返す
       return res.json([]);
     }
 
@@ -326,3 +476,4 @@ router.get('/logs', async (req, res, next) => {
 module.exports = router;
 module.exports.runAppointmentReminders = runAppointmentReminders;
 module.exports.runRecallReminders      = runRecallReminders;
+module.exports.runBirthdayReminders    = runBirthdayReminders;
