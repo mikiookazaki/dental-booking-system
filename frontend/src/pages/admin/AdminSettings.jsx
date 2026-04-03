@@ -513,12 +513,17 @@ function FollowUpMessageSettings({ enabled, onToggle }) {
     if (saved) { try { return JSON.parse(saved) } catch {} }
     return DEFAULT_FOLLOWUP_MESSAGES
   })
+  // グローバル送信タイミング設定
+  const [timing, setTiming] = useState(() => {
+    const saved = localStorage.getItem('followup_timing')
+    if (saved) { try { return JSON.parse(saved) } catch {} }
+    return { same_day_time: '18:00', follow_days: 3, follow_time: '09:00' }
+  })
   const [selectedTreatment, setSelectedTreatment] = useState(1)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  // Supabaseからカスタムメッセージ読み込み
   useEffect(() => {
     async function loadMessages() {
       try {
@@ -532,6 +537,7 @@ function FollowUpMessageSettings({ enabled, onToggle }) {
             })
             setMessages(merged)
           }
+          if (data.timing) setTiming(data.timing)
         }
       } catch {}
     }
@@ -544,26 +550,40 @@ function FollowUpMessageSettings({ enabled, onToggle }) {
       await fetch(`${API}/api/followup-messages`, {
         method: 'POST',
         headers: authHeader(),
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({ messages, timing }),
       })
       localStorage.setItem('followup_messages', JSON.stringify(messages))
+      localStorage.setItem('followup_timing', JSON.stringify(timing))
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch {}
     setSaving(false)
   }
 
-  function updateMsg(treatmentId, timing, field, value) {
+  function updateMsg(treatmentId, timingKey, field, value) {
     setMessages(prev => ({
       ...prev,
       [treatmentId]: {
         ...prev[treatmentId],
-        [timing]: {
-          ...prev[treatmentId]?.[timing],
+        [timingKey]: {
+          ...prev[treatmentId]?.[timingKey],
           [field]: value,
         }
       }
     }))
+  }
+
+  function toggleMsgEnabled(treatmentId, timingKey) {
+    setMessages(prev => {
+      const cur = prev[treatmentId]?.[timingKey] || {}
+      return {
+        ...prev,
+        [treatmentId]: {
+          ...prev[treatmentId],
+          [timingKey]: { ...cur, enabled: cur.enabled === false ? true : false }
+        }
+      }
+    })
   }
 
   function resetToDefault(treatmentId) {
@@ -573,20 +593,28 @@ function FollowUpMessageSettings({ enabled, onToggle }) {
     }))
   }
 
+  function updateTiming(field, value) {
+    setTiming(prev => ({ ...prev, [field]: value }))
+  }
+
   const current = messages[selectedTreatment] || DEFAULT_FOLLOWUP_MESSAGES[selectedTreatment]
+  const sameDayEnabled = current?.same_day?.enabled !== false
+  const followEnabled  = current?.day3?.enabled !== false
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1f2937', margin: 0 }}>{'💌 治療後フォローメッセージ'}</h2>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{'治療当日18:00と3日後9:00に自動送信（Standard / Pro）'}</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+            {`治療当日${timing.same_day_time}と${timing.follow_days}日後${timing.follow_time}に自動送信（Standard / Pro）`}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={() => setExpanded(e => !e)}
             style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: expanded ? '#eff6ff' : '#f9fafb', color: expanded ? '#2563eb' : '#6b7280', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-            {expanded ? '▲ 閉じる' : '✏️ メッセージ編集'}
+            {expanded ? '▲ 閉じる' : '✏️ 編集'}
           </button>
           <div onClick={onToggle}
             style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: enabled ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
@@ -596,99 +624,179 @@ function FollowUpMessageSettings({ enabled, onToggle }) {
       </div>
 
       <div style={{ opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af', marginBottom: expanded ? 16 : 0 }}>
-          {'📱 当日18:00：ありがとうメッセージ＋注意事項　／　3日後9:00：経過確認メッセージ　／　各メッセージに「次回予約する」ボタン付き'}
-        </div>
 
         {expanded && (
           <>
-            {/* 治療選択タブ */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-              {TREATMENTS.map(t => (
-                <button key={t.id} onClick={() => setSelectedTreatment(t.id)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 8, border: '1px solid',
-                    fontSize: 12, cursor: 'pointer', transition: 'all .15s',
-                    background: selectedTreatment === t.id ? '#2563eb' : '#f9fafb',
-                    color: selectedTreatment === t.id ? '#fff' : '#374151',
-                    borderColor: selectedTreatment === t.id ? '#2563eb' : '#e5e7eb',
-                    fontWeight: selectedTreatment === t.id ? 600 : 400,
-                  }}>
-                  {t.name}
-                </button>
-              ))}
+            {/* ── グローバル送信タイミング設定 ── */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 14 }}>⏰ 送信タイミング設定（全治療共通）</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                    <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 20, marginRight: 6, fontSize: 11 }}>当日</span>
+                    送信時刻
+                  </label>
+                  <input type="time" value={timing.same_day_time}
+                    onChange={e => updateTiming('same_day_time', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                    <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 20, marginRight: 6, fontSize: 11 }}>フォロー</span>
+                    送信日数
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="number" min="1" max="30" value={timing.follow_days}
+                      onChange={e => updateTiming('follow_days', parseInt(e.target.value) || 3)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                    <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>日後</span>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                    <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 20, marginRight: 6, fontSize: 11 }}>フォロー</span>
+                    送信時刻
+                  </label>
+                  <input type="time" value={timing.follow_time}
+                    onChange={e => updateTiming('follow_time', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box' }} />
+                </div>
+              </div>
             </div>
 
-            {/* 選択中の治療のメッセージ編集 */}
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-              {/* 当日フォロー */}
-              <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <span style={{ background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>当日18:00</span>
+            {/* ── 治療選択タブ ── */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 10 }}>✏️ 治療別メッセージ編集</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {TREATMENTS.map(t => {
+                const msg = messages[t.id]
+                const sdOn = msg?.same_day?.enabled !== false
+                const flOn = msg?.day3?.enabled !== false
+                const badge = sdOn && flOn ? null : !sdOn && !flOn ? '✕' : !sdOn ? '当日OFF' : 'フォローOFF'
+                return (
+                  <button key={t.id} onClick={() => setSelectedTreatment(t.id)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 8, border: '1px solid',
+                      fontSize: 12, cursor: 'pointer', transition: 'all .15s',
+                      background: selectedTreatment === t.id ? '#2563eb' : '#f9fafb',
+                      color: selectedTreatment === t.id ? '#fff' : '#374151',
+                      borderColor: selectedTreatment === t.id ? '#2563eb' : '#e5e7eb',
+                      fontWeight: selectedTreatment === t.id ? 600 : 400,
+                      position: 'relative',
+                    }}>
+                    {t.name}
+                    {badge && (
+                      <span style={{
+                        position: 'absolute', top: -6, right: -6,
+                        background: '#f59e0b', color: '#fff',
+                        fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 10,
+                      }}>{badge}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* ── 当日フォロー編集 ── */}
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ padding: '12px 16px', background: sameDayEnabled ? '#f0fdf4' : '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ background: '#dcfce7', color: '#166534', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>
+                    {`当日${timing.same_day_time}`}
+                  </span>
                   <span style={{ fontSize: 12, color: '#6b7280' }}>ありがとうメッセージ</span>
                 </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
-                  <textarea
-                    value={current?.same_day?.text || ''}
-                    onChange={e => updateMsg(selectedTreatment, 'same_day', 'text', e.target.value)}
-                    rows={4}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
-                  <input
-                    type="text"
-                    value={current?.same_day?.button || ''}
-                    onChange={e => updateMsg(selectedTreatment, 'same_day', 'button', e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: sameDayEnabled ? '#059669' : '#9ca3af' }}>
+                    {sameDayEnabled ? '送信する' : '送信しない'}
+                  </span>
+                  <div onClick={() => toggleMsgEnabled(selectedTreatment, 'same_day')}
+                    style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: sameDayEnabled ? '#059669' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: sameDayEnabled ? 19 : 3, transition: 'left .15s' }} />
+                  </div>
                 </div>
               </div>
+              {sameDayEnabled && (
+                <div style={{ padding: 16 }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                    <textarea value={current?.same_day?.text || ''} onChange={e => updateMsg(selectedTreatment, 'same_day', 'text', e.target.value)} rows={4}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                    <input type="text" value={current?.same_day?.button || ''} onChange={e => updateMsg(selectedTreatment, 'same_day', 'button', e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              )}
+              {!sameDayEnabled && (
+                <div style={{ padding: '12px 16px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
+                  この治療の当日フォローはOFFです
+                </div>
+              )}
+            </div>
 
-              {/* 3日後フォロー */}
-              <div style={{ padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <span style={{ background: '#dbeafe', color: '#1e40af', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>3日後9:00</span>
+            {/* ── フォローアップ編集 ── */}
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', background: followEnabled ? '#eff6ff' : '#f9fafb', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>
+                    {`${timing.follow_days}日後${timing.follow_time}`}
+                  </span>
                   <span style={{ fontSize: 12, color: '#6b7280' }}>経過確認メッセージ</span>
                 </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
-                  <textarea
-                    value={current?.day3?.text || ''}
-                    onChange={e => updateMsg(selectedTreatment, 'day3', 'text', e.target.value)}
-                    rows={4}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
-                  <input
-                    type="text"
-                    value={current?.day3?.button || ''}
-                    onChange={e => updateMsg(selectedTreatment, 'day3', 'button', e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }}
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: followEnabled ? '#2563eb' : '#9ca3af' }}>
+                    {followEnabled ? '送信する' : '送信しない'}
+                  </span>
+                  <div onClick={() => toggleMsgEnabled(selectedTreatment, 'day3')}
+                    style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: followEnabled ? '#2563eb' : '#d1d5db', position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: followEnabled ? 19 : 3, transition: 'left .15s' }} />
+                  </div>
                 </div>
               </div>
+              {followEnabled && (
+                <div style={{ padding: 16 }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>メッセージ本文</label>
+                    <textarea value={current?.day3?.text || ''} onChange={e => updateMsg(selectedTreatment, 'day3', 'text', e.target.value)} rows={4}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, lineHeight: 1.6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>ボタンのラベル</label>
+                    <input type="text" value={current?.day3?.button || ''} onChange={e => updateMsg(selectedTreatment, 'day3', 'button', e.target.value)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              )}
+              {!followEnabled && (
+                <div style={{ padding: '12px 16px', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
+                  この治療のフォローアップはOFFです
+                </div>
+              )}
             </div>
 
             {/* 操作ボタン */}
             <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
               <button onClick={handleSave} disabled={saving}
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: saved ? '#059669' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 メッセージを保存'}
+                {saved ? '保存しました ✓' : saving ? '保存中...' : '💾 保存する'}
               </button>
               <button onClick={() => resetToDefault(selectedTreatment)}
                 style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
                 🔄 デフォルトに戻す
               </button>
               <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                {TREATMENTS.find(t => t.id === selectedTreatment)?.name} のメッセージを編集中
+                {TREATMENTS.find(t => t.id === selectedTreatment)?.name} を編集中
               </span>
             </div>
           </>
+        )}
+
+        {!expanded && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#1e40af' }}>
+            {`📱 当日${timing.same_day_time}：ありがとうメッセージ　／　${timing.follow_days}日後${timing.follow_time}：経過確認メッセージ　／　各メッセージに「次回予約する」ボタン付き`}
+          </div>
         )}
       </div>
     </div>
