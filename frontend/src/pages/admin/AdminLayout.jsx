@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { Settings, BarChart2, CalendarOff, LogOut, ChevronRight, BookOpen, X, MessageSquare, FlaskConical, Users } from 'lucide-react'
 import { useTestMode } from '../../context/TestModeContext'
+import TestSpecPanel from '../../components/admin/TestSpecPanel'
 
 const NAV_DASHBOARD = '/admin/dashboard'
 const NAV_SETTINGS  = '/admin/settings'
@@ -18,7 +19,6 @@ export default function AdminLayout({ onLogout }) {
   const isSuperAdmin = adminRole === 'superadmin'
   const [showManual, setShowManual] = useState(false)
 
-  // TestModeContextの正しい名前で取得
   const { isTestMode, toggleTestMode } = useTestMode()
 
   function openManual() {
@@ -174,7 +174,7 @@ export default function AdminLayout({ onLogout }) {
                 {'LINEデバッグ'}
                 <span style={{ marginLeft:'auto', fontSize:9, opacity:0.6 }}>↗</span>
               </button>
-              <NavBtn path={NAV_TEST_PAT} label={'テスト患者管理'} icon={<Users size={18}/>}         activeColor={'rgba(245,158,11,0.2)'} />
+              <NavBtn path={NAV_TEST_PAT} label={'テスト患者管理'} icon={<Users size={18}/>} activeColor={'rgba(245,158,11,0.2)'} />
             </>
           )}
         </nav>
@@ -268,6 +268,9 @@ export default function AdminLayout({ onLogout }) {
           </div>
         )}
       </div>
+
+      {/* テスト仕様書フローティングパネル（スーパー管理者のみ） */}
+      <TestSpecPanel />
     </div>
   )
 }

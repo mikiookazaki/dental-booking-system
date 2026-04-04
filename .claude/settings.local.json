@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l c:/dev/dental-booking-system-step1/backend/src/routes/*.js)"
+    ]
+  }
+}
