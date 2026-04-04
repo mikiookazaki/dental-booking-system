@@ -604,17 +604,8 @@ export default function AdminDashboard() {
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/admin/dashboard?month=${month}`, { headers: authHeader() })
-      const json = await res.json()
-      if (!res.ok) {
-        console.error('dashboard API error:', json)
-        setData(null)
-      } else {
-        setData(json)
-      }
-    } catch (err) {
-      console.error('fetchData error:', err)
-      setData(null)
-    }
+      setData(await res.json())
+    } catch (err) { console.error(err) }
     setLoading(false)
   }
 
@@ -625,17 +616,8 @@ export default function AdminDashboard() {
       const res = await fetch(`${API}/api/analytics/age`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      const json = await res.json()
-      if (!res.ok) {
-        console.error('analytics/age API error:', json)
-        setAgeData(null)
-      } else {
-        setAgeData(json)
-      }
-    } catch (err) {
-      console.error('fetchAgeData error:', err)
-      setAgeData(null)
-    }
+      setAgeData(await res.json())
+    } catch (err) { console.error(err) }
     setAgeLoading(false)
   }
 
@@ -686,7 +668,7 @@ export default function AdminDashboard() {
 
       {/* タブ切替 */}
       <div style={{ display:'flex', gap:4, marginBottom:20, borderBottom:'2px solid #e5e7eb' }}>
-        {[['overview','📋 月次概要'], ['age','📊 年代分析'], ['map','🗺️ 地域・流入分析']].map(([v, label]) => (
+        {[['overview','📋 月次概要'], ['age','📊 年代分析'], ['map','🗺️ 地域・流入分析'], ['churn','⚠️ 離脱防止アラート']].map(([v, label]) => (
           <button key={v} onClick={()=>setActiveTab(v)}
             style={{
               padding:'8px 18px', fontSize:13, fontWeight:600, border:'none', cursor:'pointer',
@@ -914,6 +896,303 @@ export default function AdminDashboard() {
         : !ageData ? null : (
           <MapAndReferralTab ageData={ageData} clinicLocation={ageData.clinicLocation} />
         )
+      )}
+
+      {/* ── タブ4: 離脱防止アラート ── */}
+      {activeTab === 'churn' && <ChurnAlertTab />}
+    </div>
+  )
+}
+
+// ============================================================
+// 離脱防止アラートタブ
+// ============================================================
+function ChurnAlertTab() {
+  const [months, setMonths]           = useState(3)
+  const [customMonths, setCustomMonths] = useState('')
+  const [patients, setPatients]       = useState([])
+  const [loading, setLoading]         = useState(false)
+  const [selected, setSelected]       = useState(new Set())
+  const [messageText, setMessageText] = useState('しばらくご来院がないことが気になり、ご連絡いたしました。\nお口の健康のために、ぜひ一度ご来院ください。\n\nご予約はLINEから簡単にできます。お待ちしております。')
+  const [sending, setSending]         = useState(false)
+  const [sendResult, setSendResult]   = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [fetched, setFetched]         = useState(false)
+
+  const isTest = localStorage.getItem('test_mode') === 'true'
+  const effectiveMonths = customMonths ? parseInt(customMonths) : months
+
+  async function fetchChurnPatients() {
+    setLoading(true)
+    setSelected(new Set())
+    setSendResult(null)
+    try {
+      const res  = await fetch(`${API}/api/analytics/churn?months=${effectiveMonths}&is_test=${isTest}`, { headers: authHeader() })
+      const data = await res.json()
+      setPatients(data.patients || [])
+      setFetched(true)
+    } catch (e) {
+      console.error(e)
+    }
+    setLoading(false)
+  }
+
+  async function handleSend() {
+    setSending(true)
+    setSendResult(null)
+    try {
+      const ids = [...selected].length > 0 ? [...selected] : patients.filter(p => p.line_user_id).map(p => p.id)
+      const res = await fetch(`${API}/api/analytics/churn/send`, {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ patient_ids: ids, message_text: messageText, is_test: isTest }),
+      })
+      const data = await res.json()
+      setSendResult(data)
+    } catch (e) {
+      setSendResult({ error: e.message })
+    }
+    setSending(false)
+    setShowConfirm(false)
+  }
+
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function selectAll() {
+    setSelected(new Set(patients.filter(p => p.line_user_id).map(p => p.id)))
+  }
+
+  function clearAll() { setSelected(new Set()) }
+
+  const linePatients   = patients.filter(p => p.line_user_id)
+  const noLinePatients = patients.filter(p => !p.line_user_id)
+  const sendTargetCount = selected.size > 0 ? selected.size : linePatients.length
+
+  const getRiskColor = (m) => {
+    if (m >= 12) return { bg: '#fef2f2', text: '#dc2626', border: '#fca5a5', label: '高リスク' }
+    if (m >= 6)  return { bg: '#fff7ed', text: '#d97706', border: '#fed7aa', label: '中リスク' }
+    return            { bg: '#fffbeb', text: '#92400e', border: '#fde68a', label: '要注意' }
+  }
+
+  const cardStyle = { background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20 }
+
+  return (
+    <div>
+      {/* 設定パネル */}
+      <div style={{ ...cardStyle, marginBottom:16 }}>
+        <h2 style={{ fontSize:15, fontWeight:700, color:'#1f2937', margin:'0 0 16px' }}>⚠️ 離脱防止アラート設定</h2>
+
+        {/* 未来院期間 */}
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:8 }}>
+            未来院期間の閾値
+          </label>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            {[3, 6, 12].map(m => (
+              <button key={m} onClick={() => { setMonths(m); setCustomMonths('') }}
+                style={{
+                  padding:'7px 16px', borderRadius:8, border:'1px solid',
+                  fontSize:13, cursor:'pointer', fontWeight:600,
+                  background: months === m && !customMonths ? '#dc2626' : '#f9fafb',
+                  color:      months === m && !customMonths ? '#fff'    : '#374151',
+                  borderColor: months === m && !customMonths ? '#dc2626' : '#e5e7eb',
+                }}>
+                {m}ヶ月以上
+              </button>
+            ))}
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <input type="number" min="1" max="60" value={customMonths}
+                onChange={e => { setCustomMonths(e.target.value); setMonths(0) }}
+                placeholder="カスタム"
+                style={{ width:90, padding:'7px 10px', borderRadius:8, border:`1px solid ${customMonths ? '#dc2626' : '#d1d5db'}`, fontSize:13, boxSizing:'border-box' }} />
+              <span style={{ fontSize:12, color:'#6b7280' }}>ヶ月以上</span>
+            </div>
+            <button onClick={fetchChurnPatients} disabled={loading}
+              style={{ padding:'8px 20px', borderRadius:8, border:'none', background: loading ? '#93c5fd' : '#2563eb', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+              {loading ? '検索中...' : '🔍 検索する'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 検索結果 */}
+      {fetched && (
+        <>
+          {/* サマリー */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:16 }}>
+            <div style={{ background:'#fef2f2', borderRadius:12, padding:'16px 18px', border:'1px solid #fca5a5' }}>
+              <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>離脱リスク患者数</div>
+              <div style={{ fontSize:28, fontWeight:700, color:'#dc2626' }}>{patients.length}名</div>
+              <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>{effectiveMonths}ヶ月以上未来院</div>
+            </div>
+            <div style={{ background:'#eff6ff', borderRadius:12, padding:'16px 18px', border:'1px solid #bfdbfe' }}>
+              <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>LINE送信可能</div>
+              <div style={{ fontSize:28, fontWeight:700, color:'#2563eb' }}>{linePatients.length}名</div>
+              <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>LINE連携済み</div>
+            </div>
+            <div style={{ background:'#f9fafb', borderRadius:12, padding:'16px 18px', border:'1px solid #e5e7eb' }}>
+              <div style={{ fontSize:11, color:'#6b7280', marginBottom:4 }}>LINE未連携</div>
+              <div style={{ fontSize:28, fontWeight:700, color:'#9ca3af' }}>{noLinePatients.length}名</div>
+              <div style={{ fontSize:11, color:'#9ca3af', marginTop:2 }}>メッセージ送信不可</div>
+            </div>
+          </div>
+
+          {patients.length === 0 ? (
+            <div style={{ ...cardStyle, textAlign:'center', padding:40, color:'#9ca3af' }}>
+              {effectiveMonths}ヶ月以上未来院の患者はいません 🎉
+            </div>
+          ) : (
+            <>
+              {/* 患者一覧 */}
+              <div style={{ ...cardStyle, marginBottom:16 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                  <h2 style={{ fontSize:15, fontWeight:700, color:'#1f2937', margin:0 }}>
+                    離脱リスク患者一覧
+                    <span style={{ fontSize:12, fontWeight:400, color:'#6b7280', marginLeft:8 }}>
+                      {selected.size > 0 ? `${selected.size}名選択中` : 'チェックで個別選択、未選択時は全LINE連携患者が対象'}
+                    </span>
+                  </h2>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button onClick={selectAll}
+                      style={{ padding:'5px 12px', borderRadius:6, border:'1px solid #d1d5db', background:'#fff', fontSize:12, cursor:'pointer', color:'#374151' }}>
+                      全選択
+                    </button>
+                    <button onClick={clearAll}
+                      style={{ padding:'5px 12px', borderRadius:6, border:'1px solid #d1d5db', background:'#fff', fontSize:12, cursor:'pointer', color:'#374151' }}>
+                      解除
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight:360, overflowY:'auto' }}>
+                  {patients.map(p => {
+                    const risk = getRiskColor(p.months_since_visit)
+                    const isSelected = selected.has(p.id)
+                    return (
+                      <div key={p.id}
+                        onClick={() => p.line_user_id && toggleSelect(p.id)}
+                        style={{
+                          display:'flex', alignItems:'center', gap:12,
+                          padding:'10px 12px', borderRadius:8, marginBottom:4,
+                          border: `1px solid ${isSelected ? '#2563eb' : '#f3f4f6'}`,
+                          background: isSelected ? '#eff6ff' : '#fafafa',
+                          cursor: p.line_user_id ? 'pointer' : 'default',
+                          opacity: p.line_user_id ? 1 : 0.6,
+                        }}>
+                        {/* チェックボックス */}
+                        <div style={{
+                          width:18, height:18, borderRadius:4, flexShrink:0,
+                          border: `2px solid ${isSelected ? '#2563eb' : '#d1d5db'}`,
+                          background: isSelected ? '#2563eb' : '#fff',
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                        }}>
+                          {isSelected && <span style={{ color:'#fff', fontSize:11, fontWeight:700 }}>✓</span>}
+                        </div>
+                        {/* リスクバッジ */}
+                        <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, background:risk.bg, color:risk.text, border:`1px solid ${risk.border}`, whiteSpace:'nowrap' }}>
+                          {risk.label}
+                        </span>
+                        {/* 患者情報 */}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:'#1f2937' }}>{p.name}</div>
+                          <div style={{ fontSize:11, color:'#9ca3af', marginTop:1 }}>
+                            {p.age_group || '年代不明'} ／ 来院{p.total_visits || 0}回
+                          </div>
+                        </div>
+                        {/* 最終来院 */}
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontSize:12, fontWeight:600, color:risk.text }}>{p.months_since_visit}ヶ月未来院</div>
+                          <div style={{ fontSize:11, color:'#9ca3af', marginTop:1 }}>最終: {p.last_visit_date}</div>
+                        </div>
+                        {/* LINE状態 */}
+                        <div style={{ flexShrink:0 }}>
+                          {p.line_user_id
+                            ? <span style={{ fontSize:10, background:'#dcfce7', color:'#166534', padding:'2px 8px', borderRadius:20 }}>LINE連携</span>
+                            : <span style={{ fontSize:10, background:'#f3f4f6', color:'#9ca3af', padding:'2px 8px', borderRadius:20 }}>LINE未連携</span>
+                          }
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* LINEメッセージ送信 */}
+              {linePatients.length > 0 && (
+                <div style={cardStyle}>
+                  <h2 style={{ fontSize:15, fontWeight:700, color:'#1f2937', margin:'0 0 16px' }}>📱 LINEフォローメッセージ送信</h2>
+
+                  <div style={{ marginBottom:14 }}>
+                    <label style={{ fontSize:13, fontWeight:600, color:'#374151', display:'block', marginBottom:6 }}>メッセージ本文</label>
+                    <textarea value={messageText} onChange={e => setMessageText(e.target.value)} rows={5}
+                      style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid #d1d5db', fontSize:13, lineHeight:1.6, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit' }} />
+                    <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>{messageText.length}文字</div>
+                  </div>
+
+                  {/* プレビュー */}
+                  <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:10, padding:14, marginBottom:16 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:'#1e40af', marginBottom:8 }}>📱 LINEプレビュー</div>
+                    <div style={{ background:'#fff', borderRadius:10, overflow:'hidden', border:'1px solid #e5e7eb', maxWidth:260 }}>
+                      <div style={{ background:'#2563eb', padding:'10px 14px' }}>
+                        <div style={{ color:'#fff', fontSize:12, fontWeight:600 }}>スマイル歯科からのご連絡</div>
+                      </div>
+                      <div style={{ padding:'12px 14px' }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:'#1f2937', marginBottom:6 }}>〇〇 様</div>
+                        <div style={{ fontSize:11, color:'#374151', lineHeight:1.6, whiteSpace:'pre-wrap' }}>{messageText}</div>
+                      </div>
+                      <div style={{ padding:'10px 14px', background:'#f9fafb', borderTop:'1px solid #e5e7eb' }}>
+                        <div style={{ background:'#2563eb', color:'#fff', borderRadius:6, padding:'8px', textAlign:'center', fontSize:12, fontWeight:600 }}>予約する</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!showConfirm ? (
+                    <button onClick={() => setShowConfirm(true)}
+                      style={{ padding:'10px 28px', borderRadius:8, border:'none', background:'#dc2626', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                      📣 {sendTargetCount}名にLINE送信する
+                    </button>
+                  ) : (
+                    <div style={{ background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:10, padding:'14px 18px' }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:'#991b1b', marginBottom:8 }}>⚠️ 本当に送信しますか？</div>
+                      <div style={{ fontSize:13, color:'#374151', marginBottom:14 }}>
+                        <strong>{sendTargetCount}名</strong>にLINEメッセージを送信します。この操作は取り消せません。
+                        {isTest && <span style={{ color:'#d97706', marginLeft:8 }}>（テストモード）</span>}
+                      </div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={handleSend} disabled={sending}
+                          style={{ padding:'8px 20px', borderRadius:8, border:'none', background: sending ? '#fca5a5' : '#dc2626', color:'#fff', fontSize:13, fontWeight:600, cursor: sending ? 'wait' : 'pointer' }}>
+                          {sending ? '送信中...' : '送信する'}
+                        </button>
+                        <button onClick={() => setShowConfirm(false)} disabled={sending}
+                          style={{ padding:'8px 16px', borderRadius:8, border:'1px solid #d1d5db', background:'#fff', color:'#6b7280', fontSize:13, cursor:'pointer' }}>
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {sendResult && (
+                    <div style={{ marginTop:14, background: sendResult.error ? '#fef2f2' : '#f0fdf4', border:`1px solid ${sendResult.error ? '#fca5a5' : '#a7f3d0'}`, borderRadius:10, padding:'12px 16px', fontSize:13 }}>
+                      {sendResult.error
+                        ? <span style={{ color:'#dc2626' }}>❌ {sendResult.error}</span>
+                        : <div style={{ color:'#166534', fontWeight:600 }}>
+                            ✅ 送信完了 — 成功: <strong>{sendResult.results?.sent}件</strong>
+                            {sendResult.results?.failed > 0 && <span style={{ color:'#dc2626', marginLeft:8 }}>失敗: {sendResult.results.failed}件</span>}
+                            {sendResult.results?.no_line > 0 && <span style={{ color:'#9ca3af', marginLeft:8 }}>LINE未連携: {sendResult.results.no_line}件</span>}
+                          </div>
+                      }
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   )
