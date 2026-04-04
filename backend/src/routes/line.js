@@ -379,7 +379,15 @@ async function handleSetAgeDetail(replyToken, lineUserId, ageGroup) {
 
 async function getPatientByLineId(lineUserId) {
   if (!lineUserId) return null;
-  const { data } = await supabase.from('patients').select('*').eq('line_user_id', lineUserId).single();
+  // 本番患者を優先、複数ある場合は最初の1件
+  const { data } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('line_user_id', lineUserId)
+    .eq('is_active', true)
+    .order('is_test', { ascending: true }) // false(本番)が先
+    .limit(1)
+    .maybeSingle()
   return data || null;
 }
 
