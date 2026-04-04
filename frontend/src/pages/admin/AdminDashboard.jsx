@@ -6,8 +6,11 @@ Chart.register(...registerables)
 
 const API = import.meta.env.VITE_API_URL || ''
 function authHeader() {
-  const token = localStorage.getItem('admin_token')
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const token    = localStorage.getItem('admin_token')
+  const testMode = localStorage.getItem('test_mode')
+  const headers  = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  if (testMode === 'true') headers['x-test-mode'] = 'true'
+  return headers
 }
 
 const TREATMENT_COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#065f46']
