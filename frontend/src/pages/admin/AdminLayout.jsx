@@ -151,7 +151,29 @@ export default function AdminLayout({ onLogout }) {
                 )}
               </div>
 
-              <NavBtn path={NAV_LINE}     label={'LINEデバッグ'}   icon={<MessageSquare size={18}/>} activeColor={'rgba(245,158,11,0.2)'} />
+              <button
+                onClick={() => {
+                  const w = window.open(
+                    '/line-debug-window',
+                    'LineDebug',
+                    'width=560,height=900,left=100,top=50,resizable=yes,scrollbars=no'
+                  )
+                  w?.focus()
+                }}
+                style={{
+                  display:'flex', alignItems:'center', gap:10, width:'100%',
+                  padding:'10px 12px', borderRadius:8, border:'none', cursor:'pointer',
+                  background:'transparent', color:'rgba(255,255,255,0.65)',
+                  fontSize:13, fontWeight:400, marginBottom:2, textAlign:'left',
+                  transition:'all 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(245,158,11,0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background='transparent'}
+              >
+                <MessageSquare size={18} style={{ color:'rgba(255,255,255,0.65)' }}/>
+                {'LINEデバッグ'}
+                <span style={{ marginLeft:'auto', fontSize:9, opacity:0.6 }}>↗</span>
+              </button>
               <NavBtn path={NAV_TEST_PAT} label={'テスト患者管理'} icon={<Users size={18}/>}         activeColor={'rgba(245,158,11,0.2)'} />
             </>
           )}

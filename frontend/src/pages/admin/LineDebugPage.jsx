@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/LineDebugPage.jsx
 import { useState, useEffect, useRef } from 'react'
 import { useTestMode } from '../../context/TestModeContext'
-import { FlaskConical } from 'lucide-react'
+import { FlaskConical, ExternalLink, X } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -40,6 +40,7 @@ function ChatBubble({ message, isUser, onPostback }) {
       const header = bubble?.header?.contents?.[0]?.text
       const bgColor = bubble?.header?.backgroundColor || '#06C755'
       const bodyItems = bubble?.body?.contents || []
+      const footerItems = bubble?.footer?.contents || []
       return (
         <div style={{ maxWidth: 280, borderRadius: '2px 14px 14px 14px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
           {header && (
@@ -52,6 +53,14 @@ function ChatBubble({ message, isUser, onPostback }) {
               <div key={i} style={{ fontSize: 12, color: item.color || '#333', marginBottom: 4, whiteSpace: 'pre-wrap' }}>{item.text}</div>
             ))}
           </div>
+          {footerItems.filter(item => item.type === 'button').map((item, i) => (
+            <button key={i}
+              onClick={() => item.action?.type === 'postback' && onPostback?.(item.action.data, item.action.label)}
+              style={{ display: 'block', width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid #e5e7eb', background: '#fff', color: '#06C755', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}
+              onMouseEnter={e => e.target.style.background='#f0fdf4'} onMouseLeave={e => e.target.style.background='#fff'}>
+              {item.action?.label}
+            </button>
+          ))}
         </div>
       )
     }
@@ -67,7 +76,7 @@ function ChatBubble({ message, isUser, onPostback }) {
                   <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{col.text}</div>
                 </div>
                 {(col.actions || []).map((action, j) => (
-                  <button key={j} onClick={() => action.type === 'postback' && onPostback && onPostback(action.data, action.label)}
+                  <button key={j} onClick={() => action.type === 'postback' && onPostback?.(action.data, action.label)}
                     style={{ display: 'block', width: '100%', padding: '9px 12px', border: 'none', borderTop: j > 0 ? '1px solid #e5e7eb' : 'none', background: '#fff', color: '#06C755', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}
                     onMouseEnter={e => e.target.style.background='#f0fdf4'} onMouseLeave={e => e.target.style.background='#fff'}>
                     {action.label}
@@ -107,6 +116,10 @@ function ChatBubble({ message, isUser, onPostback }) {
 
 export default function LineDebugPage() {
   const { isTestMode } = useTestMode()
+
+  // フローティングウィンドウかどうかを検出
+  const isFloating = window.opener !== null || window.name === 'LineDebug'
+
   const [patients, setPatients]               = useState([])
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [messages, setMessages]               = useState([])
@@ -114,7 +127,9 @@ export default function LineDebugPage() {
   const [loading, setLoading]                 = useState(false)
   const [logs, setLogs]                       = useState([])
   const [productionMode, setProductionMode]   = useState(false)
-  const [deleteMsg, setDeleteMsg]             = useState('')
+  const [deleteMsg, setDeleteMsg]             = useState(''
+  const [showPatients, setShowPatients]       = useState(!isFloating)
+  const [showLogs, setShowLogs]               = useState(!isFloating)
   const chatEndRef = useRef(null)
 
   const QUICK = [
@@ -127,7 +142,9 @@ export default function LineDebugPage() {
   useEffect(() => {
     fetchPatients()
     setMessages([{ type: 'bot', message: { type: 'text', text: 'スマイル歯科クリニックへようこそ！\n\nご予約・変更・キャンセルはメニューからどうぞ。' } }])
-  }, [isTestMode]) // テストモード切替時に患者一覧を再取得
+    // ウィンドウタイトル設定
+    if (isFloating) document.title = '🦷 LINEデバッグ | スマイル歯科'
+  }, [isTestMode])
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -193,10 +210,149 @@ export default function LineDebugPage() {
     }
   }
 
+  // フローティングウィンドウ用のコンパクトレイアウト
+  if (isFloating) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f9fafb', fontFamily: '"Noto Sans JP",sans-serif', overflow: 'hidden' }}>
+        {/* ウィンドウヘッダー */}
+        <div style={{ background: '#1e3a5f', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14 }}>🦷</span>
+            <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>LINEデバッグ</span>
+            {isTestMode && (
+              <span style={{ background: 'rgba(245,158,11,0.3)', color: '#fbbf24', fontSize: 10, padding: '2px 7px', borderRadius: 10, fontWeight: 600 }}>🧪 テスト</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* カレンダーを開く */}
+            <button
+              onClick={() => { window.opener?.focus() || window.open('/calendar', '_blank') }}
+              style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <ExternalLink size={11} /> カレンダー
+            </button>
+            {/* 本番モードトグル */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: productionMode ? '#fbbf24' : 'rgba(255,255,255,0.5)', fontSize: 11 }}>
+                {productionMode ? '🔴 本番' : '⚪ シミュ'}
+              </span>
+              <button onClick={() => setProductionMode(!productionMode)}
+                style={{ position: 'relative', width: 32, height: 18, borderRadius: 9, border: 'none', background: productionMode ? '#f59e0b' : 'rgba(255,255,255,0.2)', cursor: 'pointer' }}>
+                <span style={{ position: 'absolute', top: 2, left: productionMode ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* テストユーザー選択（コンパクト） */}
+        <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '6px 10px', flexShrink: 0 }}>
+          <select
+            value={selectedPatient?.id || ''}
+            onChange={e => {
+              const p = patients.find(p => String(p.id) === e.target.value)
+              setSelectedPatient(p || null)
+            }}
+            style={{ width: '100%', padding: '5px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, color: '#374151' }}>
+            <option value="">未登録ユーザー（問診フロー用）</option>
+            {patients.map(p => (
+              <option key={p.id} value={p.id}>{p.name} / {p.line_user_id ? 'LINE連携' : '未連携'}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 本番モード警告 */}
+        {productionMode && (
+          <div style={{ background: '#fef3c7', borderBottom: '1px solid #f59e0b', padding: '5px 12px', fontSize: 11, color: '#92400e', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠️ 本番モードON — DBに保存されます</span>
+            <button onClick={deleteTestAppointments}
+              style={{ padding: '3px 8px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', fontSize: 10, cursor: 'pointer', color: '#92400e' }}>
+              テスト予約削除
+            </button>
+          </div>
+        )}
+        {deleteMsg && <div style={{ background: '#d1fae5', padding: '5px 12px', fontSize: 11, color: '#065f46', flexShrink: 0 }}>✅ {deleteMsg}</div>}
+
+        {/* LINEチャット */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ background: '#06C755', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#06C755', fontWeight: 700 }}>S</div>
+            <div>
+              <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>スマイル歯科</div>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10 }}>
+                {selectedPatient ? selectedPatient.name : '未登録ユーザー'}
+                {isTestMode && <span style={{ marginLeft: 5, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: 8, fontSize: 9 }}>🧪</span>}
+              </div>
+            </div>
+            <button onClick={clearChat} style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+              リセット
+            </button>
+          </div>
+
+          <div style={{ flex: 1, background: '#86CEAC', padding: 12, overflowY: 'auto', minHeight: 0 }}>
+            {messages.map((m, i) => (
+              m.type === 'user'
+                ? <ChatBubble key={i} message={m.message} isUser={true} />
+                : <ChatBubble key={i} message={m.message} isUser={false} onPostback={handlePostback} />
+            ))}
+            {loading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#06C755', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff' }}>S</div>
+                <div style={{ background: '#fff', borderRadius: '2px 12px 12px 12px', padding: '8px 12px', fontSize: 12, color: '#999', border: '1px solid #e5e7eb' }}>入力中...</div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* クイックボタン */}
+          <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb', padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
+            {QUICK.map(s => (
+              <button key={s.text} onClick={() => sendMessage(s.text)}
+                style={{ padding: '4px 12px', borderRadius: 16, border: '1px solid #06C755', background: '#fff', color: '#06C755', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 入力エリア */}
+          <div style={{ padding: '8px 10px', background: '#f9fafb', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8, flexShrink: 0 }}>
+            <input type="text" value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && inputText.trim() && sendMessage(inputText)}
+              placeholder="メッセージを入力..."
+              style={{ flex: 1, padding: '7px 12px', borderRadius: 18, border: '1px solid #e5e7eb', fontSize: 12, outline: 'none' }} />
+            <button onClick={() => inputText.trim() && sendMessage(inputText)} disabled={loading || !inputText.trim()}
+              style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: '#06C755', color: '#fff', cursor: 'pointer', fontSize: 14, opacity: loading || !inputText.trim() ? 0.5 : 1, flexShrink: 0 }}>↑</button>
+          </div>
+        </div>
+
+        {/* APIログ（折りたたみ） */}
+        <div style={{ background: '#111827', borderTop: '1px solid #374151', flexShrink: 0 }}>
+          <button onClick={() => setShowLogs(v => !v)}
+            style={{ width: '100%', padding: '5px 12px', background: 'transparent', border: 'none', color: '#9ca3af', fontSize: 11, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between' }}>
+            <span>APIログ {logs.length > 0 ? `(${logs.length})` : ''}</span>
+            <span>{showLogs ? '▼' : '▲'}</span>
+          </button>
+          {showLogs && (
+            <div style={{ padding: '6px 12px', maxHeight: 120, overflowY: 'auto' }}>
+              {logs.length === 0
+                ? <div style={{ color: '#6b7280', fontSize: 10 }}>送信するとログが表示されます</div>
+                : logs.map((log, i) => (
+                  <div key={i} style={{ marginBottom: 3, fontSize: 10, fontFamily: 'monospace' }}>
+                    <span style={{ color: '#6b7280' }}>[{log.timeStr}] </span>
+                    <span style={{ color: log.type === 'reply' ? '#34d399' : '#60a5fa' }}>{log.type === 'reply' ? 'REPLY' : 'PUSH'}</span>
+                    <span style={{ color: '#d1d5db' }}> {log.messages?.length}件</span>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // 通常レイアウト（管理画面内埋め込み）
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, padding: 24, height: 'calc(100vh - 48px)', boxSizing: 'border-box' }}>
-
-      {/* 左: LINEシミュレーター */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
@@ -204,13 +360,20 @@ export default function LineDebugPage() {
             <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>スーパー管理者専用 — 実際のLINE Bot動作をシミュレート</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* テストモードバッジ */}
             {isTestMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, background: '#fef3c7', border: '1px solid #f59e0b', fontSize: 11, color: '#92400e', fontWeight: 600 }}>
                 <FlaskConical size={12} />テストモード
               </div>
             )}
-            {/* 本番モードトグル */}
+            {/* フローティングウィンドウで開くボタン */}
+            <button
+              onClick={() => {
+                const w = window.open('/line-debug-window', 'LineDebug', 'width=560,height=900,left=100,top=50,resizable=yes')
+                w?.focus()
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px solid #2563eb', background: '#eff6ff', color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <ExternalLink size={13} /> 別ウィンドウで開く
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: productionMode ? '#FEF3C7' : '#F3F4F6', border: `1px solid ${productionMode ? '#F59E0B' : '#E5E7EB'}` }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: productionMode ? '#92400E' : '#6B7280' }}>
                 {productionMode ? '🔴 本番モード' : '⚪ シミュレーション'}
@@ -227,7 +390,6 @@ export default function LineDebugPage() {
           </div>
         </div>
 
-        {/* 本番モード警告 */}
         {productionMode && (
           <div style={{ background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <span>⚠️ 本番モードON — 予約確定するとDBに保存されます（source: line_debug）</span>
@@ -243,7 +405,6 @@ export default function LineDebugPage() {
           </div>
         )}
 
-        {/* LINEチャット */}
         <div style={{ flex: 1, background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ background: '#06C755', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: '#06C755', fontWeight: 700 }}>S</div>
@@ -290,7 +451,6 @@ export default function LineDebugPage() {
         </div>
       </div>
 
-      {/* 右: コントロールパネル */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>

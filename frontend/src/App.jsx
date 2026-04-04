@@ -33,6 +33,15 @@ function SuperAdminGuard({ children }) {
   return children
 }
 
+// ── LINEデバッグウィンドウ（独立ページ） ─────────────────
+function LineDebugWindow() {
+  return (
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#f9fafb', fontFamily: '"Noto Sans JP", sans-serif' }}>
+      <LineDebugPage />
+    </div>
+  )
+}
+
 function App() {
   const [adminLoggedIn, setAdminLoggedIn] = useState(
     !!(localStorage.getItem('admin_token') &&
@@ -68,6 +77,11 @@ function App() {
             <Sidebar />
             <main className="flex-1 overflow-auto"><StaffPage /></main>
           </div>
+        } />
+
+        {/* ── LINEデバッグ独立ウィンドウ（認証不要・別ウィンドウ用） ── */}
+        <Route path="/line-debug-window" element={
+          <SuperAdminGuard><LineDebugWindow /></SuperAdminGuard>
         } />
 
         {/* ── 管理者ログイン ── */}
