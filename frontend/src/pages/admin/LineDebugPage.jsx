@@ -451,6 +451,8 @@ export default function LineDebugPage() {
 
       {/* 右: コントロールパネル */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+
+        {/* テストユーザー選択 */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937' }}>テストユーザー</div>
@@ -460,7 +462,7 @@ export default function LineDebugPage() {
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
             <div onClick={() => setSelectedPatient(null)}
               style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, border: `1px solid ${!selectedPatient ? '#06C755' : '#e5e7eb'}`, background: !selectedPatient ? '#f0fdf4' : '#f9fafb', color: !selectedPatient ? '#065f46' : '#374151' }}>
               未登録ユーザー（問診フロー用）
@@ -477,21 +479,239 @@ export default function LineDebugPage() {
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937', marginBottom: 10 }}>APIログ</div>
-          <div style={{ background: '#111827', borderRadius: 8, padding: 10, minHeight: 120, maxHeight: 300, overflowY: 'auto' }}>
-            {logs.length === 0
-              ? <div style={{ color: '#6b7280', fontSize: 11 }}>メッセージを送信するとログが表示されます</div>
-              : logs.map((log, i) => (
-                <div key={i} style={{ marginBottom: 4, fontSize: 11, fontFamily: 'monospace' }}>
-                  <span style={{ color: '#6b7280' }}>[{log.timeStr}] </span>
-                  <span style={{ color: log.type === 'reply' ? '#34d399' : '#60a5fa' }}>{log.type === 'reply' ? 'REPLY' : 'PUSH'}</span>
-                  <span style={{ color: '#d1d5db' }}> {log.messages?.length}件</span>
-                </div>
-              ))
-            }
+        {/* タブ式ツールパネル */}
+        <RightToolPanel
+          patients={patients}
+          selectedPatient={selectedPatient}
+          logs={logs}
+          onPostback={handlePostback}
+          sendMessage={sendMessage}
+          API={API}
+          authHeader={authHeader}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
+// 右パネル：リッチメニュー・リマインダー・本番送信・ログ
+// ─────────────────────────────────────────────────────────
+function RightToolPanel({ patients, selectedPatient, logs, onPostback, sendMessage, API, authHeader }) {
+  const [activeTab, setActiveTab] = useState('richmenu')
+  const [reminderType, setReminderType] = useState('appointment')
+  const [reminderPatientId, setReminderPatientId] = useState('')
+  const [reminderSending, setReminderSending] = useState(false)
+  const [reminderResult, setReminderResult] = useState(null)
+  const [pushMsg, setPushMsg] = useState('こんにちは！スマイル歯科からのお知らせです。')
+  const [pushPatientId, setPushPatientId] = useState('')
+  const [pushSending, setPushSending] = useState(false)
+  const [pushResult, setPushResult] = useState(null)
+
+  const TABS = [
+    { id: 'richmenu',  label: '📋 メニュー' },
+    { id: 'reminder',  label: '⏰ リマインダー' },
+    { id: 'push',      label: '📱 本番送信' },
+    { id: 'logs',      label: '📄 ログ' },
+  ]
+
+  // リッチメニューのボタン定義
+  const RICH_MENU = [
+    { label: '📅 予約する',    text: '予約する',  color: '#06C755' },
+    { label: '📋 予約確認',    text: '予約確認',  color: '#2563eb' },
+    { label: '❌ キャンセル',  text: 'キャンセル', color: '#dc2626' },
+    { label: '📞 電話する',    url: 'tel:0312345678', color: '#7c3aed' },
+    { label: '🏥 医院情報',    text: '医院情報',  color: '#059669' },
+    { label: '❓ ヘルプ',      text: 'ヘルプ',    color: '#d97706' },
+  ]
+
+  const REMINDER_TYPES = [
+    { value: 'appointment', label: '📅 予約リマインダー（前日）' },
+    { value: 'same_day',    label: '📅 当日リマインダー' },
+    { value: 'recall',      label: '🔄 定期検診リマインド' },
+    { value: 'birthday',    label: '🎂 誕生日メッセージ' },
+    { value: 'followup_same_day', label: '💌 治療後フォロー（当日）' },
+    { value: 'followup_day3',     label: '💌 治療後フォロー（3日後）' },
+    { value: 'churn',       label: '⚠️ 離脱防止フォロー' },
+  ]
+
+  async function sendReminderNow() {
+    if (!reminderPatientId) return
+    setReminderSending(true)
+    setReminderResult(null)
+    try {
+      const res = await fetch(`${API}/api/line-debug/send-reminder`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ type: reminderType, patientId: reminderPatientId }),
+      })
+      const data = await res.json()
+      setReminderResult(data.success ? { ok: true, msg: '送信しました ✅' } : { ok: false, msg: data.error || '失敗' })
+    } catch (e) {
+      setReminderResult({ ok: false, msg: e.message })
+    }
+    setReminderSending(false)
+  }
+
+  async function sendPushNow() {
+    if (!pushPatientId || !pushMsg.trim()) return
+    setPushSending(true)
+    setPushResult(null)
+    try {
+      const res = await fetch(`${API}/api/line-debug/push-test`, {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ patientId: pushPatientId, message: pushMsg }),
+      })
+      const data = await res.json()
+      setPushResult(data.success ? { ok: true, msg: '実際のLINEに送信しました ✅' } : { ok: false, msg: data.error || '失敗' })
+    } catch (e) {
+      setPushResult({ ok: false, msg: e.message })
+    }
+    setPushSending(false)
+  }
+
+  const linePatients = patients.filter(p => p.line_user_id)
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* タブ */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            style={{
+              flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer',
+              background: activeTab === t.id ? '#fff' : 'transparent',
+              color: activeTab === t.id ? '#2563eb' : '#6b7280',
+              borderBottom: activeTab === t.id ? '2px solid #2563eb' : '2px solid transparent',
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+
+        {/* ── リッチメニュータブ ── */}
+        {activeTab === 'richmenu' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 10 }}>リッチメニュー（クリックで動作テスト）</div>
+            <div style={{ background: '#f3f4f6', borderRadius: 10, padding: 8, marginBottom: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                {RICH_MENU.map((btn, i) => (
+                  <button key={i}
+                    onClick={() => btn.text && sendMessage(btn.text)}
+                    style={{
+                      padding: '14px 6px', borderRadius: 8, border: 'none',
+                      background: btn.color, color: '#fff',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      lineHeight: 1.3, textAlign: 'center',
+                    }}>
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: '#9ca3af', background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}>
+              💡 実際のLINEアプリのリッチメニューと同じボタン構成です。クリックするとチャットにメッセージが送信されます。
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ── リマインダー送信タブ ── */}
+        {activeTab === 'reminder' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 12 }}>リマインダーを今すぐ送信</div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>送信種別</label>
+              <select value={reminderType} onChange={e => setReminderType(e.target.value)}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 11 }}>
+                {REMINDER_TYPES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                送信先患者 <span style={{ color: '#9ca3af' }}>（LINE連携済みのみ）</span>
+              </label>
+              <select value={reminderPatientId} onChange={e => setReminderPatientId(e.target.value)}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 11 }}>
+                <option value="">患者を選択...</option>
+                {linePatients.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <button onClick={sendReminderNow} disabled={reminderSending || !reminderPatientId}
+              style={{ width: '100%', padding: '9px', borderRadius: 8, border: 'none', background: reminderSending || !reminderPatientId ? '#93c5fd' : '#2563eb', color: '#fff', fontSize: 12, fontWeight: 600, cursor: reminderPatientId ? 'pointer' : 'not-allowed' }}>
+              {reminderSending ? '送信中...' : '⏰ 今すぐ送信（シミュレーション）'}
+            </button>
+            {reminderResult && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: reminderResult.ok ? '#f0fdf4' : '#fef2f2', color: reminderResult.ok ? '#065f46' : '#dc2626', fontSize: 11, fontWeight: 600 }}>
+                {reminderResult.msg}
+              </div>
+            )}
+            <div style={{ marginTop: 10, fontSize: 10, color: '#9ca3af', background: '#f9fafb', borderRadius: 6, padding: '6px 8px' }}>
+              💡 チャット画面にメッセージが表示されます。実際のLINEには届きません（シミュレーション）。本番送信は「📱 本番送信」タブから。
+            </div>
+          </div>
+        )}
+
+        {/* ── 本番送信テストタブ ── */}
+        {activeTab === 'push' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 4 }}>実際のLINEに送信テスト</div>
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 10px', fontSize: 11, color: '#92400e', marginBottom: 12 }}>
+              ⚠️ 実際のスマートフォンにLINEが届きます
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                送信先 <span style={{ color: '#9ca3af' }}>（LINE連携済みのみ）</span>
+              </label>
+              <select value={pushPatientId} onChange={e => setPushPatientId(e.target.value)}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 11 }}>
+                <option value="">患者を選択...</option>
+                {linePatients.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} {p.line_user_id ? '🟢' : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>メッセージ</label>
+              <textarea value={pushMsg} onChange={e => setPushMsg(e.target.value)} rows={4}
+                style={{ width: '100%', padding: '7px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 11, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            </div>
+            <button onClick={sendPushNow} disabled={pushSending || !pushPatientId || !pushMsg.trim()}
+              style={{ width: '100%', padding: '9px', borderRadius: 8, border: 'none', background: pushSending || !pushPatientId ? '#fca5a5' : '#dc2626', color: '#fff', fontSize: 12, fontWeight: 600, cursor: pushPatientId ? 'pointer' : 'not-allowed' }}>
+              {pushSending ? '送信中...' : '📱 実際のLINEに送信する'}
+            </button>
+            {pushResult && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: pushResult.ok ? '#f0fdf4' : '#fef2f2', color: pushResult.ok ? '#065f46' : '#dc2626', fontSize: 11, fontWeight: 600 }}>
+                {pushResult.msg}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ログタブ ── */}
+        {activeTab === 'logs' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 10 }}>APIログ</div>
+            <div style={{ background: '#111827', borderRadius: 8, padding: 10, minHeight: 200, maxHeight: 400, overflowY: 'auto' }}>
+              {logs.length === 0
+                ? <div style={{ color: '#6b7280', fontSize: 11 }}>メッセージを送信するとログが表示されます</div>
+                : logs.map((log, i) => (
+                  <div key={i} style={{ marginBottom: 4, fontSize: 11, fontFamily: 'monospace' }}>
+                    <span style={{ color: '#6b7280' }}>[{log.timeStr}] </span>
+                    <span style={{ color: log.type === 'reply' ? '#34d399' : '#60a5fa' }}>{log.type === 'reply' ? 'REPLY' : 'PUSH'}</span>
+                    <span style={{ color: '#d1d5db' }}> {log.messages?.length}件</span>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
