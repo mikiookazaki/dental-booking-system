@@ -3,7 +3,7 @@ import { useState } from 'react'
 import axios from '../../api'
 
 export default function AdminLogin({ onLogin }) {
-  const [mode, setMode]         = useState('admin') // 'admin' | 'staff'
+  const [mode, setMode]         = useState('staff') // 'staff' | 'admin'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -58,12 +58,12 @@ export default function AdminLogin({ onLogin }) {
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>管理システム</div>
         </div>
 
-        {/* モード切替 */}
+        {/* モード切替（スタッフが左・デフォルト） */}
         <div style={{
           display: 'flex', borderRadius: 10, overflow: 'hidden',
           border: '1px solid #e5e7eb', marginBottom: 20,
         }}>
-          {[['admin','🔐 管理者'],['staff','👨‍⚕️ スタッフ']].map(([v, label]) => (
+          {[['staff','👨‍⚕️ スタッフ'],['admin','🔐 管理者']].map(([v, label]) => (
             <button key={v} type="button" onClick={() => { setMode(v); setError('') }}
               style={{
                 flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600,
