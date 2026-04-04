@@ -115,7 +115,6 @@ async function handleEvent(event) {
       if (session && action?.startsWith('inq_')) { await handleInquiryPostback(replyToken, lineUserId, session, action, data); break; }
       switch (action) {
         case 'existing_patient':
-          // 以前来院あり → QRコード連携案内
           await replyMessage(replyToken, [{ type: 'text', text: '受付で診察券番号をご確認の上、QRコードを発行してもらってください。\n\nQRコードを読み取ると自動でLINE連携されます。' }]);
           break;
         case 'start_inquiry':      await startInquiryFlow(replyToken, lineUserId); break;
@@ -155,7 +154,6 @@ async function clearSession(lineUserId) {
 // ============================================================
 async function startBookingOrInquiry(replyToken, lineUserId, patient, _reply = replyMessage) {
   if (patient) {
-    // LINE連携済みの患者は直接予約フローへ
     await startBookingFlow(replyToken, patient, _reply);
   } else {
     await _reply(replyToken, [{ type: 'template', altText: '初めてのご来院ですか？', template: { type: 'confirm', text: 'スマイル歯科クリニックへようこそ！\n\n初めてのご来院ですか？', actions: [
@@ -244,7 +242,6 @@ async function showConfirm(replyToken, lineUserId, d) {
 
 async function registerNewPatient(replyToken, lineUserId, d) {
   try {
-    // 既にこのLINEIDで登録済みか確認
     const existing = await getPatientByLineId(lineUserId);
     if (existing) {
       await clearSession(lineUserId);
@@ -253,37 +250,16 @@ async function registerNewPatient(replyToken, lineUserId, d) {
       await startBookingFlow(replyToken, existing);
       return;
     }
-
-    // patient_code を自動生成
-    const { data: lastPatient } = await supabase
-      .from('patients')
-      .select('patient_code')
-      .order('id', { ascending: false })
-      .limit(1)
-      .single();
-    const lastNum = lastPatient?.patient_code
-      ? parseInt(lastPatient.patient_code.replace('P-', '')) + 1
-      : 1;
+    const { data: lastPatient } = await supabase.from('patients').select('patient_code').order('id', { ascending: false }).limit(1).single();
+    const lastNum = lastPatient?.patient_code ? parseInt(lastPatient.patient_code.replace('P-', '')) + 1 : 1;
     const patient_code = `P-${String(lastNum).padStart(5, '0')}`;
-
-    const { data: patient, error } = await supabase
-      .from('patients')
-      .insert({
-        name:            d.name,
-        name_kana:       d.name_kana,
-        phone:           d.phone,
-        age_group:       d.age_group       || null,
-        postal_code:     d.postal_code     || null,
-        referral_source: d.referral_source || null,
-        notes:           d.memo            || null,
-        line_user_id:    lineUserId,
-        line_linked_at:  new Date().toISOString(),
-        is_active:       true,
-        patient_code,
-      })
-      .select()
-      .single();
-
+    const { data: patient, error } = await supabase.from('patients').insert({
+      name: d.name, name_kana: d.name_kana, phone: d.phone,
+      age_group: d.age_group || null, postal_code: d.postal_code || null,
+      referral_source: d.referral_source || null, notes: d.memo || null,
+      line_user_id: lineUserId, line_linked_at: new Date().toISOString(),
+      is_active: true, patient_code,
+    }).select().single();
     if (error) throw error;
     await clearSession(lineUserId);
     await showRichMenu(lineUserId);
@@ -515,7 +491,7 @@ async function handleEventDebug(event, mockReply, mockPush) {
                 start_time: time, end_time: endTime,
                 status: 'confirmed', source: 'line_debug',
                 patient_name: patient.name, patient_phone: patient.phone,
-                is_test: patient.is_test || false,  // ← 追加
+                is_test: patient.is_test || false,
               });
               if (insertError) throw insertError;
               await mockReply(replyToken, [{ type: 'text', text: `${patient.name} 様\n\nご予約を承りました！\n\n📅 ${formatDateJP(date)}\n🕐 ${time}〜${endTime}\n🦷 ${t?.name}\n👨‍⚕️ 担当: ${availableStaff.name}\n\n※テスト予約です（削除可能）` }]);
@@ -528,10 +504,71 @@ async function handleEventDebug(event, mockReply, mockPush) {
           }
           break;
         }
+
+        // ── キャンセル（実際にDBを更新） ──────────────────────
+        case 'cancel_select':
         case 'cancel_appointment': {
-          await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] キャンセルシミュレーション\n予約ID: ${data.get('appointment_id')}\n\n※実際のキャンセルは行われません` }]);
+          const appointmentId = data.get('appointment_id');
+          if (!appointmentId) {
+            // appointment_idなし → 予約一覧を表示
+            if (patient) {
+              const today = new Date().toISOString().split('T')[0];
+              const { data: appts } = await supabase
+                .from('appointments')
+                .select('id, appointment_date, start_time, treatments(name)')
+                .eq('patient_id', patient.id)
+                .eq('status', 'confirmed')
+                .gte('appointment_date', today)
+                .order('appointment_date')
+                .limit(3);
+              if (!appts?.length) {
+                await mockReply(replyToken, [{ type: 'text', text: 'キャンセルできる予約がありません。' }]);
+              } else {
+                await mockReply(replyToken, [{
+                  type: 'template', altText: 'キャンセルする予約を選択',
+                  template: {
+                    type: 'buttons', text: 'キャンセルする予約を選択してください',
+                    actions: appts.map(a => ({
+                      type: 'postback',
+                      label: `${formatDateJP(a.appointment_date)} ${a.start_time?.substring(0,5)}`,
+                      data: `action=cancel_appointment&appointment_id=${a.id}&ts=${Date.now()}`
+                    }))
+                  }
+                }]);
+              }
+            } else {
+              await mockReply(replyToken, [{ type: 'text', text: '患者情報が見つかりません。' }]);
+            }
+            break;
+          }
+          // appointment_idあり → 実際にキャンセル
+          try {
+            const { data: appt } = await supabase
+              .from('appointments')
+              .select('id, appointment_date, start_time, treatments(name)')
+              .eq('id', appointmentId)
+              .single();
+            if (!appt) { await mockReply(replyToken, [{ type: 'text', text: '予約が見つかりません。' }]); break; }
+            await supabase
+              .from('appointments')
+              .update({ status: 'cancelled', cancelled_by: 'patient', cancel_reason: 'LINEデバッグからキャンセル', updated_at: new Date().toISOString() })
+              .eq('id', appointmentId);
+            await mockReply(replyToken, [{
+              type: 'text',
+              text: `予約をキャンセルしました。\n\n📅 ${formatDateJP(appt.appointment_date)} ${appt.start_time?.substring(0,5)}\n🦷 ${appt.treatments?.name}\n\nまたのご来院をお待ちしております。`
+            }]);
+          } catch (err) {
+            await mockReply(replyToken, [{ type: 'text', text: `キャンセルに失敗しました: ${err.message}` }]);
+          }
           break;
         }
+
+        // ── やり直す → 治療メニューに戻る ──────────────────────
+        case 'restart': {
+          await startBookingOrInquiry(replyToken, lineUserId, patient, mockReply);
+          break;
+        }
+
         default:
           await mockReply(replyToken, [{ type: 'text', text: `[デバッグ] postback: ${action || '不明'}` }]);
       }
