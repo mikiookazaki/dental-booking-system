@@ -73,7 +73,7 @@ const DOW = ['日','月','火','水','木','金','土']
 // スーパー管理者専用セクション（テストモード + LINEデバッグ）
 // =============================================
 function SuperAdminSection() {
-  const { testMode, setTestMode } = useTestMode()
+  const { isTestMode, toggleTestMode } = useTestMode()
   const location = useLocation()
 
   return (
@@ -90,15 +90,15 @@ function SuperAdminSection() {
             <span className="text-xs font-medium text-orange-700">テストモード</span>
           </div>
           <button
-            onClick={() => setTestMode(!testMode)}
+            onClick={toggleTestMode}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none
-              ${testMode ? 'bg-orange-500' : 'bg-gray-300'}`}
+              ${isTestMode ? 'bg-orange-500' : 'bg-gray-300'}`}
           >
             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform
-              ${testMode ? 'translate-x-4' : 'translate-x-1'}`} />
+              ${isTestMode ? 'translate-x-4' : 'translate-x-1'}`} />
           </button>
         </div>
-        {testMode && (
+        {isTestMode && (
           <p className="text-xs text-orange-600 mt-1">テストデータ表示中</p>
         )}
       </div>
@@ -194,12 +194,8 @@ export default function Sidebar() {
   }
 
   function handleDayClick(dateStr) {
-    // 現在のviewTypeを保持しつつカレンダーページへ遷移
-    // 週表示中なら週表示を維持、それ以外は日表示
-    const currentPath = window.location.pathname
     const currentParams = new URLSearchParams(window.location.search)
     const currentView = currentParams.get('view') || 'day'
-    // 週表示中（week or week5）なら週表示を維持
     const nextView = (currentView === 'week' || currentView === 'week5') ? currentView : 'day'
     window.location.href = `/calendar?date=${dateStr}&view=${nextView}`
   }
@@ -208,9 +204,8 @@ export default function Sidebar() {
   const daysInMonth = new Date(year, month, 0).getDate()
   const firstDow    = new Date(year, month - 1, 1).getDay()
   const todayStr    = today.toISOString().split('T')[0]
-  const holidays    = getHolidays(year)  // 【2】祝日マップ
+  const holidays    = getHolidays(year)
 
-  // 現在の週表示中かどうかと、選択中の週の日付範囲を取得
   const currentParams = new URLSearchParams(window.location.search)
   const currentView   = currentParams.get('view') || 'day'
   const currentDate   = currentParams.get('date') || todayStr
