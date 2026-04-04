@@ -53,18 +53,4 @@ router.post('/setup', async (req, res) => {
   }
 });
 
-// 一時的なrole変更エンドポイント（使用後は削除）
-router.post('/set-role', async (req, res) => {
-  const { username, role, secret } = req.body;
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  try {
-    await db.query('UPDATE admin_users SET role=$1 WHERE username=$2', [role, username]);
-    res.json({ message: 'ロールを変更しました' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 module.exports = router;
