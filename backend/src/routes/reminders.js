@@ -729,32 +729,16 @@ router.post('/run-test', async (req, res, next) => {
 // 送信履歴取得
 router.get('/logs', async (req, res, next) => {
   try {
-    const limit  = Math.min(Number(req.query.limit) || 50, 200);
-    const isTest = req.isTestMode;
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
 
-    const { data: testPatientIds } = await supabase
-      .from('patients')
-      .select('id')
-      .eq('is_test', isTest)
-      .eq('is_active', true);
-
-    const ids = (testPatientIds || []).map(p => p.id);
-
-    let query = supabase
+    const { data, error } = await supabase
       .from('reminder_logs')
       .select('*, patients(name, is_test)')
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (ids.length > 0) {
-      query = query.in('patient_id', ids);
-    } else {
-      return res.json([]);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
-    res.json(data);
+    res.json(data || []);
   } catch (err) { next(err); }
 });
 
