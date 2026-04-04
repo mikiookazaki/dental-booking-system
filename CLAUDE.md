@@ -137,10 +137,12 @@ BACKEND_URL=http://localhost:3001
 
 ## ログイン情報
 
-| ロール | ID | パスワード |
-|--------|-----|-----------|
-| superadmin | admin | smile2026 |
-| staff | staff | dental2026 |
+| ユーザー名 | パスワード | ロール | できること |
+|-----------|-----------|--------|-----------|
+| superadmin | smile2026 | superadmin | 全機能（LINEデバッグ・テスト系含む） |
+| admin | smile2026 | admin | ダッシュボード・設定（テスト系非表示） |
+| kanri | smile2026 | admin | ダッシュボード・設定（テスト系非表示） |
+| staff | dental2026 | staff | カレンダー・患者管理 |
 
 ## LINE Integration
 
